@@ -7,25 +7,26 @@ import { Kbd } from "@/components/ui/kbd";
 import { usePaletteItems, type PaletteItem } from "@/features/palette/usePaletteItems";
 import { cn } from "@/lib/utils";
 import { useUiStore, type PaletteMode } from "@/stores/ui-store";
-import { useActiveWorkspace } from "@/stores/workspace-store";
 
 const placeholders: Record<PaletteMode, string> = {
   all: "Search sessions, open tabs, files…   (type > for actions)",
   files: "Go to file…",
   commands: "Run an action…",
+  chats: "Search inside every conversation…",
 };
 
 const PaletteList = ({ mode, onClose }: { mode: PaletteMode; onClose: () => void }) => {
   const [query, setQuery] = useState(mode === "commands" ? ">" : "");
   const [selected, setSelected] = useState(0);
-  const { items, loadingFiles } = usePaletteItems(mode, query);
+  const { items, loading, emptyHint } = usePaletteItems(mode, query);
   const listRef = useRef<HTMLDivElement>(null);
-  const workspace = useActiveWorkspace();
 
   useEffect(() => setSelected(0), [query]);
 
   useEffect(() => {
-    listRef.current?.querySelector(`[data-index="${selected}"]`)?.scrollIntoView({ block: "nearest" });
+    listRef.current
+      ?.querySelector(`[data-index="${selected}"]`)
+      ?.scrollIntoView({ block: "nearest" });
   }, [selected]);
 
   const run = (item: PaletteItem | undefined) => {
@@ -56,13 +57,11 @@ const PaletteList = ({ mode, onClose }: { mode: PaletteMode; onClose: () => void
           placeholder={placeholders[mode]}
           className="h-full flex-1 bg-transparent text-[14px] text-fg outline-none placeholder:text-faint"
         />
-        {loadingFiles && <Spinner className="size-3.5" />}
+        {loading && <Spinner className="size-3.5" />}
       </div>
       <div ref={listRef} className="max-h-[min(460px,60vh)] overflow-y-auto p-1.5">
         {items.length === 0 ? (
-          <p className="px-3 py-8 text-center text-xs text-faint">
-            {mode === "files" && !workspace ? "Open a session to search its files." : "Nothing matches."}
-          </p>
+          <p className="px-3 py-8 text-center text-xs text-faint">{emptyHint}</p>
         ) : (
           items.map((item, index) => (
             <div key={item.id}>
@@ -82,8 +81,24 @@ const PaletteList = ({ mode, onClose }: { mode: PaletteMode; onClose: () => void
                 )}
               >
                 {item.icon}
-                <span className="shrink-0 truncate text-[13px] text-fg">{item.title}</span>
-                {item.subtitle && <span className="min-w-0 flex-1 truncate text-[11.5px] text-faint">{item.subtitle}</span>}
+                <span
+                  className={cn(
+                    "truncate text-[13px] text-fg",
+                    mode === "chats" ? "min-w-0 flex-1" : "shrink-0",
+                  )}
+                >
+                  {item.title}
+                </span>
+                {item.subtitle && (
+                  <span
+                    className={cn(
+                      "truncate text-[11.5px] text-faint",
+                      mode === "chats" ? "max-w-[40%] shrink-0" : "min-w-0 flex-1",
+                    )}
+                  >
+                    {item.subtitle}
+                  </span>
+                )}
                 {!item.subtitle && <span className="flex-1" />}
                 {item.hint && <Kbd keys={item.hint} />}
               </button>
@@ -109,14 +124,31 @@ const PaletteList = ({ mode, onClose }: { mode: PaletteMode; onClose: () => void
 export const CommandPalette = () => {
   const mode = useUiStore((s) => s.paletteMode);
   const closePalette = useUiStore((s) => s.closePalette);
+  const previousFocus = useRef<HTMLElement | null>(null);
 
   return (
     <DialogPrimitive.Root open={!!mode} onOpenChange={(open) => !open && closePalette()}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="animate-fade-in fixed inset-0 z-40 bg-black/40" />
-        <DialogPrimitive.Content className="animate-pop-in fixed top-[11%] left-1/2 z-50 w-[min(680px,calc(100vw-48px))] -translate-x-1/2 overflow-hidden rounded-xl border border-border-strong bg-panel shadow-2xl shadow-black/60 outline-none">
+        <DialogPrimitive.Content
+          onOpenAutoFocus={() => {
+            previousFocus.current =
+              document.activeElement instanceof HTMLElement ? document.activeElement : null;
+          }}
+          onCloseAutoFocus={(event) => {
+            const target = previousFocus.current;
+            previousFocus.current = null;
+            if (target?.isConnected) {
+              event.preventDefault();
+              target.focus({ preventScroll: true });
+            }
+          }}
+          className="animate-pop-in fixed top-[11%] left-1/2 z-50 w-[min(680px,calc(100vw-48px))] -translate-x-1/2 overflow-hidden rounded-xl border border-border-strong bg-panel shadow-2xl shadow-black/60 outline-none"
+        >
           <DialogPrimitive.Title className="sr-only">Command palette</DialogPrimitive.Title>
-          <DialogPrimitive.Description className="sr-only">Search sessions, files and actions</DialogPrimitive.Description>
+          <DialogPrimitive.Description className="sr-only">
+            Search sessions, files and actions
+          </DialogPrimitive.Description>
           {mode && <PaletteList key={mode} mode={mode} onClose={closePalette} />}
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>

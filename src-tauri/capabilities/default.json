@@ -2,7 +2,9 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Main window capabilities",
-  "windows": ["main"],
+  "windows": [
+    "main"
+  ],
   "permissions": [
     "core:default",
     "core:window:allow-minimize",
@@ -17,7 +19,74 @@
     "notification:default",
     "core:window:allow-request-user-attention",
     "opener:allow-reveal-item-in-dir",
-    { "identifier": "opener:allow-open-path", "allow": [{ "path": "**" }] },
-    { "identifier": "opener:allow-open-url", "allow": [{ "url": "https://*" }, { "url": "http://*" }] }
+    {
+      "identifier": "opener:allow-open-path",
+      "allow": [
+        {
+          "path": "**"
+        }
+      ],
+      "deny": [
+        {
+          "path": "**/*.exe"
+        },
+        {
+          "path": "**/*.bat"
+        },
+        {
+          "path": "**/*.cmd"
+        },
+        {
+          "path": "**/*.ps1"
+        },
+        {
+          "path": "**/*.psm1"
+        },
+        {
+          "path": "**/*.vbs"
+        },
+        {
+          "path": "**/*.js"
+        },
+        {
+          "path": "**/*.jse"
+        },
+        {
+          "path": "**/*.wsf"
+        },
+        {
+          "path": "**/*.msi"
+        },
+        {
+          "path": "**/*.com"
+        },
+        {
+          "path": "**/*.scr"
+        },
+        {
+          "path": "**/*.lnk"
+        },
+        {
+          "path": "**/*.reg"
+        },
+        {
+          "path": "**/*.hta"
+        },
+        {
+          "path": "**/*.cpl"
+        }
+      ]
+    },
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [
+        {
+          "url": "https://*"
+        },
+        {
+          "url": "http://*"
+        }
+      ]
+    }
   ]
 }

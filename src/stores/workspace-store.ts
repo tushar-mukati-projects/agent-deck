@@ -2,46 +2,44 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
 import {
+  claudeSpec,
+  defaultShellProgram,
+  planLaunch,
+  shellSpec,
+  type LaunchOptions,
+} from "@/lib/claude/launch";
+import {
   disposeTerminal,
   hasTerminal,
   isPtyRunning,
+  requestFocus,
   restartTerminal,
   startTerminal,
-  type TerminalSpec,
 } from "@/lib/terminal/registry";
-import { basename, newId, samePath } from "@/lib/utils";
-import { parseWslPath, shellQuote } from "@/lib/wsl";
-import { parseArgs, useSettingsStore } from "@/stores/settings-store";
-import { useSessionsStore } from "@/stores/sessions-store";
-import type { SessionInfo, Workspace } from "@/types";
+import { newId, samePath } from "@/lib/utils";
+import { parseWslPath } from "@/lib/wsl";
+import { blankWorkspace, workspaceFromSession } from "@/stores/workspace-factory";
+import type { SessionInfo, ShellTab, Workspace } from "@/types";
 
-export interface ShellTab {
-  id: string;
-  cwd: string;
-  program: string;
-}
-
-export interface WorkspaceRecord extends Workspace {
-  claudeArgs: string[];
-  shells: ShellTab[];
-}
-
-interface ResumeOptions {
-  fork?: boolean;
+export interface ShellOptions {
+  cwd?: string;
+  label?: string;
+  command?: string;
 }
 
 interface WorkspaceState {
-  workspaces: WorkspaceRecord[];
+  workspaces: Workspace[];
   activeId: string | null;
-  openSession: (session: SessionInfo, options?: { resume?: boolean }) => void;
-  resume: (workspaceId: string, options?: ResumeOptions) => void;
-  newSession: (cwd: string) => void;
+  recentlyClosed: string[];
+  openSession: (session: SessionInfo) => string;
+  launch: (workspaceId: string, options?: LaunchOptions) => string | null;
+  newSession: (cwd: string, options?: LaunchOptions) => string;
   restartClaude: (workspaceId: string) => void;
   close: (workspaceId: string) => Promise<void>;
   activate: (workspaceId: string) => void;
   cycle: (direction: 1 | -1) => void;
   reorder: (fromId: string, toId: string) => void;
-  openShell: (workspaceId: string, cwd?: string) => void;
+  openShell: (workspaceId: string, options?: ShellOptions) => void;
   closeShell: (workspaceId: string, shellId: string) => void;
   setActiveShell: (workspaceId: string, shellId: string) => void;
   setShellPanel: (workspaceId: string, open: boolean) => void;
@@ -52,168 +50,91 @@ interface WorkspaceState {
   restore: () => void;
 }
 
-const claudeArgs = () => parseArgs(useSettingsStore.getState().claudeArgs);
+const RECENTLY_CLOSED_LIMIT = 20;
 
-const shellProgram = () => {
-  const override = useSettingsStore.getState().shellProgram.trim();
-  return override || useSessionsStore.getState().environment?.shell || "powershell.exe";
+const withClaude = (workspace: Workspace, args: string[]) => {
+  const next = { ...workspace, mode: "live" as const, claudeTerminalId: newId(), claudeArgs: args };
+  startTerminal(claudeSpec(next), { focus: true });
+  return next;
 };
-
-const windowsHome = () => useSessionsStore.getState().environment?.home ?? "C:\\";
-
-const wslLaunch = (hostCwd: string, command: string[] | null) => {
-  const location = parseWslPath(hostCwd);
-  if (!location) return null;
-  const base = ["-d", location.distro, "--cd", location.linuxPath];
-  if (!command) return { cwd: windowsHome(), program: "wsl.exe", args: base };
-  const loginShell = useSessionsStore.getState().wslShells[location.distro] ?? "/bin/bash";
-  const script = `exec ${command.map(shellQuote).join(" ")}`;
-  return { cwd: windowsHome(), program: "wsl.exe", args: [...base, "-e", loginShell, "-lic", script] };
-};
-
-const claudeSpec = (workspace: WorkspaceRecord): TerminalSpec => ({
-  id: workspace.claudeTerminalId ?? workspace.id,
-  kind: "claude",
-  workspaceId: workspace.id,
-  ...(wslLaunch(workspace.cwd, ["claude", ...workspace.claudeArgs]) ?? {
-    cwd: workspace.cwd,
-    program: "claude",
-    args: workspace.claudeArgs,
-  }),
-});
-
-const shellSpec = (workspaceId: string, shell: ShellTab): TerminalSpec => ({
-  id: shell.id,
-  kind: "shell",
-  workspaceId,
-  ...(wslLaunch(shell.cwd, null) ?? { cwd: shell.cwd, program: shell.program, args: [] }),
-});
-
-const sessionExists = (sessionId: string) => !!useSessionsStore.getState().byId[sessionId];
-
-const resumeArgs = (sessionId: string, fork: boolean) => {
-  if (!sessionExists(sessionId)) return ["--session-id", sessionId, ...claudeArgs()];
-  return fork
-    ? ["--resume", sessionId, "--fork-session", "--session-id", newId(), ...claudeArgs()]
-    : ["--resume", sessionId, ...claudeArgs()];
-};
-
-const workspaceFromSession = (session: SessionInfo): WorkspaceRecord => ({
-  id: session.id,
-  sessionId: session.id,
-  cwd: session.cwd,
-  title: session.title ?? basename(session.cwd),
-  filePath: session.filePath,
-  mode: "preview",
-  claudeTerminalId: null,
-  claudeArgs: [],
-  shells: [],
-  activeShellId: null,
-  shellPanelOpen: false,
-  openFiles: [],
-  activeFile: null,
-});
 
 export const useWorkspaceStore = create<WorkspaceState>()(
   persist(
     (set, get) => {
-      const patch = (id: string, update: (w: WorkspaceRecord) => Partial<WorkspaceRecord>) =>
+      const find = (id: string) => get().workspaces.find((w) => w.id === id);
+
+      const patch = (id: string, update: (w: Workspace) => Partial<Workspace>) =>
         set((s) => ({
           workspaces: s.workspaces.map((w) => (w.id === id ? { ...w, ...update(w) } : w)),
         }));
 
-      const find = (id: string) => get().workspaces.find((w) => w.id === id);
-
-      const launchClaude = (workspace: WorkspaceRecord, args: string[]) => {
-        const terminalId = newId();
-        const next: WorkspaceRecord = {
-          ...workspace,
-          mode: "live",
-          claudeTerminalId: terminalId,
-          claudeArgs: args,
-        };
-        const forkedId = args[args.indexOf("--fork-session") + 2];
-        if (args.includes("--fork-session") && forkedId) {
-          next.sessionId = forkedId;
-          next.title = `${workspace.title} (fork)`;
-        }
-        startTerminal(claudeSpec(next));
-        return next;
+      const add = (workspace: Workspace) => {
+        set((s) => ({ workspaces: [...s.workspaces, workspace], activeId: workspace.id }));
+        return workspace.id;
       };
 
       return {
         workspaces: [],
         activeId: null,
+        recentlyClosed: [],
 
-        openSession: (session, options) => {
+        openSession: (session) => {
           const existing = get().workspaces.find((w) => w.sessionId === session.id);
           if (existing) {
-            set({ activeId: existing.id });
-            if (options?.resume && existing.mode === "preview") get().resume(existing.id);
-            return;
+            get().activate(existing.id);
+            return existing.id;
           }
-          const workspace = workspaceFromSession(session);
-          set((s) => ({ workspaces: [...s.workspaces, workspace], activeId: workspace.id }));
-          if (options?.resume) get().resume(workspace.id);
+          return add(workspaceFromSession(session));
         },
 
-        resume: (workspaceId, options) => {
+        launch: (workspaceId, options = {}) => {
           const workspace = find(workspaceId);
-          if (!workspace) return;
-          const fork = !!options?.fork;
-          if (workspace.mode === "live" && !fork) {
+          if (!workspace) return null;
+          if (workspace.mode === "live" && !options.fork) {
             set({ activeId: workspaceId });
-            return;
+            return workspaceId;
           }
-          const args = resumeArgs(workspace.sessionId, fork);
-          if (fork) {
-            const source = useSessionsStore.getState().byId[workspace.sessionId];
-            const base = source ? workspaceFromSession(source) : workspace;
-            const forked = launchClaude({ ...base, id: newId(), shells: [] }, args);
-            set((s) => ({ workspaces: [...s.workspaces, forked], activeId: forked.id }));
-            return;
+          const plan = planLaunch(workspace, options);
+          if (options.fork) {
+            const base = blankWorkspace({
+              id: newId(),
+              sessionId: plan.sessionId,
+              cwd: workspace.cwd,
+              title: `${workspace.title} (fork)`,
+              filePath: null,
+            });
+            return add(withClaude(base, plan.args));
           }
-          const next = launchClaude(workspace, args);
+          const next = withClaude(workspace, plan.args);
           set((s) => ({
             workspaces: s.workspaces.map((w) => (w.id === workspaceId ? next : w)),
             activeId: workspaceId,
           }));
+          return workspaceId;
         },
 
-        newSession: (cwd) => {
+        newSession: (cwd, options = {}) => {
           const sessionId = newId();
-          const base: WorkspaceRecord = {
-            ...workspaceFromSession({
-              id: sessionId,
-              distro: parseWslPath(cwd)?.distro ?? null,
-              cwd,
-              filePath: "",
-              projectKey: "",
-              title: null,
-              customTitle: null,
-              firstPrompt: null,
-              lastPrompt: null,
-              gitBranch: null,
-              startedAt: null,
-              lastMessageAt: null,
-              modifiedMs: Date.now(),
-              promptCount: 0,
-              size: 0,
-              version: null,
-            }),
-            title: "New session",
+          const base = blankWorkspace({
+            id: sessionId,
+            sessionId,
+            cwd,
+            title: options.agent ? `New ${options.agent} session` : "New session",
             filePath: null,
-          };
-          const workspace = launchClaude(base, ["--session-id", sessionId, ...claudeArgs()]);
-          set((s) => ({ workspaces: [...s.workspaces, workspace], activeId: workspace.id }));
+          });
+          return add(withClaude(base, planLaunch(base, options).args));
         },
 
         restartClaude: (workspaceId) => {
           const workspace = find(workspaceId);
           if (!workspace?.claudeTerminalId) return;
-          const args = resumeArgs(workspace.sessionId, false);
-          patch(workspaceId, () => ({ claudeArgs: args }));
-          void restartTerminal(workspace.claudeTerminalId, { args });
+          const next = {
+            ...workspace,
+            claudeTerminalId: workspace.claudeTerminalId,
+            claudeArgs: planLaunch(workspace).args,
+          };
+          patch(workspaceId, () => ({ claudeArgs: next.claudeArgs }));
+          void restartTerminal(next.claudeTerminalId, claudeSpec(next));
         },
 
         close: async (workspaceId) => {
@@ -223,19 +144,32 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           if (!workspace) return;
           const remaining = workspaces.filter((w) => w.id !== workspaceId);
           const neighbor = remaining[Math.min(index, remaining.length - 1)]?.id ?? null;
-          set({ workspaces: remaining, activeId: activeId === workspaceId ? neighbor : activeId });
+          set((s) => ({
+            workspaces: remaining,
+            activeId: activeId === workspaceId ? neighbor : activeId,
+            recentlyClosed: [
+              workspace.sessionId,
+              ...s.recentlyClosed.filter((id) => id !== workspace.sessionId),
+            ].slice(0, RECENTLY_CLOSED_LIMIT),
+          }));
           const terminalIds = [workspace.claudeTerminalId, ...workspace.shells.map((s) => s.id)];
           await Promise.all(terminalIds.filter((id): id is string => !!id).map(disposeTerminal));
         },
 
-        activate: (workspaceId) => set({ activeId: workspaceId }),
+        activate: (workspaceId) => {
+          set({ activeId: workspaceId });
+          const workspace = find(workspaceId);
+          if (workspace?.mode === "live" && workspace.claudeTerminalId)
+            requestFocus(workspace.claudeTerminalId);
+        },
 
         cycle: (direction) => {
           const { workspaces, activeId } = get();
           if (workspaces.length < 2) return;
           const index = workspaces.findIndex((w) => w.id === activeId);
-          const next = (index + direction + workspaces.length) % workspaces.length;
-          set({ activeId: workspaces[next].id });
+          get().activate(
+            workspaces[(index + direction + workspaces.length) % workspaces.length].id,
+          );
         },
 
         reorder: (fromId, toId) =>
@@ -249,13 +183,18 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             return { workspaces: list };
           }),
 
-        openShell: (workspaceId, cwd) => {
+        openShell: (workspaceId, options = {}) => {
           const workspace = find(workspaceId);
           if (!workspace) return;
-          const shellCwd = cwd ?? workspace.cwd;
-          const program = parseWslPath(shellCwd) ? "wsl.exe" : shellProgram();
-          const shell: ShellTab = { id: newId(), cwd: shellCwd, program };
-          startTerminal(shellSpec(workspaceId, shell));
+          const cwd = options.cwd ?? workspace.cwd;
+          const shell: ShellTab = {
+            id: newId(),
+            cwd,
+            program: parseWslPath(cwd) ? "wsl.exe" : defaultShellProgram(),
+            label: options.label,
+            command: options.command,
+          };
+          startTerminal(shellSpec(workspaceId, shell), { focus: true });
           patch(workspaceId, (w) => ({
             shells: [...w.shells, shell],
             activeShellId: shell.id,
@@ -269,13 +208,17 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             const shells = w.shells.filter((s) => s.id !== shellId);
             return {
               shells,
-              activeShellId: w.activeShellId === shellId ? (shells.at(-1)?.id ?? null) : w.activeShellId,
+              activeShellId:
+                w.activeShellId === shellId ? (shells.at(-1)?.id ?? null) : w.activeShellId,
               shellPanelOpen: shells.length > 0 && w.shellPanelOpen,
             };
           });
         },
 
-        setActiveShell: (workspaceId, shellId) => patch(workspaceId, () => ({ activeShellId: shellId })),
+        setActiveShell: (workspaceId, shellId) => {
+          requestFocus(shellId);
+          patch(workspaceId, () => ({ activeShellId: shellId }));
+        },
 
         setShellPanel: (workspaceId, open) => {
           const workspace = find(workspaceId);
@@ -284,12 +227,16 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             get().openShell(workspaceId);
             return;
           }
+          if (open && workspace.activeShellId) requestFocus(workspace.activeShellId);
+          if (!open && workspace.claudeTerminalId) requestFocus(workspace.claudeTerminalId);
           patch(workspaceId, () => ({ shellPanelOpen: open }));
         },
 
         openFile: (workspaceId, path) =>
           patch(workspaceId, (w) => ({
-            openFiles: w.openFiles.some((f) => samePath(f, path)) ? w.openFiles : [...w.openFiles, path],
+            openFiles: w.openFiles.some((f) => samePath(f, path))
+              ? w.openFiles
+              : [...w.openFiles, path],
             activeFile: path,
           })),
 
@@ -297,11 +244,13 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           patch(workspaceId, (w) => {
             const index = w.openFiles.findIndex((f) => samePath(f, path));
             const openFiles = w.openFiles.filter((f) => !samePath(f, path));
-            const activeFile =
-              w.activeFile && samePath(w.activeFile, path)
+            const wasActive = !!w.activeFile && samePath(w.activeFile, path);
+            return {
+              openFiles,
+              activeFile: wasActive
                 ? (openFiles[Math.min(index, openFiles.length - 1)] ?? null)
-                : w.activeFile;
-            return { openFiles, activeFile };
+                : w.activeFile,
+            };
           }),
 
         setActiveFile: (workspaceId, path) => patch(workspaceId, () => ({ activeFile: path })),
@@ -324,13 +273,19 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           set((s) => ({
             workspaces: s.workspaces.map((workspace) => {
               const shells = workspace.shells.filter((shell) => isPtyRunning(shell.id));
-              shells.forEach((shell) => hasTerminal(shell.id) || startTerminal(shellSpec(workspace.id, shell)));
-              const claudeAlive = !!workspace.claudeTerminalId && isPtyRunning(workspace.claudeTerminalId);
-              if (claudeAlive && !hasTerminal(workspace.claudeTerminalId!)) startTerminal(claudeSpec(workspace));
+              shells.forEach(
+                (shell) =>
+                  hasTerminal(shell.id) ||
+                  startTerminal(shellSpec(workspace.id, { ...shell, command: undefined })),
+              );
+              const claudeId = workspace.claudeTerminalId;
+              const claudeAlive = !!claudeId && isPtyRunning(claudeId);
+              if (claudeAlive && !hasTerminal(claudeId))
+                startTerminal(claudeSpec({ ...workspace, claudeTerminalId: claudeId }));
               return {
                 ...workspace,
                 mode: claudeAlive ? "live" : "preview",
-                claudeTerminalId: claudeAlive ? workspace.claudeTerminalId : null,
+                claudeTerminalId: claudeAlive ? claudeId : null,
                 shells,
                 activeShellId: shells.some((shell) => shell.id === workspace.activeShellId)
                   ? workspace.activeShellId
@@ -343,11 +298,36 @@ export const useWorkspaceStore = create<WorkspaceState>()(
     },
     {
       name: "claude-deck-workspaces",
-      version: 1,
+      version: 2,
       partialize: (s) => ({ workspaces: s.workspaces, activeId: s.activeId }),
+      migrate: (persisted) => persisted as Pick<WorkspaceState, "workspaces" | "activeId">,
+      merge: (persisted, current) => {
+        const saved = (persisted ?? {}) as Partial<Pick<WorkspaceState, "workspaces" | "activeId">>;
+        const workspaces = (saved.workspaces ?? []).map((w) => ({ ...blankWorkspace(w), ...w }));
+        return { ...current, workspaces, activeId: saved.activeId ?? null };
+      },
     },
   ),
 );
 
+export const getActiveWorkspace = () => {
+  const { workspaces, activeId } = useWorkspaceStore.getState();
+  return workspaces.find((w) => w.id === activeId) ?? null;
+};
+
+export const findWorkspace = (id: string) =>
+  useWorkspaceStore.getState().workspaces.find((w) => w.id === id) ?? null;
+
+export const findWorkspaceBySession = (sessionId: string) =>
+  useWorkspaceStore.getState().workspaces.find((w) => w.sessionId === sessionId) ?? null;
+
 export const useActiveWorkspace = () =>
   useWorkspaceStore((s) => s.workspaces.find((w) => w.id === s.activeId) ?? null);
+
+export const referencedTerminalIds = () =>
+  new Set(
+    useWorkspaceStore
+      .getState()
+      .workspaces.flatMap((w) => [w.claudeTerminalId, ...w.shells.map((s) => s.id)])
+      .filter((id): id is string => !!id),
+  );

@@ -1,14 +1,15 @@
 import { useMemo } from "react";
-import { Cpu, FolderOpen, GitBranch, Hash, SquareTerminal } from "lucide-react";
+import { Bell, Cpu, FolderOpen, GitBranch, Hash, SquareTerminal } from "lucide-react";
 import { toast } from "sonner";
 
+import { focusNextAttention, toggleShellPanel } from "@/actions/workspaces";
 import { StatusDot } from "@/components/ui/feedback";
 import { shortcutLabel } from "@/lib/shortcuts";
 import { copyText } from "@/lib/tauri/system";
 import { shortenHome } from "@/lib/utils";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useTerminalStore } from "@/stores/terminal-store";
-import { useActiveWorkspace, useWorkspaceStore } from "@/stores/workspace-store";
+import { useActiveWorkspace } from "@/stores/workspace-store";
 
 const Item = ({
   children,
@@ -36,11 +37,11 @@ export const StatusBar = () => {
   const home = useSessionsStore((s) => s.environment?.home ?? "");
   const sessionCount = useSessionsStore((s) => s.sessions.length);
   const terminals = useTerminalStore((s) => s.terminals);
-  const setShellPanel = useWorkspaceStore((s) => s.setShellPanel);
 
-  const { claudeRunning, claudeBusy, shells } = useMemo(() => {
+  const { claudeRunning, claudeBusy, shells, waiting } = useMemo(() => {
     const list = Object.values(terminals).filter((t) => t.status === "running");
     return {
+      waiting: list.filter((t) => t.kind === "claude" && t.attention).length,
       claudeRunning: list.filter((t) => t.kind === "claude").length,
       claudeBusy: list.filter((t) => t.kind === "claude" && t.busy).length,
       shells: list.filter((t) => t.kind === "shell").length,
@@ -52,7 +53,10 @@ export const StatusBar = () => {
       <div className="flex min-w-0 items-stretch">
         {workspace && (
           <>
-            <Item title={workspace.cwd} onClick={() => void copyText(workspace.cwd).then(() => toast.success("Path copied"))}>
+            <Item
+              title={workspace.cwd}
+              onClick={() => void copyText(workspace.cwd).then(() => toast.success("Path copied"))}
+            >
               <FolderOpen />
               <span className="truncate">{shortenHome(workspace.cwd, home)}</span>
             </Item>
@@ -64,22 +68,35 @@ export const StatusBar = () => {
             )}
             <Item
               title="Copy session ID"
-              onClick={() => void copyText(workspace.sessionId).then(() => toast.success("Session ID copied"))}
+              onClick={() =>
+                void copyText(workspace.sessionId).then(() => toast.success("Session ID copied"))
+              }
             >
               <Hash />
               <span className="font-mono">{workspace.sessionId.slice(0, 8)}</span>
             </Item>
             <Item
               title={`Toggle shell panel (${shortcutLabel("toggleShell")})`}
-              onClick={() => setShellPanel(workspace.id, !workspace.shellPanelOpen)}
+              onClick={toggleShellPanel}
             >
               <SquareTerminal />
-              {workspace.shells.length > 0 ? `${workspace.shells.length} shell${workspace.shells.length > 1 ? "s" : ""}` : "Shell"}
+              {workspace.shells.length > 0
+                ? `${workspace.shells.length} shell${workspace.shells.length > 1 ? "s" : ""}`
+                : "Shell"}
             </Item>
           </>
         )}
       </div>
       <div className="flex shrink-0 items-stretch">
+        {waiting > 0 && (
+          <Item
+            title={`Jump to the session waiting for you (${shortcutLabel("nextAttention")})`}
+            onClick={focusNextAttention}
+          >
+            <Bell className="text-accent" />
+            <span className="text-fg">{waiting} waiting for you</span>
+          </Item>
+        )}
         {claudeRunning > 0 && (
           <Item title="Claude sessions running in Deck">
             <StatusDot tone={claudeBusy > 0 ? "busy" : "running"} className="size-1.5" />

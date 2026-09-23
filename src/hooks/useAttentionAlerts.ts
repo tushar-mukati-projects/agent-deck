@@ -1,16 +1,20 @@
 import { useEffect } from "react";
 import { UserAttentionType } from "@tauri-apps/api/window";
-import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
+import {
+  isPermissionGranted,
+  requestPermission,
+  sendNotification,
+} from "@tauri-apps/plugin-notification";
 import { toast } from "sonner";
 
 import { playChime } from "@/lib/chime";
+import { onClaudeIdle, type IdleEvent } from "@/lib/terminal/activity";
 import { api } from "@/lib/tauri/commands";
 import { appWindow } from "@/lib/tauri/system";
-import { onClaudeIdle, type IdleEvent } from "@/lib/terminal/registry";
 import { basename } from "@/lib/utils";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useTerminalStore } from "@/stores/terminal-store";
-import { useWorkspaceStore } from "@/stores/workspace-store";
+import { findWorkspace, getActiveWorkspace, useWorkspaceStore } from "@/stores/workspace-store";
 
 let permission: Promise<boolean> | null = null;
 
@@ -21,23 +25,16 @@ const notificationsAllowed = () => {
   return permission;
 };
 
-const describe = (event: IdleEvent) => {
-  const workspace = useWorkspaceStore.getState().workspaces.find((w) => w.id === event.spec.workspaceId);
-  return {
-    workspace,
-    title: event.needsInput ? "Claude needs your approval" : "Claude finished",
-    body: workspace ? `${workspace.title} · ${basename(workspace.cwd)}` : basename(event.spec.cwd),
-  };
-};
-
 const handleIdle = async (event: IdleEvent) => {
-  const settings = useSettingsStore.getState();
-  if (event.visible || !settings.notifications) return;
-  const { workspace, title, body } = describe(event);
-  if (settings.sound) playChime(event.needsInput ? "input" : "done");
+  if (event.visible) return;
+  const { sound, notifications } = useSettingsStore.getState();
+  if (sound) playChime(event.needsInput ? "input" : "done");
+  if (!notifications) return;
+  const workspace = findWorkspace(event.workspaceId);
+  const title = event.needsInput ? "Claude needs your approval" : "Claude finished";
+  const body = workspace ? `${workspace.title} · ${basename(workspace.cwd)}` : basename(event.cwd);
 
-  const focused = await appWindow.isFocused().catch(() => false);
-  if (!focused) {
+  if (!(await appWindow.isFocused().catch(() => false))) {
     void appWindow.requestUserAttention(UserAttentionType.Informational).catch(() => undefined);
     if (await notificationsAllowed()) sendNotification({ title, body });
     return;
@@ -51,27 +48,24 @@ const handleIdle = async (event: IdleEvent) => {
 };
 
 const clearVisibleAttention = () => {
-  const { workspaces, activeId } = useWorkspaceStore.getState();
-  const active = workspaces.find((w) => w.id === activeId);
-  const terminalId = active?.claudeTerminalId;
+  const terminalId = getActiveWorkspace()?.claudeTerminalId;
   if (terminalId) useTerminalStore.getState().update(terminalId, { attention: false });
 };
 
 export const useAttentionAlerts = () => {
   useEffect(() => {
     const unsubscribeIdle = onClaudeIdle((event) => void handleIdle(event));
-    const unlistenFocus = appWindow.onFocusChanged(({ payload: focused }) => {
-      if (focused) clearVisibleAttention();
-    });
+    const unlistenFocus = appWindow.onFocusChanged(
+      ({ payload: focused }) => focused && clearVisibleAttention(),
+    );
 
     let badge = false;
-    const syncBadge = () => {
-      const waiting = Object.values(useTerminalStore.getState().terminals).some((t) => t.attention);
+    const unsubscribeTerminals = useTerminalStore.subscribe((state) => {
+      const waiting = Object.values(state.terminals).some((t) => t.attention);
       if (waiting === badge) return;
       badge = waiting;
       void api.setAttentionBadge(waiting).catch(() => undefined);
-    };
-    const unsubscribeTerminals = useTerminalStore.subscribe(syncBadge);
+    });
     const unsubscribeWorkspaces = useWorkspaceStore.subscribe((state, previous) => {
       if (state.activeId !== previous.activeId) clearVisibleAttention();
     });

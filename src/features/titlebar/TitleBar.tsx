@@ -25,7 +25,12 @@ const WindowControls = () => {
 
   return (
     <div className="flex h-full">
-      <button type="button" aria-label="Minimize" className={controlClass} onClick={() => appWindow.minimize()}>
+      <button
+        type="button"
+        aria-label="Minimize"
+        className={controlClass}
+        onClick={() => appWindow.minimize()}
+      >
         <Minus className="size-4" strokeWidth={1.5} />
       </button>
       <button
@@ -63,7 +68,13 @@ export const TitleBar = () => {
       </div>
 
       <div className="flex min-w-0 flex-1 items-stretch">
-        <div className="no-scrollbar flex min-w-0 items-stretch overflow-x-auto">
+        <div
+          role="tablist"
+          onWheel={(e) => {
+            if (e.deltaY) e.currentTarget.scrollLeft += e.deltaY;
+          }}
+          className="no-scrollbar flex min-w-0 items-stretch overflow-x-auto"
+        >
           {workspaces.map((workspace) => (
             <WorkspaceTab key={workspace.id} workspace={workspace} />
           ))}
@@ -77,14 +88,16 @@ export const TitleBar = () => {
         </div>
       </div>
 
-      <div data-tauri-drag-region className="flex shrink-0 items-center px-2">
+      <div data-tauri-drag-region className="flex min-w-0 shrink items-center px-2">
         <button
           type="button"
           onClick={() => openPalette("all")}
-          className="flex h-[26px] w-[300px] items-center gap-2 rounded-md border border-border bg-bg/60 px-2.5 text-xs text-faint transition-colors hover:border-border-strong hover:text-muted"
+          className="flex h-[26px] w-[300px] max-w-[30vw] min-w-[120px] items-center gap-2 rounded-md border border-border bg-bg/60 px-2.5 text-xs text-faint transition-colors hover:border-border-strong hover:text-muted"
         >
           <Search className="size-3.5" />
-          <span className="flex-1 truncate text-left whitespace-nowrap">Search sessions, files, actions</span>
+          <span className="flex-1 truncate text-left whitespace-nowrap">
+            Search sessions, files, actions
+          </span>
           <Kbd keys={shortcutLabel("palette")} />
         </button>
       </div>

@@ -20,7 +20,11 @@ interface ItemProps {
   children: React.ReactNode;
 }
 
-const ItemBody = ({ icon, shortcut, children }: Pick<ItemProps, "icon" | "shortcut" | "children">) => (
+const ItemBody = ({
+  icon,
+  shortcut,
+  children,
+}: Pick<ItemProps, "icon" | "shortcut" | "children">) => (
   <>
     {icon}
     <span className="flex-1 truncate">{children}</span>
@@ -60,7 +64,11 @@ interface DropdownContentProps {
   className?: string;
 }
 
-export const DropdownMenuContent = ({ children, align = "start", className }: DropdownContentProps) => (
+export const DropdownMenuContent = ({
+  children,
+  align = "start",
+  className,
+}: DropdownContentProps) => (
   <DropdownPrimitive.Portal>
     <DropdownPrimitive.Content align={align} sideOffset={6} className={cn(contentClass, className)}>
       {children}

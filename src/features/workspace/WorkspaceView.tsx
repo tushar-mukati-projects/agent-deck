@@ -8,7 +8,7 @@ import { FileViewer } from "@/features/viewer/FileViewer";
 import { releaseWatch, retainWatch } from "@/lib/file-events";
 import { api } from "@/lib/tauri/commands";
 import { cn } from "@/lib/utils";
-import type { WorkspaceRecord } from "@/stores/workspace-store";
+import type { Workspace } from "@/types";
 
 export const ResizeHandle = ({ orientation }: { orientation: "horizontal" | "vertical" }) => (
   <Separator
@@ -19,7 +19,7 @@ export const ResizeHandle = ({ orientation }: { orientation: "horizontal" | "ver
   />
 );
 
-export const WorkspaceView = ({ workspace }: { workspace: WorkspaceRecord }) => {
+export const WorkspaceView = ({ workspace }: { workspace: Workspace }) => {
   const hasFiles = workspace.openFiles.length > 0;
   const shellOpen = workspace.shellPanelOpen && workspace.shells.length > 0;
 
@@ -30,15 +30,19 @@ export const WorkspaceView = ({ workspace }: { workspace: WorkspaceRecord }) => 
 
   return (
     <Group orientation="horizontal" className="h-full">
-      <Panel id="main" minSize={360}>
+      <Panel id="main" minSize={280}>
         <Group orientation="vertical" className="h-full">
-          <Panel id="primary" minSize={140}>
-            {workspace.mode === "live" ? <ClaudePane workspace={workspace} /> : <SessionPreview workspace={workspace} />}
+          <Panel id="primary" minSize={120}>
+            {workspace.mode === "live" ? (
+              <ClaudePane workspace={workspace} />
+            ) : (
+              <SessionPreview workspace={workspace} />
+            )}
           </Panel>
           {shellOpen && (
             <>
               <ResizeHandle orientation="vertical" />
-              <Panel id="shell" defaultSize="34%" minSize={110}>
+              <Panel id="shell" defaultSize="34%" minSize={100}>
                 <ShellPanel workspace={workspace} />
               </Panel>
             </>
@@ -48,7 +52,7 @@ export const WorkspaceView = ({ workspace }: { workspace: WorkspaceRecord }) => 
       {hasFiles && (
         <>
           <ResizeHandle orientation="horizontal" />
-          <Panel id="viewer" defaultSize="46%" minSize={320}>
+          <Panel id="viewer" defaultSize="46%" minSize={240}>
             <FileViewer workspace={workspace} />
           </Panel>
         </>

@@ -1,12 +1,14 @@
-import { useDeferredValue, useMemo, useState } from "react";
-import { Archive, ChevronRight, FolderOpen, Pin, Plus, Power, RefreshCw, Search, Sparkles, X } from "lucide-react";
+import { useDeferredValue, useMemo, useRef, useState } from "react";
+import { Archive, FolderOpen, Pin, Plus, Power, RefreshCw, Sparkles } from "lucide-react";
+
+import { startSessionInPickedFolder } from "@/actions/sessions";
 
 import { Button } from "@/components/ui/button";
 import { EmptyState, Spinner, type DotTone } from "@/components/ui/feedback";
 import { IconButton } from "@/components/ui/icon-button";
+import { Chevron, PanelHeader, SearchInput } from "@/components/ui/panel";
 import { FolderFilter } from "@/features/sidebar/FolderFilter";
 import { SessionItem } from "@/features/sidebar/SessionItem";
-import { startSessionInPickedFolder } from "@/features/titlebar/NewSessionMenu";
 import { terminalTone } from "@/hooks/useWorkspaceStatus";
 import { basename, cn, isWithin, normalizePath, samePath, shortenHome } from "@/lib/utils";
 import { parseWslPath } from "@/lib/wsl";
@@ -56,7 +58,9 @@ const useSessionTones = () => {
     const ownPids = new Set(Object.values(terminals).map((t) => t.pid));
     for (const entry of live) if (!ownPids.has(entry.pid)) tones.set(entry.sessionId, "external");
     for (const workspace of workspaces) {
-      const tone = workspace.claudeTerminalId ? terminalTone(terminals[workspace.claudeTerminalId]) : null;
+      const tone = workspace.claudeTerminalId
+        ? terminalTone(terminals[workspace.claudeTerminalId])
+        : null;
       if (tone) tones.set(workspace.sessionId, tone);
     }
     return tones;
@@ -81,9 +85,11 @@ const FolderHeader = ({
         type="button"
         onClick={onToggle}
         title={group.cwd}
+        data-session-row
+        aria-expanded={!collapsed}
         className="flex min-w-0 flex-1 items-center gap-1.5 rounded px-1 py-0.5 text-left text-[12.5px] font-medium text-fg hover:text-fg"
       >
-        <ChevronRight className={cn("size-3 shrink-0 transition-transform", !collapsed && "rotate-90")} />
+        <Chevron open={!collapsed} />
         <FolderOpen className="size-3.5 shrink-0 text-folder" />
         <span className="max-w-[70%] shrink-0 truncate">{basename(group.cwd)}</span>
         {wsl && (
@@ -91,12 +97,16 @@ const FolderHeader = ({
             WSL
           </span>
         )}
-        <span className="min-w-0 truncate text-[11px] font-normal text-faint">{shortenHome(group.cwd, home)}</span>
+        <span className="min-w-0 truncate text-[11px] font-normal text-faint">
+          {shortenHome(group.cwd, home)}
+        </span>
       </button>
-      <span className="text-[10.5px] text-faint tabular-nums group-hover:hidden">{group.sessions.length}</span>
+      <span className="text-[10.5px] text-faint tabular-nums group-focus-within:hidden group-hover:hidden">
+        {group.sessions.length}
+      </span>
       <IconButton
         label={`New session in ${basename(group.cwd)}`}
-        className="hidden group-hover:inline-flex"
+        className="hidden group-focus-within:inline-flex group-hover:inline-flex"
         onClick={() => newSession(group.cwd)}
       >
         <Plus />
@@ -131,13 +141,22 @@ const WslStatus = () => {
           >
             <span className="size-1.5 rounded-full bg-faint" />
             <span className="flex-1 truncate">WSL {distro.name} is stopped</span>
-            <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[11px]" onClick={() => void startDistro(distro.name)}>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-5 px-1.5 text-[11px]"
+              onClick={() => void startDistro(distro.name)}
+            >
               <Power /> Start
             </Button>
           </div>
         ))}
       {errorList.map(([name, message]) => (
-        <div key={name} title={message} className="truncate rounded-md border border-danger/30 bg-danger/10 px-2 py-1 text-[11px] text-danger">
+        <div
+          key={name}
+          title={message}
+          className="truncate rounded-md border border-danger/30 bg-danger/10 px-2 py-1 text-[11px] text-danger"
+        >
           {message}
         </div>
       ))}
@@ -156,13 +175,19 @@ export const SessionsPanel = () => {
   const activeSessionId = useWorkspaceStore(
     (s) => s.workspaces.find((w) => w.id === s.activeId)?.sessionId ?? null,
   );
-  const openSessionIds = useWorkspaceStore((s) => s.workspaces.map((w) => w.sessionId).join(","));
+  const openSessionKey = useWorkspaceStore((s) => s.workspaces.map((w) => w.sessionId).join(","));
+  const openSessionIds = useMemo(() => new Set(openSessionKey.split(",")), [openSessionKey]);
   const newSession = useWorkspaceStore((s) => s.newSession);
   const tones = useSessionTones();
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const activeCwd = useWorkspaceStore((s) => s.workspaces.find((w) => w.id === s.activeId)?.cwd ?? null);
+  // Explicit open/closed choices per folder; folders without a choice follow the automatic rule below.
+  const [expanded, setExpanded] = useState<Map<string, boolean>>(new Map());
+  const listRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const activeCwd = useWorkspaceStore(
+    (s) => s.workspaces.find((w) => w.id === s.activeId)?.cwd ?? null,
+  );
 
   const filtered = useMemo(() => {
     const terms = deferredQuery.toLowerCase().split(/\s+/).filter(Boolean);
@@ -194,25 +219,37 @@ export const SessionsPanel = () => {
   const grouped = !folderFilter || includeSubfolders;
   const groups = useMemo(() => (grouped ? groupByFolder(rest) : []), [grouped, rest]);
 
-  const isExpanded = (cwd: string) =>
-    expanded.has(normalizePath(cwd)) ||
-    deferredQuery.trim().length > 0 ||
-    groups.length === 1 ||
-    (!!activeCwd && samePath(activeCwd, cwd) && !expanded.has(`closed:${normalizePath(cwd)}`));
+  const isExpanded = (cwd: string) => {
+    if (deferredQuery.trim()) return true;
+    const choice = expanded.get(normalizePath(cwd));
+    if (choice !== undefined) return choice;
+    return groups.length === 1 || (!!activeCwd && samePath(activeCwd, cwd));
+  };
 
   const toggleGroup = (cwd: string) =>
-    setExpanded((current) => {
-      const next = new Set(current);
-      const key = normalizePath(cwd);
-      if (isExpanded(cwd)) {
-        next.delete(key);
-        next.add(`closed:${key}`);
-      } else {
-        next.add(key);
-        next.delete(`closed:${key}`);
-      }
-      return next;
-    });
+    setExpanded((current) => new Map(current).set(normalizePath(cwd), !isExpanded(cwd)));
+
+  const moveFocus = (event: React.KeyboardEvent) => {
+    if (
+      event.key !== "ArrowDown" &&
+      event.key !== "ArrowUp" &&
+      event.key !== "Home" &&
+      event.key !== "End"
+    )
+      return;
+    const rows = [...(listRef.current?.querySelectorAll<HTMLElement>("[data-session-row]") ?? [])];
+    if (!rows.length) return;
+    const current = rows.indexOf(document.activeElement as HTMLElement);
+    const next =
+      event.key === "Home"
+        ? 0
+        : event.key === "End"
+          ? rows.length - 1
+          : current + (event.key === "ArrowDown" ? 1 : -1);
+    event.preventDefault();
+    if (next < 0) searchRef.current?.focus();
+    else rows[Math.min(next, rows.length - 1)].focus();
+  };
 
   const renderItem = (session: SessionInfo) => (
     <SessionItem
@@ -220,52 +257,51 @@ export const SessionsPanel = () => {
       session={session}
       tone={tones.get(session.id) ?? null}
       isActive={session.id === activeSessionId}
-      isOpen={openSessionIds.includes(session.id)}
+      isOpen={openSessionIds.has(session.id)}
     />
   );
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex h-10 shrink-0 items-center justify-between pr-2 pl-3.5">
-        <span className="text-[11px] font-semibold tracking-wider text-muted uppercase">Sessions</span>
-        <div className="flex items-center gap-0.5">
-          <IconButton label="Refresh" onClick={() => void Promise.all([refresh(), refreshWsl()])}>
-            <RefreshCw className={cn(refreshing && "animate-spin")} />
-          </IconButton>
-          <IconButton
-            label={folderFilter ? `New session in ${basename(folderFilter)}` : "New session in folder…"}
-            onClick={() =>
-              folderFilter ? newSession(folderFilter) : void startSessionInPickedFolder()
-            }
-          >
-            <Plus />
-          </IconButton>
-        </div>
-      </div>
+      <PanelHeader title="Sessions">
+        <IconButton label="Refresh" onClick={() => void Promise.all([refresh(), refreshWsl()])}>
+          <RefreshCw className={cn(refreshing && "animate-spin")} />
+        </IconButton>
+        <IconButton
+          label={
+            folderFilter ? `New session in ${basename(folderFilter)}` : "New session in folder…"
+          }
+          onClick={() =>
+            folderFilter ? newSession(folderFilter) : void startSessionInPickedFolder()
+          }
+        >
+          <Plus />
+        </IconButton>
+      </PanelHeader>
 
       <FolderFilter />
 
       <div className="px-2 pb-2">
-        <div className="flex h-7 items-center gap-2 rounded-md border border-border bg-bg px-2 focus-within:border-border-strong">
-          <Search className="size-3.5 shrink-0 text-faint" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.key === "Escape" && setQuery("")}
-            placeholder="Search title, prompt, branch…"
-            className="h-full min-w-0 flex-1 bg-transparent text-xs text-fg outline-none placeholder:text-faint"
-          />
-          {query && (
-            <button type="button" onClick={() => setQuery("")} className="text-faint hover:text-fg">
-              <X className="size-3.5" />
-            </button>
-          )}
-        </div>
+        <SearchInput
+          inputRef={searchRef}
+          value={query}
+          onChange={setQuery}
+          onKeyDown={(e) => {
+            if (e.key !== "ArrowDown") return;
+            e.preventDefault();
+            listRef.current?.querySelector<HTMLElement>("[data-session-row]")?.focus();
+          }}
+          placeholder="Search title, prompt, branch…"
+        />
       </div>
 
       <WslStatus />
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-1.5 pb-3">
+      <div
+        ref={listRef}
+        onKeyDown={moveFocus}
+        className="min-h-0 flex-1 overflow-y-auto px-1.5 pb-3"
+      >
         {!loaded ? (
           <div className="flex justify-center py-10">
             <Spinner />
@@ -294,7 +330,9 @@ export const SessionsPanel = () => {
                 <div className="flex h-8 items-center gap-1.5 px-2 text-[12.5px] font-medium text-fg">
                   <Pin className="size-3.5 fill-current text-faint" /> Pinned
                 </div>
-                <div className="mb-1 ml-[13px] flex flex-col gap-px border-l border-border pl-[6px]">{pinned.map(renderItem)}</div>
+                <div className="mb-1 ml-[13px] flex flex-col gap-px border-l border-border pl-[6px]">
+                  {pinned.map(renderItem)}
+                </div>
               </section>
             )}
             {grouped ? (
@@ -302,9 +340,15 @@ export const SessionsPanel = () => {
                 const isCollapsed = !isExpanded(group.cwd);
                 return (
                   <section key={group.cwd} className="mb-1">
-                    <FolderHeader group={group} collapsed={isCollapsed} onToggle={() => toggleGroup(group.cwd)} />
+                    <FolderHeader
+                      group={group}
+                      collapsed={isCollapsed}
+                      onToggle={() => toggleGroup(group.cwd)}
+                    />
                     {!isCollapsed && (
-                      <div className="mb-1 ml-[13px] flex flex-col gap-px border-l border-border pl-[6px]">{group.sessions.map(renderItem)}</div>
+                      <div className="mb-1 ml-[13px] flex flex-col gap-px border-l border-border pl-[6px]">
+                        {group.sessions.map(renderItem)}
+                      </div>
                     )}
                   </section>
                 );
@@ -317,13 +361,17 @@ export const SessionsPanel = () => {
                 <button
                   type="button"
                   onClick={() => useSettingsStore.getState().set({ showArchived: !showArchived })}
+                  data-session-row
+                  aria-expanded={showArchived}
                   className="flex h-7 w-full items-center gap-1.5 px-1 text-[11px] font-semibold tracking-wide text-faint hover:text-muted"
                 >
-                  <ChevronRight className={cn("size-3 transition-transform", showArchived && "rotate-90")} />
+                  <Chevron open={showArchived} />
                   <Archive className="size-3" /> Archived
                   <span className="ml-auto pr-1 font-normal tabular-nums">{archived.length}</span>
                 </button>
-                {showArchived && <div className="flex flex-col gap-px">{archived.map(renderItem)}</div>}
+                {showArchived && (
+                  <div className="flex flex-col gap-px">{archived.map(renderItem)}</div>
+                )}
               </section>
             )}
           </>

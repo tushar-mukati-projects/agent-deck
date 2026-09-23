@@ -7,7 +7,15 @@ import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore, type ClickBehavior } from "@/stores/settings-store";
 import { useUiStore } from "@/stores/ui-store";
 
-const Field = ({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) => (
+const Field = ({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) => (
   <div className="grid grid-cols-[170px_1fr] items-start gap-4 py-3">
     <div>
       <p className="text-[12.5px] font-medium text-fg">{label}</p>
@@ -147,7 +155,9 @@ export const SettingsDialog = () => {
           />
         </Field>
         <Field label="Claude data folder">
-          <p className="pt-1.5 font-mono text-xs break-all text-muted select-text">{environment?.claudeHome}</p>
+          <p className="pt-1.5 font-mono text-xs break-all text-muted select-text">
+            {environment?.claudeHome}
+          </p>
         </Field>
       </div>
       <div className="flex justify-end px-5 pt-2 pb-4">

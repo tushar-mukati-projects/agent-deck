@@ -1,11 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
+  ArrowDown,
   Calendar,
   FolderOpen,
   GitBranch,
   GitFork,
   MessageSquare,
+  Pencil,
   Play,
   SquareTerminal,
   Trash2,
@@ -13,27 +15,37 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 
+import { deleteSessionWithConfirm, renameSession, resumeWorkspace } from "@/actions/sessions";
 import { Button } from "@/components/ui/button";
 import { EmptyState, Spinner } from "@/components/ui/feedback";
+import { IconButton } from "@/components/ui/icon-button";
 import { Kbd } from "@/components/ui/kbd";
+import { Alert, SearchInput } from "@/components/ui/panel";
 import { MarkdownView } from "@/features/viewer/MarkdownView";
-import { deleteSessionWithConfirm } from "@/hooks/useDeleteSession";
-import { resumeWorkspace } from "@/hooks/useResumeSession";
 import { useExternalLive } from "@/hooks/useWorkspaceStatus";
 import { api } from "@/lib/tauri/commands";
 import { revealInExplorer } from "@/lib/tauri/system";
-import { cn, errorMessage, formatBytes, shortenHome } from "@/lib/utils";
+import { errorMessage, formatBytes, shortenHome } from "@/lib/utils";
 import { useSessionsStore } from "@/stores/sessions-store";
-import { useUiStore } from "@/stores/ui-store";
-import { useWorkspaceStore, type WorkspaceRecord } from "@/stores/workspace-store";
-import type { TranscriptItem } from "@/types";
+import { useWorkspaceStore } from "@/stores/workspace-store";
+import type { TranscriptItem, Workspace } from "@/types";
 
 const PAGE = 60;
-const cache = new Map<string, TranscriptItem[]>();
+const CACHE_LIMIT = 24;
+const NEAR_BOTTOM_PX = 120;
+
+/** Transcripts keyed by file, remembering which modification they were read at. */
+const cache = new Map<string, { stamp: number; items: TranscriptItem[] }>();
+
+const remember = (filePath: string, stamp: number, items: TranscriptItem[]) => {
+  cache.delete(filePath);
+  cache.set(filePath, { stamp, items });
+  while (cache.size > CACHE_LIMIT) cache.delete(cache.keys().next().value!);
+};
 
 const useTranscript = (filePath: string | null, distro: string | null, stamp: number) => {
-  const cacheKey = `${filePath}:${stamp}`;
-  const [items, setItems] = useState<TranscriptItem[] | null>(() => cache.get(cacheKey) ?? null);
+  const initial = filePath ? cache.get(filePath) : undefined;
+  const [items, setItems] = useState<TranscriptItem[] | null>(initial?.items ?? null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -41,23 +53,24 @@ const useTranscript = (filePath: string | null, distro: string | null, stamp: nu
       setItems([]);
       return;
     }
-    const cached = cache.get(cacheKey);
-    if (cached) {
-      setItems(cached);
-      return;
-    }
+    const cached = cache.get(filePath);
+    if (cached) setItems(cached.items);
+    if (cached?.stamp === stamp) return;
     let cancelled = false;
     api
       .sessionTranscript(filePath, distro)
       .then((result) => {
-        cache.set(cacheKey, result);
-        if (!cancelled) setItems(result);
+        remember(filePath, stamp, result);
+        if (!cancelled) {
+          setItems(result);
+          setError(null);
+        }
       })
       .catch((e) => !cancelled && setError(errorMessage(e)));
     return () => {
       cancelled = true;
     };
-  }, [filePath, distro, cacheKey]);
+  }, [filePath, distro, stamp]);
 
   return { items, error };
 };
@@ -65,7 +78,14 @@ const useTranscript = (filePath: string | null, distro: string | null, stamp: nu
 const useFolderExists = (cwd: string) => {
   const [exists, setExists] = useState(true);
   useEffect(() => {
-    void api.pathIsDir(cwd).then(setExists);
+    let cancelled = false;
+    api
+      .pathIsDir(cwd)
+      .then((value) => !cancelled && setExists(value))
+      .catch(() => !cancelled && setExists(false));
+    return () => {
+      cancelled = true;
+    };
   }, [cwd]);
   return exists;
 };
@@ -73,7 +93,7 @@ const useFolderExists = (cwd: string) => {
 const Message = ({ item }: { item: TranscriptItem }) => {
   if (item.kind === "tool") {
     return (
-      <div className="flex items-center gap-2 py-px pl-1 font-mono text-[10.5px] text-faint/80">
+      <div className="ml-0.5 flex items-center gap-2 py-px pl-1 font-mono text-[10.5px] text-faint/80">
         <Wrench className="size-3 shrink-0" />
         <span className="truncate">{item.text}</span>
       </div>
@@ -95,143 +115,272 @@ const Message = ({ item }: { item: TranscriptItem }) => {
   );
 };
 
-export const SessionPreview = ({ workspace }: { workspace: WorkspaceRecord }) => {
+const Meta = ({ workspace }: { workspace: Workspace }) => {
   const session = useSessionsStore((s) => s.byId[workspace.sessionId]);
   const home = useSessionsStore((s) => s.environment?.home ?? "");
-  const { resume, openShell } = useWorkspaceStore.getState();
+  return (
+    <div className="mt-1.5 flex flex-wrap items-center gap-x-3.5 gap-y-1 text-[11px] text-faint [&_svg]:size-3">
+      <span className="flex items-center gap-1.5" title={workspace.cwd}>
+        <FolderOpen />
+        {shortenHome(workspace.cwd, home)}
+      </span>
+      {session?.gitBranch && session.gitBranch !== "HEAD" && (
+        <span className="flex items-center gap-1.5">
+          <GitBranch />
+          {session.gitBranch}
+        </span>
+      )}
+      {session?.startedAt && (
+        <span className="flex items-center gap-1.5">
+          <Calendar />
+          {format(new Date(session.startedAt), "d MMM yyyy, HH:mm")}
+        </span>
+      )}
+      {session && (
+        <span className="flex items-center gap-1.5">
+          <MessageSquare />
+          {session.promptCount} {session.promptCount === 1 ? "prompt" : "prompts"} ·{" "}
+          {formatBytes(session.size)}
+        </span>
+      )}
+      {session?.version && <span>v{session.version}</span>}
+    </div>
+  );
+};
+
+export const SessionPreview = ({ workspace }: { workspace: Workspace }) => {
+  const session = useSessionsStore((s) => s.byId[workspace.sessionId]);
   const external = useExternalLive(workspace.sessionId);
   const folderExists = useFolderExists(workspace.cwd);
-  const { items, error } = useTranscript(session?.filePath ?? null, session?.distro ?? null, session?.modifiedMs ?? 0);
+  const { items, error } = useTranscript(
+    session?.filePath ?? null,
+    session?.distro ?? null,
+    session?.modifiedMs ?? 0,
+  );
   const [visible, setVisible] = useState(PAGE);
+  const [query, setQuery] = useState("");
+  const deferredQuery = useDeferredValue(query.trim().toLowerCase());
+  const [atBottom, setAtBottom] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const resumeRef = useRef<HTMLButtonElement>(null);
+  const stickRef = useRef(true);
+  const anchorRef = useRef<number | null>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    resumeRef.current?.focus();
+    resumeRef.current?.focus({ preventScroll: true });
   }, [workspace.id]);
 
+  const matches = useMemo(() => {
+    if (!items) return [];
+    const indexed = items.map((item, index) => ({ item, index }));
+    return deferredQuery
+      ? indexed.filter(({ item }) => item.text.toLowerCase().includes(deferredQuery))
+      : indexed;
+  }, [items, deferredQuery]);
+
+  const shown = deferredQuery ? matches : matches.slice(Math.max(0, matches.length - visible));
+  const hiddenCount = matches.length - shown.length;
+
+  // Follow new messages only when the reader is already at the bottom; keep position when loading earlier ones.
+  useLayoutEffect(() => {
+    const element = scrollRef.current;
+    if (!element) return;
+    if (anchorRef.current !== null) {
+      element.scrollTop = element.scrollHeight - anchorRef.current;
+      anchorRef.current = null;
+    } else if (stickRef.current) {
+      element.scrollTop = element.scrollHeight;
+    }
+  }, [shown.length, items]);
+
+  // Markdown, code highlighting and images settle after the first paint; keep following the bottom while they do.
   useEffect(() => {
     const element = scrollRef.current;
-    if (element && items) element.scrollTop = element.scrollHeight;
-  }, [items]);
+    const content = contentRef.current;
+    if (!element || !content) return;
+    const observer = new ResizeObserver(() => {
+      if (stickRef.current && anchorRef.current === null) element.scrollTop = element.scrollHeight;
+    });
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, []);
 
-  const shown = items ? items.slice(Math.max(0, items.length - visible)) : [];
-  const hiddenCount = items ? Math.max(0, items.length - visible) : 0;
-  const canResume = folderExists;
+  const onScroll = () => {
+    const element = scrollRef.current;
+    if (!element) return;
+    const near = element.scrollHeight - element.scrollTop - element.clientHeight < NEAR_BOTTOM_PX;
+    stickRef.current = near;
+    setAtBottom(near);
+  };
+
+  const showEarlier = () => {
+    const element = scrollRef.current;
+    if (element) anchorRef.current = element.scrollHeight - element.scrollTop;
+    setVisible((v) => v + PAGE * 2);
+  };
+
+  const jumpToLatest = () => {
+    const element = scrollRef.current;
+    if (!element) return;
+    stickRef.current = true;
+    element.scrollTo({ top: element.scrollHeight, behavior: "smooth" });
+  };
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-bg">
       <div className="shrink-0 border-b border-border px-6 pt-4 pb-3.5">
-        <h1
-          title="Double-click to rename"
-          onDoubleClick={() => session && useUiStore.getState().setRenameTarget(session)}
-          className="line-clamp-2 cursor-text text-[15px] font-semibold tracking-tight text-fg"
-        >{workspace.title}</h1>
-        <div className="mt-1.5 flex flex-wrap items-center gap-x-3.5 gap-y-1 text-[11px] text-faint [&_svg]:!size-3">
-          <span className="flex items-center gap-1.5" title={workspace.cwd}>
-            <FolderOpen className="size-3.5" />
-            {shortenHome(workspace.cwd, home)}
-          </span>
-          {session?.gitBranch && session.gitBranch !== "HEAD" && (
-            <span className="flex items-center gap-1.5">
-              <GitBranch className="size-3.5" />
-              {session.gitBranch}
-            </span>
-          )}
-          {session?.startedAt && (
-            <span className="flex items-center gap-1.5">
-              <Calendar className="size-3.5" />
-              {format(new Date(session.startedAt), "d MMM yyyy, HH:mm")}
-            </span>
-          )}
+        <div className="group flex items-start gap-1">
+          <h1
+            title="Double-click to rename"
+            onDoubleClick={() => session && renameSession(session)}
+            className="line-clamp-2 min-w-0 cursor-text text-[15px] font-semibold tracking-tight text-fg"
+          >
+            {workspace.title}
+          </h1>
           {session && (
-            <span className="flex items-center gap-1.5">
-              <MessageSquare className="size-3.5" />
-              {session.promptCount} {session.promptCount === 1 ? "prompt" : "prompts"} · {formatBytes(session.size)}
-            </span>
+            <IconButton
+              label="Rename"
+              className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+              onClick={() => renameSession(session)}
+            >
+              <Pencil />
+            </IconButton>
           )}
-          {session?.version && <span>v{session.version}</span>}
         </div>
+        <Meta workspace={workspace} />
 
         {!folderExists && (
-          <div className="mt-4 flex items-start gap-2 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger">
-            <AlertTriangle className="mt-px size-3.5 shrink-0" />
-            This folder isn't reachable from this machine (it may be from a remote host, a stopped WSL distro, or it was moved), so the session can't be resumed here.
-          </div>
+          <Alert tone="danger" className="mt-3">
+            This folder isn't reachable from this machine. It may be on another host, in a stopped
+            WSL distro, or it was moved, so the session can't be resumed here.
+          </Alert>
         )}
         {external && (
-          <div className="mt-4 flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
-            <AlertTriangle className="mt-px size-3.5 shrink-0" />
-            This session is already open in another terminal (PID {external.pid}). Resuming it here too can make both copies write to the same conversation — fork it instead if you want a separate branch.
-          </div>
+          <Alert tone="warning" className="mt-3">
+            This session is already open in another terminal (PID {external.pid}). Resuming it here
+            too makes both copies write to the same conversation. Fork it instead for a separate
+            branch.
+          </Alert>
         )}
 
-        <div className="mt-3 flex items-center gap-1.5">
+        <div className="mt-3 flex flex-wrap items-center gap-1.5">
           <Button
             ref={resumeRef}
             variant="primary"
             size="sm"
-            disabled={!canResume}
+            disabled={!folderExists}
             onClick={() => void resumeWorkspace(workspace.id)}
           >
             <Play className="fill-current" /> {session ? "Resume session" : "Start session"}
-            <Kbd keys="Enter" className="ml-0.5 opacity-60 [&_kbd]:border-on-accent/25 [&_kbd]:bg-on-accent/10 [&_kbd]:text-on-accent" />
-          </Button>
-          {session && (
-            <Button size="sm" disabled={!canResume} onClick={() => resume(workspace.id, { fork: true })}>
-              <GitFork /> Fork
-            </Button>
-          )}
-          <Button size="sm" variant="ghost" disabled={!folderExists} onClick={() => openShell(workspace.id)}>
-            <SquareTerminal /> Shell
-          </Button>
-          <Button size="sm" variant="ghost" disabled={!folderExists} onClick={() => void revealInExplorer(workspace.cwd)}>
-            <FolderOpen /> Folder
+            <Kbd
+              keys="Enter"
+              className="ml-0.5 opacity-60 [&_kbd]:border-on-accent/25 [&_kbd]:bg-on-accent/10 [&_kbd]:text-on-accent"
+            />
           </Button>
           {session && (
             <Button
               size="sm"
-              variant="ghost"
-              className="ml-auto hover:bg-danger/15 hover:text-danger"
-              onClick={() => void deleteSessionWithConfirm(session)}
+              disabled={!folderExists}
+              onClick={() => void resumeWorkspace(workspace.id, { fork: true })}
             >
-              <Trash2 /> Delete
+              <GitFork /> Fork
             </Button>
           )}
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={!folderExists}
+            onClick={() => useWorkspaceStore.getState().openShell(workspace.id)}
+          >
+            <SquareTerminal /> Shell
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={!folderExists}
+            onClick={() => void revealInExplorer(workspace.cwd)}
+          >
+            <FolderOpen /> Folder
+          </Button>
+          <div className="ml-auto flex items-center gap-1.5">
+            {items && items.length > 0 && (
+              <SearchInput
+                value={query}
+                onChange={setQuery}
+                placeholder="Find in conversation"
+                className="w-[200px]"
+              />
+            )}
+            {session && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="hover:bg-danger/15 hover:text-danger"
+                onClick={() => void deleteSessionWithConfirm(session)}
+              >
+                <Trash2 /> Delete
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-[860px] px-6 py-4">
-          {error ? (
-            <EmptyState icon={<AlertTriangle />} title="Couldn't read this conversation" description={error} />
-          ) : !items ? (
-            <div className="flex justify-center py-10">
-              <Spinner />
-            </div>
-          ) : items.length === 0 ? (
-            <EmptyState
-              icon={<MessageSquare />}
-              title="No messages yet"
-              description="Start the session and your conversation will appear here."
-            />
-          ) : (
-            <>
-              {hiddenCount > 0 && (
-                <div className="mb-4 flex justify-center">
-                  <Button size="sm" variant="ghost" onClick={() => setVisible((v) => v + PAGE * 2)}>
-                    Show {Math.min(hiddenCount, PAGE * 2)} earlier messages
-                  </Button>
-                </div>
-              )}
-              {shown.map((item, index) => (
-                <div key={index} className={cn(item.kind === "tool" && "ml-0.5")}>
-                  <Message item={item} />
-                </div>
-              ))}
-            </>
-          )}
+      <div className="relative min-h-0 flex-1">
+        <div ref={scrollRef} onScroll={onScroll} className="h-full overflow-y-auto">
+          <div ref={contentRef} className="mx-auto max-w-[860px] px-6 py-4">
+            {error && !items?.length ? (
+              <EmptyState
+                icon={<AlertTriangle />}
+                title="Couldn't read this conversation"
+                description={error}
+              />
+            ) : !items ? (
+              <div className="flex justify-center py-10">
+                <Spinner />
+              </div>
+            ) : items.length === 0 ? (
+              <EmptyState
+                icon={<MessageSquare />}
+                title="No messages yet"
+                description="Start the session and your conversation will appear here."
+              />
+            ) : deferredQuery && matches.length === 0 ? (
+              <EmptyState
+                icon={<MessageSquare />}
+                title="No matches"
+                description={`Nothing in this conversation mentions “${query.trim()}”.`}
+              />
+            ) : (
+              <>
+                {deferredQuery && (
+                  <p className="mb-3 text-center text-[11px] text-faint">
+                    {matches.length} {matches.length === 1 ? "message matches" : "messages match"}
+                  </p>
+                )}
+                {hiddenCount > 0 && (
+                  <div className="mb-4 flex justify-center">
+                    <Button size="sm" variant="ghost" onClick={showEarlier}>
+                      Show {Math.min(hiddenCount, PAGE * 2)} earlier messages
+                    </Button>
+                  </div>
+                )}
+                {shown.map(({ item, index }) => (
+                  <Message key={index} item={item} />
+                ))}
+              </>
+            )}
+          </div>
         </div>
+        {!atBottom && !deferredQuery && (
+          <Button
+            size="sm"
+            className="absolute right-5 bottom-4 shadow-lg shadow-black/30"
+            onClick={jumpToLatest}
+          >
+            <ArrowDown /> Latest
+          </Button>
+        )}
       </div>
     </div>
   );

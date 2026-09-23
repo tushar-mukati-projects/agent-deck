@@ -2,11 +2,12 @@ use std::{
     fs,
     io::Read,
     path::{Path, PathBuf},
-    time::UNIX_EPOCH,
 };
 
 use anyhow::Context;
 use serde::Serialize;
+
+use crate::util::{has_parent_components, hidden, is_sensitive, mtime_ms};
 
 const MAX_TEXT_BYTES: u64 = 8 * 1024 * 1024;
 const SNIFF_BYTES: usize = 8 * 1024;
@@ -30,14 +31,6 @@ pub enum FileContent {
     Text { text: String, size: u64 },
     Binary { size: u64 },
     TooLarge { size: u64 },
-}
-
-fn modified_ms(meta: &fs::Metadata) -> u64 {
-    meta.modified()
-        .ok()
-        .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
-        .map(|d| d.as_millis() as u64)
-        .unwrap_or(0)
 }
 
 #[cfg(windows)]
@@ -67,7 +60,7 @@ pub fn list_dir(path: &str) -> anyhow::Result<Vec<DirEntry>> {
                 is_dir: meta.is_dir(),
                 is_symlink,
                 size: if meta.is_dir() { 0 } else { meta.len() },
-                modified_ms: modified_ms(&meta),
+                modified_ms: mtime_ms(&meta),
                 name,
             })
         })
@@ -80,37 +73,53 @@ pub fn list_dir(path: &str) -> anyhow::Result<Vec<DirEntry>> {
     Ok(entries)
 }
 
+const BOM: &[u8] = b"\xEF\xBB\xBF";
+
+fn guard(path: &Path) -> anyhow::Result<()> {
+    anyhow::ensure!(!has_parent_components(path), "Relative path segments are not allowed");
+    anyhow::ensure!(!is_sensitive(path), "Claude Deck doesn't open files in credential folders");
+    Ok(())
+}
+
 pub fn read_file(path: &str) -> anyhow::Result<FileContent> {
-    let meta = fs::metadata(path).with_context(|| format!("Cannot open {path}"))?;
-    let size = meta.len();
+    let target = Path::new(path);
+    guard(target)?;
+    let size = fs::metadata(target).with_context(|| format!("Cannot open {path}"))?.len();
     if size > MAX_TEXT_BYTES {
         return Ok(FileContent::TooLarge { size });
     }
     let mut bytes = Vec::with_capacity(size as usize);
-    fs::File::open(path)?.read_to_end(&mut bytes)?;
-    let sniff = &bytes[..bytes.len().min(SNIFF_BYTES)];
-    if sniff.contains(&0) {
+    fs::File::open(target)?.take(MAX_TEXT_BYTES + 1).read_to_end(&mut bytes)?;
+    if bytes.len() as u64 > MAX_TEXT_BYTES {
+        return Ok(FileContent::TooLarge { size: bytes.len() as u64 });
+    }
+    if bytes[..bytes.len().min(SNIFF_BYTES)].contains(&0) {
         return Ok(FileContent::Binary { size });
     }
-    let text = match String::from_utf8(bytes) {
-        Ok(text) => text,
-        Err(err) => String::from_utf8_lossy(err.as_bytes()).into_owned(),
-    };
-    Ok(FileContent::Text { text: text.strip_prefix('\u{FEFF}').map(str::to_string).unwrap_or(text), size })
+    let body = bytes.strip_prefix(BOM).unwrap_or(&bytes);
+    Ok(FileContent::Text { text: String::from_utf8_lossy(body).into_owned(), size })
 }
 
 pub fn write_file(path: &str, contents: &str) -> anyhow::Result<()> {
-    let target = Path::new(path);
-    anyhow::ensure!(target.is_file(), "Only existing files can be saved: {path}");
-    let tmp = target.with_extension(format!(
-        "{}.claude-deck-tmp",
-        target.extension().map(|e| e.to_string_lossy().to_string()).unwrap_or_default()
-    ));
-    fs::write(&tmp, contents)?;
-    fs::rename(&tmp, target).or_else(|_| {
+    let requested = Path::new(path);
+    guard(requested)?;
+    anyhow::ensure!(requested.is_file(), "Only existing files can be saved: {path}");
+    let target = dunce::canonicalize(requested)?;
+    guard(&target)?;
+    let mut head = [0u8; 3];
+    let had_bom = fs::File::open(&target).and_then(|mut f| f.read_exact(&mut head)).is_ok() && head == BOM;
+    let mut data = Vec::with_capacity(contents.len() + 3);
+    if had_bom {
+        data.extend_from_slice(BOM);
+    }
+    data.extend_from_slice(contents.as_bytes());
+    let file_name = target.file_name().context("invalid file name")?.to_string_lossy().to_string();
+    let tmp = target.with_file_name(format!(".{file_name}.claude-deck-tmp"));
+    fs::write(&tmp, &data)?;
+    if fs::rename(&tmp, &target).is_err() {
         let _ = fs::remove_file(&tmp);
-        fs::write(target, contents)
-    })?;
+        fs::write(&target, &data)?;
+    }
     Ok(())
 }
 
@@ -131,15 +140,9 @@ pub fn list_files(root: &str) -> Vec<String> {
 }
 
 pub fn open_in_editor(path: &str) -> anyhow::Result<()> {
+    let target = Path::new(path);
+    anyhow::ensure!(target.is_absolute() && target.exists() && !path.starts_with('-'), "Can't open {path}");
     let code = which::which("code").context("VS Code (`code`) is not on PATH")?;
-    let mut cmd = std::process::Command::new(code);
-    cmd.arg(path);
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        cmd.creation_flags(CREATE_NO_WINDOW);
-    }
-    cmd.spawn()?;
+    hidden(std::process::Command::new(code).arg("--").arg(target)).spawn()?;
     Ok(())
 }

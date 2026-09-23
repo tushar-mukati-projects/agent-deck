@@ -18,6 +18,11 @@ STRING_FIELD = {
 TEXT_BLOCK_RE = re.compile(rb'"type":"text","text":"((?:[^"\\]|\\.)*)"')
 SIDECHAIN_RE = re.compile(rb'"isSidechain":(true|false)')
 TOOL_FIELDS = ("description", "command", "file_path", "pattern", "url", "query", "prompt")
+STRING_CONTENT_RE = re.compile(rb'"content":"((?:[^"\\]|\\.){0,4000})')
+META_RE = re.compile(rb'"isMeta":(true|false)')
+RELEVANT = (b'"type":"user"', b'"type":"assistant"', b'-title"', b'"last-prompt"')
+SESSION_ID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+GIT = ["git", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null"]
 
 
 def claude_homes():
@@ -36,10 +41,12 @@ def claude_homes():
 
 
 def decode(raw):
-    try:
-        return json.loads(b'"' + raw + b'"')
-    except ValueError:
-        return None
+    for candidate in (raw, raw.rsplit(b"\\", 1)[0]):
+        try:
+            return json.loads(b'"' + candidate + b'"')
+        except ValueError:
+            continue
+    return None
 
 
 def field(chunk, key):
@@ -70,6 +77,8 @@ def base_record(data):
 
 
 def reduce_short(line):
+    if not any(marker in line for marker in RELEVANT):
+        return None
     try:
         data = json.loads(line)
     except ValueError:
@@ -98,8 +107,10 @@ def reduce_long(line):
         record[key] = field(tail, key) or field(head[:1500], key)
     side = SIDECHAIN_RE.search(head[:600])
     record["isSidechain"] = bool(side and side.group(1) == b"true")
+    meta = META_RE.search(tail) or META_RE.search(head[:1500])
+    record["isMeta"] = bool(meta and meta.group(1) == b"true")
     if kind == "user" and b'"tool_result"' not in head[:4000]:
-        text = TEXT_BLOCK_RE.search(head)
+        text = TEXT_BLOCK_RE.search(head) or STRING_CONTENT_RE.search(head)
         decoded = decode(text.group(1)) if text else None
         if decoded and not is_system_text(decoded):
             record["message"] = {"content": decoded[:PROMPT_CHARS]}
@@ -208,7 +219,15 @@ def summarize_tool(block):
     return {"type": "tool_use", "name": block.get("name"), "input": {"description": detail[:300]} if detail else {}}
 
 
+def session_id_of(path):
+    session_id = os.path.basename(path)[: -len(".jsonl")]
+    if not path.endswith(".jsonl") or not SESSION_ID_RE.fullmatch(session_id):
+        raise ValueError("not a Claude session file")
+    return session_id
+
+
 def transcript(path):
+    session_home(path)
     out = []
     with open(path, "rb") as handle:
         for line in handle:
@@ -254,7 +273,7 @@ def in_projects(path):
 def delete(path):
     if not in_projects(path):
         raise ValueError("not a Claude session file")
-    session_id = os.path.basename(path)[: -len(".jsonl")]
+    session_id = session_id_of(path)
     home = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(path))))
     os.remove(path)
     for extra in (path[: -len(".jsonl")], os.path.join(home, "file-history", session_id), os.path.join(home, "session-env", session_id)):
@@ -270,7 +289,7 @@ def delete(path):
 def list_files(root):
     try:
         output = subprocess.run(
-            ["git", "-C", root, "ls-files", "-co", "--exclude-standard"],
+            GIT + ["-C", root, "ls-files", "-co", "--exclude-standard"],
             capture_output=True, timeout=20, check=True,
         ).stdout.decode("utf-8", "replace")
         return {"files": [line for line in output.splitlines() if line][:60000]}
@@ -293,6 +312,7 @@ MAX_DIFF_BYTES = 2 * 1024 * 1024
 def session_home(path):
     if not in_projects(path):
         raise ValueError("not a Claude session file")
+    session_id_of(path)
     return os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(path))))
 
 
@@ -384,8 +404,8 @@ def backup(path, name):
 
 
 def git_status(root):
-    top = subprocess.run(["git", "-C", root, "rev-parse", "--show-toplevel"], capture_output=True, check=True).stdout.decode().strip()
-    out = subprocess.run(["git", "-C", root, "status", "--porcelain=v1", "-z", "--untracked-files=all"], capture_output=True, check=True).stdout
+    top = subprocess.run(GIT + ["-C", root, "rev-parse", "--show-toplevel"], capture_output=True, check=True, timeout=15).stdout.decode().strip()
+    out = subprocess.run(GIT + ["-C", root, "status", "--porcelain=v1", "-z", "--untracked-files=all"], capture_output=True, check=True, timeout=15).stdout
     entries = [e for e in out.split(b"\0") if e]
     result, index = [], 0
     while index < len(entries):
@@ -402,7 +422,7 @@ def git_status(root):
 
 def git_head(path):
     directory, name = os.path.split(path)
-    out = subprocess.run(["git", "-C", directory, "show", f"HEAD:./{name}"], capture_output=True)
+    out = subprocess.run(GIT + ["-C", directory, "show", f"HEAD:./{name}"], capture_output=True, timeout=15)
     if out.returncode != 0:
         raise ValueError(out.stderr.decode("utf-8", "replace").strip() or "not in HEAD")
     return {"text": out.stdout.decode("utf-8", "replace")}
@@ -426,6 +446,49 @@ def rename(path, title):
     return {"renamed": path}
 
 
+def search(query):
+    needle = query.strip().lower()
+    hits = []
+    if len(needle) < 2:
+        return {"hits": hits}
+    raw_needle = needle.encode()
+    for home in claude_homes():
+        for path in glob.glob(os.path.join(home, "projects", "*", "*.jsonl")):
+            session_id = os.path.basename(path)[: -len(".jsonl")]
+            found = 0
+            with open(path, "rb") as handle:
+                for line in handle:
+                    if raw_needle not in line.lower():
+                        continue
+                    try:
+                        data = json.loads(line)
+                    except ValueError:
+                        continue
+                    if data.get("type") not in ("user", "assistant") or data.get("isSidechain"):
+                        continue
+                    content = (data.get("message") or {}).get("content")
+                    texts = [prompt_text(content)] if data["type"] == "user" else [
+                        b.get("text", "") for b in (content if isinstance(content, list) else [{"text": content or ""}])
+                        if isinstance(b, dict) and b.get("type", "text") == "text"
+                    ]
+                    for text in filter(None, texts):
+                        index = text.lower().find(needle)
+                        if index < 0:
+                            continue
+                        start, end = max(0, index - 90), min(len(text), index + len(needle) + 90)
+                        snippet = " ".join(text[start:end].split())
+                        hits.append({
+                            "sessionId": session_id,
+                            "role": data["type"],
+                            "snippet": ("…" if start else "") + snippet + ("…" if end < len(text) else ""),
+                            "timestamp": data.get("timestamp"),
+                        })
+                        found += 1
+                    if found >= 3:
+                        break
+    return {"hits": hits}
+
+
 def main():
     mode = sys.argv[1]
     if mode == "index":
@@ -444,6 +507,8 @@ def main():
         result = git_status(sys.argv[2])
     elif mode == "git_head":
         result = git_head(sys.argv[2])
+    elif mode == "search":
+        result = search(sys.stdin.read())
     elif mode == "rename":
         result = rename(sys.argv[2], sys.stdin.read())
     else:

@@ -45,7 +45,9 @@ export const FolderFilter = () => {
             ) : (
               <Layers className="size-3.5 shrink-0 text-faint" />
             )}
-            <span className="min-w-0 flex-1 truncate">{folderFilter ? basename(folderFilter) : "All folders"}</span>
+            <span className="min-w-0 flex-1 truncate">
+              {folderFilter ? basename(folderFilter) : "All folders"}
+            </span>
             <ChevronDown className="size-3.5 shrink-0 text-faint" />
           </button>
         </DropdownMenuTrigger>
@@ -78,7 +80,9 @@ export const FolderFilter = () => {
                   onSelect={() => setSettings({ folderFilter: folder.cwd })}
                 >
                   <span className={cn(selected && "text-accent")}>{folder.name}</span>
-                  <span className="ml-2 text-[11px] text-faint">{shortenHome(folder.cwd, home)}</span>
+                  <span className="ml-2 text-[11px] text-faint">
+                    {shortenHome(folder.cwd, home)}
+                  </span>
                 </DropdownMenuItem>
               );
             })}
@@ -89,7 +93,13 @@ export const FolderFilter = () => {
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              icon={includeSubfolders ? <Check className="!text-accent" /> : <span className="size-3.5" />}
+              icon={
+                includeSubfolders ? (
+                  <Check className="!text-accent" />
+                ) : (
+                  <span className="size-3.5" />
+                )
+              }
               onSelect={() => setSettings({ includeSubfolders: !includeSubfolders })}
             >
               Include subfolders

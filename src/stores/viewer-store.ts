@@ -13,7 +13,7 @@ interface ViewerState {
   setMarkdownMode: (path: string, mode: MarkdownMode) => void;
 }
 
-const omit = <T,>(record: Record<string, T>, key: string) => {
+const omit = <T>(record: Record<string, T>, key: string) => {
   const { [key]: _removed, ...rest } = record;
   return rest;
 };
@@ -24,11 +24,16 @@ export const useViewerStore = create<ViewerState>((set) => ({
   markdownMode: {},
   setDraft: (path, text) =>
     set((s) => ({
-      drafts: text === null ? omit(s.drafts, normalizePath(path)) : { ...s.drafts, [normalizePath(path)]: text },
+      drafts:
+        text === null
+          ? omit(s.drafts, normalizePath(path))
+          : { ...s.drafts, [normalizePath(path)]: text },
     })),
   setEditing: (path, editing) =>
     set((s) => ({
-      editing: editing ? { ...s.editing, [normalizePath(path)]: true } : omit(s.editing, normalizePath(path)),
+      editing: editing
+        ? { ...s.editing, [normalizePath(path)]: true }
+        : omit(s.editing, normalizePath(path)),
     })),
   setMarkdownMode: (path, mode) =>
     set((s) => ({ markdownMode: { ...s.markdownMode, [normalizePath(path)]: mode } })),

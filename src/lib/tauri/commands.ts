@@ -7,6 +7,10 @@ import type {
   DirEntry,
   FileContent,
   LiveSession,
+  MediaIndex,
+  ProjectAgent,
+  SearchHit,
+  TaskPackage,
   PtyEvent,
   PtyInfo,
   SessionInfo,
@@ -38,6 +42,11 @@ export const api = {
   gitHeadFile: (path: string) => invoke<string>("git_head_file", { path }),
   renameSession: (filePath: string, distro: string | null, title: string) =>
     invoke<void>("rename_session", { filePath, distro, title }),
+  searchSessions: (query: string, includeWsl: boolean) =>
+    invoke<SearchHit[]>("search_sessions", { query, includeWsl }),
+  projectTasks: (root: string) => invoke<TaskPackage[]>("project_tasks", { root }),
+  projectAgents: (root: string) => invoke<ProjectAgent[]>("project_agents", { root }),
+  projectMedia: (root: string) => invoke<MediaIndex>("project_media", { root }),
   setAttentionBadge: (active: boolean) => invoke<void>("set_attention_badge", { active }),
   listWslSessions: () => invoke<WslIndex>("list_wsl_sessions"),
   wslDistros: () => invoke<WslDistro[]>("wsl_distros"),
@@ -48,7 +57,8 @@ export const api = {
   ptyAttach: (id: string, onEvent: (event: PtyEvent) => void) =>
     invoke<PtyInfo>("pty_attach", { id, onEvent: createChannel(onEvent) }),
   ptyWrite: (id: string, data: string) => invoke<void>("pty_write", { id, data }),
-  ptyResize: (id: string, cols: number, rows: number) => invoke<void>("pty_resize", { id, cols, rows }),
+  ptyResize: (id: string, cols: number, rows: number) =>
+    invoke<void>("pty_resize", { id, cols, rows }),
   ptyKill: (id: string) => invoke<void>("pty_kill", { id }),
   ptyList: () => invoke<PtyInfo[]>("pty_list"),
 

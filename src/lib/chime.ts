@@ -1,6 +1,12 @@
 let context: AudioContext | null = null;
 
-const tone = (ctx: AudioContext, frequency: number, start: number, duration: number, volume: number) => {
+const tone = (
+  ctx: AudioContext,
+  frequency: number,
+  start: number,
+  duration: number,
+  volume: number,
+) => {
   const oscillator = ctx.createOscillator();
   const gain = ctx.createGain();
   oscillator.type = "sine";

@@ -3,7 +3,7 @@ use std::{
     path::{Path, PathBuf},
     sync::mpsc,
     thread,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use notify::{EventKind, RecursiveMode, Watcher};
@@ -24,9 +24,13 @@ pub struct Watchers {
     roots: Mutex<HashMap<String, notify::RecommendedWatcher>>,
 }
 
+const NOISY_DIRS: &[&str] = &[".git", "node_modules", "target", ".next", "__pycache__"];
+const MAX_BATCH_WAIT: Duration = Duration::from_secs(1);
+const MAX_BATCH_SIZE: usize = 5000;
+
 fn is_noise(path: &Path) -> bool {
-    path.components().any(|c| c.as_os_str() == ".git")
-        || path.extension().is_some_and(|e| e.to_string_lossy().ends_with("claude-deck-tmp"))
+    path.components().any(|c| NOISY_DIRS.iter().any(|dir| c.as_os_str() == *dir))
+        || path.to_string_lossy().ends_with(".claude-deck-tmp")
 }
 
 fn debounced<F>(delay: Duration, on_batch: F) -> mpsc::Sender<PathBuf>
@@ -36,8 +40,9 @@ where
     let (tx, rx) = mpsc::channel::<PathBuf>();
     thread::spawn(move || {
         while let Ok(first) = rx.recv() {
+            let started = Instant::now();
             let mut batch = BTreeSet::from([first]);
-            loop {
+            while started.elapsed() < MAX_BATCH_WAIT && batch.len() < MAX_BATCH_SIZE {
                 match rx.recv_timeout(delay) {
                     Ok(path) => {
                         batch.insert(path);

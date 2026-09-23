@@ -1,9 +1,9 @@
 use std::{
-    collections::HashMap,
-    io::Write,
+    collections::{HashMap, HashSet},
     path::PathBuf,
-    process::{Command, Stdio},
+    process::Command,
     sync::LazyLock,
+    time::Duration,
 };
 
 use anyhow::{anyhow, Context};
@@ -12,11 +12,16 @@ use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::changes::{ChangedFile, GitChange};
-use crate::sessions::{Accumulator, LiveSession, SessionInfo, TranscriptItem};
+use crate::changes::ChangedFile;
+use crate::git::GitChange;
+use crate::util::run_with_timeout;
+use crate::sessions::{Accumulator, LiveSession, SearchHit, SessionInfo, TranscriptItem};
 
 const AGENT: &str = include_str!("wsl_agent.py");
-const BOOTSTRAP: &str = "import sys,base64;exec(base64.b64decode(sys.argv.pop(1)))";
+const BOOTSTRAP: &str = "import sys,base64;exec(base64.b64decode(sys.stdin.readline()))";
+const INDEX_TIMEOUT: Duration = Duration::from_secs(90);
+const AGENT_TIMEOUT: Duration = Duration::from_secs(30);
+const LIST_TIMEOUT: Duration = Duration::from_secs(8);
 const UNC_PREFIX: &str = r"\\wsl.localhost\";
 
 #[derive(Serialize, Clone)]
@@ -83,16 +88,6 @@ fn cache_file() -> PathBuf {
     dirs::cache_dir().unwrap_or_else(std::env::temp_dir).join("claude-deck").join("wsl-index.json")
 }
 
-fn hidden(command: &mut Command) -> &mut Command {
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        command.creation_flags(CREATE_NO_WINDOW);
-    }
-    command
-}
-
 fn decode_utf16(bytes: &[u8]) -> String {
     let units: Vec<u16> = bytes.chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).collect();
     String::from_utf16_lossy(&units)
@@ -101,7 +96,7 @@ fn decode_utf16(bytes: &[u8]) -> String {
 fn distro_names(extra: &[&str]) -> Vec<String> {
     let mut args = vec!["-l", "-q"];
     args.extend_from_slice(extra);
-    let Ok(output) = hidden(Command::new("wsl.exe").args(&args)).output() else { return Vec::new() };
+    let Ok(output) = run_with_timeout(Command::new("wsl.exe").args(&args), None, LIST_TIMEOUT) else { return Vec::new() };
     if !output.status.success() {
         return Vec::new();
     }
@@ -137,22 +132,15 @@ pub fn parse_host_path(path: &str) -> Option<(String, String)> {
     Some((distro.to_string(), format!("/{}", tail.replace('\\', "/"))))
 }
 
-fn run_agent(distro: &str, args: &[&str], input: Option<String>) -> anyhow::Result<Value> {
+fn run_agent_with(distro: &str, args: &[&str], input: Option<String>, timeout: Duration) -> anyhow::Result<Value> {
     let script = base64::engine::general_purpose::STANDARD.encode(AGENT);
-    let mut child = hidden(
-        Command::new("wsl.exe")
-            .args(["-d", distro, "-e", "python3", "-c", BOOTSTRAP, &script])
-            .args(args)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped()),
+    let payload = format!("{script}\n{}", input.unwrap_or_default());
+    let output = run_with_timeout(
+        Command::new("wsl.exe").args(["-d", distro, "-e", "python3", "-c", BOOTSTRAP]).args(args),
+        Some(payload.as_bytes()),
+        timeout,
     )
-    .spawn()
-    .context("Couldn't start wsl.exe")?;
-    if let Some(mut stdin) = child.stdin.take() {
-        stdin.write_all(input.unwrap_or_default().as_bytes())?;
-    }
-    let output = child.wait_with_output()?;
+    .with_context(|| format!("WSL {distro} didn't respond"))?;
     let value: Value = serde_json::from_slice(&output.stdout).map_err(|_| {
         let stderr = String::from_utf8_lossy(&output.stderr);
         anyhow!("WSL {distro}: {}", stderr.trim().lines().last().unwrap_or("agent failed (is python3 installed?)"))
@@ -161,6 +149,10 @@ fn run_agent(distro: &str, args: &[&str], input: Option<String>) -> anyhow::Resu
         return Err(anyhow!("WSL {distro}: {error}"));
     }
     Ok(value)
+}
+
+fn run_agent(distro: &str, args: &[&str], input: Option<String>) -> anyhow::Result<Value> {
+    run_agent_with(distro, args, input, AGENT_TIMEOUT)
 }
 
 fn ensure_loaded(cache: &mut Cache) {
@@ -175,16 +167,18 @@ fn ensure_loaded(cache: &mut Cache) {
     }
 }
 
-fn save(cache: &Cache) {
+fn serialize(cache: &Cache) -> Option<String> {
+    serde_json::to_string(cache).ok()
+}
+
+fn persist(text: String) {
     let path = cache_file();
     if let Some(parent) = path.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
-    if let Ok(text) = serde_json::to_string(cache) {
-        let tmp = path.with_extension("tmp");
-        if std::fs::write(&tmp, text).is_ok() {
-            let _ = std::fs::rename(&tmp, &path);
-        }
+    let tmp = path.with_extension("tmp");
+    if std::fs::write(&tmp, text).is_ok() {
+        let _ = std::fs::rename(&tmp, &path);
     }
 }
 
@@ -214,7 +208,8 @@ fn index_distro(distro: &str) -> anyhow::Result<()> {
             .unwrap_or_default()
     };
     let request = serde_json::json!({ "offsets": offsets }).to_string();
-    let response: IndexResponse = serde_json::from_value(run_agent(distro, &["index"], Some(request))?)?;
+    let response: IndexResponse =
+        serde_json::from_value(run_agent_with(distro, &["index"], Some(request), INDEX_TIMEOUT)?)?;
 
     let mut cache = CACHE.lock();
     let state = cache.distros.entry(distro.to_string()).or_default();
@@ -226,6 +221,10 @@ fn index_distro(distro: &str) -> anyhow::Result<()> {
         };
         let mut acc = match state.entries.get(&change.path) {
             Some(existing) if change.start > 0 && existing.acc_offset() == change.start => existing.acc.clone(),
+            _ if change.start > 0 => {
+                state.entries.remove(&change.path);
+                continue;
+            }
             _ => fresh(),
         };
         for record in &change.records {
@@ -234,7 +233,8 @@ fn index_distro(distro: &str) -> anyhow::Result<()> {
         acc.set_offset(change.end);
         state.entries.insert(change.path.clone(), Entry { size: change.size, mtime: change.mtime, acc });
     }
-    state.entries.retain(|path, _| response.files.contains(path));
+    let present: HashSet<&String> = response.files.iter().collect();
+    state.entries.retain(|path, _| present.contains(path));
     state.live = response
         .live
         .into_iter()
@@ -244,13 +244,18 @@ fn index_distro(distro: &str) -> anyhow::Result<()> {
         })
         .collect();
     state.shell = Some(response.shell);
-    if changed {
-        save(&cache);
+    let snapshot = changed.then(|| serialize(&cache)).flatten();
+    drop(cache);
+    if let Some(text) = snapshot {
+        persist(text);
     }
     Ok(())
 }
 
+static INDEX_LOCK: Mutex<()> = Mutex::new(());
+
 pub fn index() -> WslIndex {
+    let _guard = INDEX_LOCK.lock();
     let running: Vec<String> = distros().into_iter().filter(|d| d.running).map(|d| d.name).collect();
     let mut errors = HashMap::new();
     for distro in &running {
@@ -295,11 +300,16 @@ pub fn delete_session(distro: &str, path: &str) -> anyhow::Result<()> {
         "This session is still running in WSL. Close it first."
     );
     run_agent(distro, &["delete", path], None)?;
-    let mut cache = CACHE.lock();
-    if let Some(state) = cache.distros.get_mut(distro) {
-        state.entries.remove(path);
+    let snapshot = {
+        let mut cache = CACHE.lock();
+        if let Some(state) = cache.distros.get_mut(distro) {
+            state.entries.remove(path);
+        }
+        serialize(&cache)
+    };
+    if let Some(text) = snapshot {
+        persist(text);
     }
-    save(&cache);
     Ok(())
 }
 
@@ -341,9 +351,19 @@ pub fn rename_session(distro: &str, path: &str, title: &str) -> anyhow::Result<(
     Ok(())
 }
 
+pub fn search(query: &str) -> Vec<SearchHit> {
+    distros()
+        .into_iter()
+        .filter(|d| d.running)
+        .filter_map(|d| run_agent(&d.name, &["search"], Some(query.to_string())).ok())
+        .filter_map(|value| serde_json::from_value::<Vec<SearchHit>>(value.get("hits")?.clone()).ok())
+        .flatten()
+        .collect()
+}
+
 pub fn start(distro: &str) -> anyhow::Result<()> {
-    let status = hidden(Command::new("wsl.exe").args(["-d", distro, "-e", "true"])).status()?;
-    anyhow::ensure!(status.success(), "Couldn't start WSL distro {distro}");
+    let output = run_with_timeout(Command::new("wsl.exe").args(["-d", distro, "-e", "true"]), None, INDEX_TIMEOUT)?;
+    anyhow::ensure!(output.status.success(), "Couldn't start WSL distro {distro}");
     Ok(())
 }
 

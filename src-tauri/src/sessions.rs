@@ -1,10 +1,9 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fs,
-    io::{BufRead, BufReader, Seek, SeekFrom},
+    io::{BufRead, BufReader, Read, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
     sync::LazyLock,
-    time::UNIX_EPOCH,
 };
 
 use anyhow::Context;
@@ -13,10 +12,12 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::value::RawValue;
 
+use crate::util::{canonical, is_session_id, mtime_ms};
+
 const PROMPT_PREVIEW_CHARS: usize = 280;
 const TRANSCRIPT_TEXT_CHARS: usize = 24_000;
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionInfo {
     pub id: String,
@@ -136,13 +137,6 @@ pub fn live_dir() -> PathBuf {
     claude_home().join("sessions")
 }
 
-fn file_stamp(meta: &fs::Metadata) -> u64 {
-    meta.modified()
-        .ok()
-        .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
-        .map(|d| d.as_millis() as u64)
-        .unwrap_or(0)
-}
 
 fn truncate_chars(text: &str, max: usize) -> String {
     match text.char_indices().nth(max) {
@@ -203,24 +197,7 @@ impl Accumulator {
 
     pub(crate) fn with_ids(id: String, file_path: String, project_key: &str, distro: Option<String>) -> Self {
         Self {
-            info: SessionInfo {
-                id,
-                distro,
-                file_path,
-                project_key: project_key.to_string(),
-                cwd: String::new(),
-                title: None,
-                custom_title: None,
-                first_prompt: None,
-                last_prompt: None,
-                git_branch: None,
-                started_at: None,
-                last_message_at: None,
-                modified_ms: 0,
-                prompt_count: 0,
-                size: 0,
-                version: None,
-            },
+            info: SessionInfo { id, distro, file_path, project_key: project_key.to_string(), ..SessionInfo::default() },
             ai_title: None,
             last_user_text: None,
             offset: 0,
@@ -308,7 +285,7 @@ impl Accumulator {
     }
 
     fn finish(&self, meta: &fs::Metadata) -> Option<SessionInfo> {
-        self.finish_with(file_stamp(meta), meta.len())
+        self.finish_with(mtime_ms(meta), meta.len())
     }
 
     pub(crate) fn finish_with(&self, modified_ms: u64, size: u64) -> Option<SessionInfo> {
@@ -361,7 +338,7 @@ pub fn list_sessions() -> Vec<SessionInfo> {
         files
             .iter()
             .filter_map(|(path, key, meta)| match cache.get(path) {
-                Some(c) if c.modified_ms == file_stamp(meta) && c.size == meta.len() => None,
+                Some(c) if c.modified_ms == mtime_ms(meta) && c.size == meta.len() => None,
                 Some(c) if meta.len() >= c.acc.offset => Some((path, meta, c.acc.clone())),
                 _ => Some((path, meta, Accumulator::new(path, key))),
             })
@@ -373,13 +350,14 @@ pub fn list_sessions() -> Vec<SessionInfo> {
         .map(|(path, meta, mut acc)| {
             acc.read_from_offset(path);
             let info = acc.finish(meta);
-            (path.clone(), CacheEntry { modified_ms: file_stamp(meta), size: meta.len(), acc, info })
+            (path.clone(), CacheEntry { modified_ms: mtime_ms(meta), size: meta.len(), acc, info })
         })
         .collect();
 
     let mut cache = CACHE.lock();
     cache.extend(parsed);
-    cache.retain(|path, _| files.iter().any(|(p, _, _)| p == path));
+    let present: HashSet<&PathBuf> = files.iter().map(|(p, _, _)| p).collect();
+    cache.retain(|path, _| present.contains(path));
 
     let mut sessions: Vec<_> = cache.values().filter_map(|c| c.info.clone()).collect();
     sessions.sort_by(|a, b| b.modified_ms.cmp(&a.modified_ms));
@@ -458,12 +436,21 @@ fn summarize_tool(name: &str, input: Option<&serde_json::Value>) -> String {
     }
 }
 
-pub fn transcript(file_path: &str) -> anyhow::Result<Vec<TranscriptItem>> {
-    let path = Path::new(file_path);
+pub fn session_file(file_path: &str) -> anyhow::Result<(PathBuf, String)> {
+    let path = canonical(Path::new(file_path))?;
+    let projects = canonical(&projects_dir())?;
+    let session_id = path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
     anyhow::ensure!(
-        path.starts_with(projects_dir()) && path.extension().is_some_and(|x| x == "jsonl"),
-        "not a session file"
+        path.extension().is_some_and(|x| x == "jsonl")
+            && path.parent().and_then(Path::parent) == Some(projects.as_path())
+            && is_session_id(&session_id),
+        "not a Claude session file"
     );
+    Ok((path, session_id))
+}
+
+pub fn transcript(file_path: &str) -> anyhow::Result<Vec<TranscriptItem>> {
+    let (path, _) = session_file(file_path)?;
     let reader = BufReader::with_capacity(256 * 1024, fs::File::open(path)?);
     let lines = reader.split(b'\n').map_while(Result::ok).filter_map(|l| String::from_utf8(l).ok());
     Ok(transcript_from_lines(lines))
@@ -525,33 +512,98 @@ pub(crate) fn transcript_from_lines(lines: impl Iterator<Item = String>) -> Vec<
     items
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchHit {
+    pub session_id: String,
+    pub role: String,
+    pub snippet: String,
+    pub timestamp: Option<String>,
+}
+
+const SEARCH_HITS_PER_SESSION: usize = 3;
+const SNIPPET_RADIUS: usize = 90;
+
+pub fn snippet_around(text: &str, needle_lower: &str) -> Option<String> {
+    let chars: Vec<char> = text.chars().collect();
+    let lower: Vec<char> = chars.iter().flat_map(|c| c.to_lowercase()).collect();
+    let needle: Vec<char> = needle_lower.chars().collect();
+    if lower.len() != chars.len() || needle.is_empty() {
+        return text.to_lowercase().contains(needle_lower).then(|| truncate_chars(&collapse_whitespace(text), SNIPPET_RADIUS * 2));
+    }
+    let index = lower.windows(needle.len()).position(|w| w == needle.as_slice())?;
+    let start = index.saturating_sub(SNIPPET_RADIUS);
+    let end = (index + needle.len() + SNIPPET_RADIUS).min(chars.len());
+    let body = collapse_whitespace(&chars[start..end].iter().collect::<String>());
+    Some(format!("{}{}{}", if start > 0 { "…" } else { "" }, body, if end < chars.len() { "…" } else { "" }))
+}
+
+fn search_file(path: &Path, needle_lower: &str) -> Vec<SearchHit> {
+    let Ok(file) = fs::File::open(path) else { return Vec::new() };
+    let session_id = path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
+    let finder = memchr::memmem::Finder::new(needle_lower.as_bytes());
+    let mut hits = Vec::new();
+    for line in BufReader::with_capacity(256 * 1024, file).split(b'\n').map_while(Result::ok) {
+        if finder.find(&line.to_ascii_lowercase()).is_none() {
+            continue;
+        }
+        let Ok(text) = std::str::from_utf8(&line) else { continue };
+        let items = transcript_from_lines(std::iter::once(text.to_string()));
+        for item in items.into_iter().filter(|i| i.kind == "text") {
+            if let Some(snippet) = snippet_around(&item.text, needle_lower) {
+                hits.push(SearchHit { session_id: session_id.clone(), role: item.role, snippet, timestamp: item.timestamp });
+            }
+        }
+        if hits.len() >= SEARCH_HITS_PER_SESSION {
+            break;
+        }
+    }
+    hits.truncate(SEARCH_HITS_PER_SESSION);
+    hits
+}
+
+pub fn search(query: &str) -> Vec<SearchHit> {
+    let needle = query.trim().to_lowercase();
+    if needle.chars().count() < 2 {
+        return Vec::new();
+    }
+    let files = session_files();
+    files.par_iter().flat_map_iter(|(path, _, _)| search_file(path, &needle)).collect()
+}
+
 pub fn delete_session(file_path: &str) -> anyhow::Result<()> {
-    let path = Path::new(file_path);
-    let project = path.parent().context("invalid session path")?;
-    anyhow::ensure!(
-        path.extension().is_some_and(|x| x == "jsonl")
-            && project.parent() == Some(projects_dir().as_path())
-            && path.is_file(),
-        "not a Claude session file"
-    );
-    let id = path.file_stem().context("invalid session path")?.to_string_lossy().to_string();
+    let (path, id) = session_file(file_path)?;
     anyhow::ensure!(
         !live_sessions().iter().any(|l| l.session_id == id),
         "This session is still running. Close it first."
     );
+    let project = path.parent().context("invalid session path")?.to_path_buf();
     let home = claude_home();
-    let targets: Vec<PathBuf> = [
-        path.to_path_buf(),
-        project.join(&id),
-        home.join("file-history").join(&id),
-        home.join("session-env").join(&id),
-    ]
-    .into_iter()
-    .filter(|p| p.exists())
-    .collect();
+    let targets: Vec<PathBuf> =
+        [path.clone(), project.join(&id), home.join("file-history").join(&id), home.join("session-env").join(&id)]
+            .into_iter()
+            .filter(|p| p.exists())
+            .collect();
     trash::delete_all(&targets).context("Couldn't move the session to the Recycle Bin")?;
-    let _ = fs::remove_dir(project);
-    CACHE.lock().remove(path);
+    let _ = fs::remove_dir(&project);
+    CACHE.lock().retain(|cached, _| dunce::canonicalize(cached).map(|c| c != path).unwrap_or(false));
+    Ok(())
+}
+
+pub fn rename_session(file_path: &str, title: &str) -> anyhow::Result<()> {
+    let (path, session_id) = session_file(file_path)?;
+    let title = title.trim();
+    anyhow::ensure!(!title.is_empty(), "Title can't be empty");
+    let record = serde_json::json!({ "type": "custom-title", "customTitle": title, "sessionId": session_id });
+    let mut file = fs::OpenOptions::new().read(true).append(true).open(&path)?;
+    let needs_newline = file.metadata()?.len() > 0 && {
+        let mut last = [0u8; 1];
+        file.seek(SeekFrom::End(-1))?;
+        file.read_exact(&mut last)?;
+        last[0] != b'\n'
+    };
+    let line = format!("{}{record}\n", if needs_newline { "\n" } else { "" });
+    file.write_all(line.as_bytes())?;
     Ok(())
 }
 

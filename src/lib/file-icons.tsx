@@ -102,7 +102,10 @@ export const fileIcon = (path: string): IconSpec => {
 
 export const folderIcon = (name: string, open: boolean): IconSpec => {
   if (name === ".git") return { icon: FolderGit2, color: "text-faint" };
-  return { icon: open ? FolderOpen : Folder, color: name.startsWith(".") ? "text-faint" : "text-folder" };
+  return {
+    icon: open ? FolderOpen : Folder,
+    color: name.startsWith(".") ? "text-faint" : "text-folder",
+  };
 };
 
 export const FileIcon = ({ path, className }: { path: string; className?: string }) => {

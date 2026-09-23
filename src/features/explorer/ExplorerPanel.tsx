@@ -1,5 +1,13 @@
 import { useEffect } from "react";
-import { ChevronsDownUp, Eye, EyeOff, FolderOpen, FolderTree, RefreshCw, Search } from "lucide-react";
+import {
+  ChevronsDownUp,
+  Eye,
+  EyeOff,
+  FolderOpen,
+  FolderTree,
+  RefreshCw,
+  Search,
+} from "lucide-react";
 
 import { EmptyState, Spinner } from "@/components/ui/feedback";
 import { IconButton } from "@/components/ui/icon-button";
@@ -47,9 +55,15 @@ export const ExplorerPanel = () => {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex h-10 shrink-0 items-center justify-between pr-2 pl-3.5">
-        <span className="text-[11px] font-semibold tracking-wider text-muted uppercase">Explorer</span>
+        <span className="text-[11px] font-semibold tracking-wider text-muted uppercase">
+          Explorer
+        </span>
         <div className="flex items-center gap-0.5">
-          <IconButton label="Find file" shortcut={shortcutLabel("quickOpen")} onClick={() => openPalette("files")}>
+          <IconButton
+            label="Find file"
+            shortcut={shortcutLabel("quickOpen")}
+            onClick={() => openPalette("files")}
+          >
             <Search />
           </IconButton>
           <IconButton
@@ -61,7 +75,10 @@ export const ExplorerPanel = () => {
           <IconButton label="Refresh" onClick={refreshAll}>
             <RefreshCw />
           </IconButton>
-          <IconButton label="Collapse all" onClick={() => useExplorerStore.getState().collapseAll(root)}>
+          <IconButton
+            label="Collapse all"
+            onClick={() => useExplorerStore.getState().collapseAll(root)}
+          >
             <ChevronsDownUp />
           </IconButton>
         </div>

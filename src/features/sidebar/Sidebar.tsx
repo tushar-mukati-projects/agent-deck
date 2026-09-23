@@ -1,8 +1,9 @@
-import { Files, GitCompare, MessagesSquare, Settings } from "lucide-react";
+import { FolderKanban, Files, GitCompare, Keyboard, MessagesSquare, Settings } from "lucide-react";
 
 import { IconButton } from "@/components/ui/icon-button";
 import { ChangesPanel } from "@/features/changes/ChangesPanel";
 import { ExplorerPanel } from "@/features/explorer/ExplorerPanel";
+import { ProjectPanel } from "@/features/project/ProjectPanel";
 import { SessionsPanel } from "@/features/sidebar/SessionsPanel";
 import { shortcutLabel } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
@@ -10,15 +11,32 @@ import { useUiStore } from "@/stores/ui-store";
 import type { SidebarView } from "@/types";
 
 const VIEWS: { view: SidebarView; label: string; icon: typeof Files; shortcut: string }[] = [
-  { view: "sessions", label: "Sessions", icon: MessagesSquare, shortcut: shortcutLabel("showSessions") },
+  {
+    view: "sessions",
+    label: "Sessions",
+    icon: MessagesSquare,
+    shortcut: shortcutLabel("showSessions"),
+  },
   { view: "explorer", label: "Explorer", icon: Files, shortcut: shortcutLabel("showExplorer") },
-  { view: "changes", label: "What changed", icon: GitCompare, shortcut: shortcutLabel("showChanges") },
+  {
+    view: "changes",
+    label: "What changed",
+    icon: GitCompare,
+    shortcut: shortcutLabel("showChanges"),
+  },
+  {
+    view: "project",
+    label: "Project: tasks, agents, media",
+    icon: FolderKanban,
+    shortcut: shortcutLabel("showProject"),
+  },
 ];
 
 export const ActivityBar = () => {
   const sidebarView = useUiStore((s) => s.sidebarView);
   const sidebarOpen = useUiStore((s) => s.sidebarOpen);
-  const { setSidebarView, toggleSidebar, setSettingsOpen } = useUiStore.getState();
+  const { setSidebarView, toggleSidebar, setSettingsOpen, setShortcutsOpen } =
+    useUiStore.getState();
 
   const select = (view: SidebarView) => {
     if (view === sidebarView && sidebarOpen) toggleSidebar();
@@ -31,7 +49,9 @@ export const ActivityBar = () => {
         const active = sidebarOpen && sidebarView === view;
         return (
           <div key={view} className="relative">
-            {active && <span className="absolute top-1.5 bottom-1.5 -left-[6px] w-[2px] rounded-full bg-accent" />}
+            {active && (
+              <span className="absolute top-1.5 bottom-1.5 -left-[6px] w-[2px] rounded-full bg-accent" />
+            )}
             <IconButton
               size="md"
               label={label}
@@ -46,6 +66,15 @@ export const ActivityBar = () => {
         );
       })}
       <div className="flex-1" />
+      <IconButton
+        size="md"
+        label="Keyboard shortcuts"
+        shortcut={shortcutLabel("shortcuts")}
+        tooltipSide="right"
+        onClick={() => setShortcutsOpen(true)}
+      >
+        <Keyboard strokeWidth={1.75} />
+      </IconButton>
       <IconButton
         size="md"
         label="Settings"
@@ -70,6 +99,7 @@ export const SidePanel = () => {
         <ExplorerPanel />
       </div>
       {sidebarView === "changes" && <ChangesPanel />}
+      {sidebarView === "project" && <ProjectPanel />}
     </aside>
   );
 };

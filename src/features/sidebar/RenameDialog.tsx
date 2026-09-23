@@ -26,7 +26,9 @@ export const RenameDialog = () => {
       await api.renameSession(target.filePath, target.distro, next);
       useSessionsStore.getState().patchSession(target.id, { title: next, customTitle: next });
       setRenameTarget(null);
-      void (target.distro ? useSessionsStore.getState().refreshWsl() : useSessionsStore.getState().refresh());
+      void (target.distro
+        ? useSessionsStore.getState().refreshWsl()
+        : useSessionsStore.getState().refresh());
     } catch (error) {
       toast.error(`Couldn't rename: ${errorMessage(error)}`);
     } finally {

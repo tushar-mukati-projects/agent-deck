@@ -15,10 +15,18 @@ export const ConfirmDialog = () => {
       className="w-[min(440px,calc(100vw-48px))]"
     >
       <div className="flex justify-end gap-2 px-5 pt-5 pb-4">
-        <Button variant="ghost" onClick={() => resolveConfirm(false)}>
+        <Button
+          autoFocus={!!confirm?.destructive}
+          variant="ghost"
+          onClick={() => resolveConfirm(false)}
+        >
           Cancel
         </Button>
-        <Button autoFocus variant={confirm?.destructive ? "danger" : "primary"} onClick={() => resolveConfirm(true)}>
+        <Button
+          autoFocus={!confirm?.destructive}
+          variant={confirm?.destructive ? "danger" : "primary"}
+          onClick={() => resolveConfirm(true)}
+        >
           {confirm?.confirmLabel ?? "Confirm"}
         </Button>
       </div>

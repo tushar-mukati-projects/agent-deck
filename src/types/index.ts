@@ -90,6 +90,53 @@ export interface GitChange {
   code: string;
 }
 
+export interface SearchHit {
+  sessionId: string;
+  role: "user" | "assistant";
+  snippet: string;
+  timestamp: string | null;
+}
+
+export interface TaskScript {
+  name: string;
+  command: string;
+}
+
+export interface TaskPackage {
+  dir: string;
+  name: string;
+  scripts: TaskScript[];
+  runner: string;
+}
+
+export interface ProjectAgent {
+  name: string;
+  description: string | null;
+  path: string;
+}
+
+export type MediaKind = "video" | "image" | "audio";
+
+export interface MediaItem {
+  path: string;
+  kind: MediaKind;
+  size: number;
+  modifiedMs: number;
+}
+
+export interface MediaSequence {
+  dir: string;
+  count: number;
+  sample: string;
+  modifiedMs: number;
+}
+
+export interface MediaIndex {
+  items: MediaItem[];
+  sequences: MediaSequence[];
+  truncated: boolean;
+}
+
 export interface WslDistro {
   name: string;
   running: boolean;
@@ -126,6 +173,14 @@ export interface TerminalState {
 
 export type WorkspaceMode = "preview" | "live";
 
+export interface ShellTab {
+  id: string;
+  cwd: string;
+  program: string;
+  label?: string;
+  command?: string;
+}
+
 export interface Workspace {
   id: string;
   sessionId: string;
@@ -134,10 +189,12 @@ export interface Workspace {
   filePath: string | null;
   mode: WorkspaceMode;
   claudeTerminalId: string | null;
+  claudeArgs: string[];
+  shells: ShellTab[];
   activeShellId: string | null;
   shellPanelOpen: boolean;
   openFiles: string[];
   activeFile: string | null;
 }
 
-export type SidebarView = "sessions" | "explorer" | "changes";
+export type SidebarView = "sessions" | "explorer" | "changes" | "project";

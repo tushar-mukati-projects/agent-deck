@@ -43,7 +43,11 @@ export const useAppEvents = () => {
     const poll = window.setInterval(() => void refreshLive(), LIVE_POLL_MS);
     const wslPoll = window.setInterval(() => {
       const { distros } = useSessionsStore.getState();
-      if (useSettingsStore.getState().includeWsl && distros.some((d) => d.running) && !document.hidden)
+      if (
+        useSettingsStore.getState().includeWsl &&
+        distros.some((d) => d.running) &&
+        !document.hidden
+      )
         void refreshWsl();
     }, WSL_POLL_MS);
     const unsubscribeSettings = useSettingsStore.subscribe((state, previous) => {

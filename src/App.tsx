@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { CommandPalette } from "@/features/palette/CommandPalette";
 import { ConfirmDialog } from "@/features/settings/ConfirmDialog";
 import { SettingsDialog } from "@/features/settings/SettingsDialog";
+import { ShortcutsDialog } from "@/features/shortcuts/ShortcutsDialog";
 import { RenameDialog } from "@/features/sidebar/RenameDialog";
 import { ActivityBar, SidePanel } from "@/features/sidebar/Sidebar";
 import { StatusBar } from "@/features/statusbar/StatusBar";
@@ -34,7 +35,8 @@ const useSidebarPanel = () => {
 
   const syncFromDrag = () => {
     const collapsed = panelRef.current?.isCollapsed() ?? false;
-    if (collapsed === useUiStore.getState().sidebarOpen) useUiStore.setState({ sidebarOpen: !collapsed });
+    if (collapsed === useUiStore.getState().sidebarOpen)
+      useUiStore.setState({ sidebarOpen: !collapsed });
   };
 
   return { panelRef, syncFromDrag };
@@ -44,7 +46,11 @@ export const App = () => {
   const workspace = useActiveWorkspace();
   const themeKind = useSettingsStore((s) => findTheme(s.themeId).kind);
   const { panelRef, syncFromDrag } = useSidebarPanel();
-  const layout = useDefaultLayout({ id: "deck-shell", storage: localStorage, onlySaveAfterUserInteractions: true });
+  const layout = useDefaultLayout({
+    id: "deck-shell",
+    storage: localStorage,
+    onlySaveAfterUserInteractions: true,
+  });
   useAppEvents();
   useGlobalShortcuts();
   useAttentionAlerts();
@@ -78,7 +84,11 @@ export const App = () => {
             <ResizeHandle orientation="horizontal" />
             <Panel id="content" minSize={420}>
               <ErrorBoundary key={workspace?.id ?? "welcome"}>
-                {workspace ? <WorkspaceView key={workspace.id} workspace={workspace} /> : <Welcome />}
+                {workspace ? (
+                  <WorkspaceView key={workspace.id} workspace={workspace} />
+                ) : (
+                  <Welcome />
+                )}
               </ErrorBoundary>
             </Panel>
           </Group>
@@ -89,6 +99,7 @@ export const App = () => {
       <SettingsDialog />
       <ConfirmDialog />
       <RenameDialog />
+      <ShortcutsDialog />
       <Toaster
         theme={themeKind}
         position="bottom-right"

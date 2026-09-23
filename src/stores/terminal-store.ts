@@ -9,6 +9,9 @@ interface TerminalStore {
   remove: (id: string) => void;
 }
 
+export const isAlive = (terminal: TerminalState | undefined) =>
+  terminal?.status === "running" || terminal?.status === "starting";
+
 export const useTerminalStore = create<TerminalStore>((set) => ({
   terminals: {},
   upsert: (terminal) => set((s) => ({ terminals: { ...s.terminals, [terminal.id]: terminal } })),
@@ -16,8 +19,8 @@ export const useTerminalStore = create<TerminalStore>((set) => ({
     set((s) => {
       const current = s.terminals[id];
       if (!current) return s;
-      const changed = Object.entries(patch).some(
-        ([key, value]) => current[key as keyof TerminalState] !== value,
+      const changed = (Object.keys(patch) as (keyof TerminalState)[]).some(
+        (key) => current[key] !== patch[key],
       );
       return changed ? { terminals: { ...s.terminals, [id]: { ...current, ...patch } } } : s;
     }),
@@ -27,3 +30,6 @@ export const useTerminalStore = create<TerminalStore>((set) => ({
       return { terminals: rest };
     }),
 }));
+
+export const isTerminalAlive = (id: string | null | undefined) =>
+  !!id && isAlive(useTerminalStore.getState().terminals[id]);

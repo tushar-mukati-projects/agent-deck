@@ -8,9 +8,10 @@ import { subscribeFileChanges } from "@/lib/file-events";
 import { FileIcon } from "@/lib/file-icons";
 import { api } from "@/lib/tauri/commands";
 import { basename, cn, dirname, errorMessage, isWithin, relativePath } from "@/lib/utils";
+import { DECK_PATH_MIME } from "@/lib/terminal/input";
 import { useSessionsStore } from "@/stores/sessions-store";
-import { useActiveWorkspace, useWorkspaceStore, type WorkspaceRecord } from "@/stores/workspace-store";
-import type { ChangedFile, GitChange } from "@/types";
+import { useActiveWorkspace, useWorkspaceStore } from "@/stores/workspace-store";
+import type { ChangedFile, GitChange, Workspace } from "@/types";
 
 const statusBadge: Record<string, { letter: string; className: string; label: string }> = {
   added: { letter: "A", className: "text-add", label: "Added" },
@@ -43,7 +44,7 @@ const Row = ({
   onOpen,
   children,
 }: {
-  workspace: WorkspaceRecord;
+  workspace: Workspace;
   path: string;
   badge: { letter: string; className: string; label: string };
   onOpen: () => void;
@@ -56,13 +57,21 @@ const Row = ({
       type="button"
       onClick={onOpen}
       title={path}
+      draggable
+      onDragStart={(e) => e.dataTransfer.setData(DECK_PATH_MIME, path)}
       className="group flex h-[26px] w-full items-center gap-2 rounded-md px-2 text-left text-[12px] hover:bg-hover"
     >
       <FileIcon path={path} />
       <span className="shrink-0 truncate text-fg/90">{basename(path)}</span>
       <span className="min-w-0 flex-1 truncate text-[11px] text-faint">{folder}</span>
       {children}
-      <span title={badge.label} className={cn("w-3 shrink-0 text-center font-mono text-[11px] font-semibold", badge.className)}>
+      <span
+        title={badge.label}
+        className={cn(
+          "w-3 shrink-0 text-center font-mono text-[11px] font-semibold",
+          badge.className,
+        )}
+      >
         {badge.letter}
       </span>
     </button>
@@ -109,19 +118,26 @@ export const ChangesPanel = () => {
   const [loading, setLoading] = useState(false);
   const [showUnchanged, setShowUnchanged] = useState(false);
 
+  const cwd = workspace?.cwd;
+  const filePath = session?.filePath;
+  const distro = session?.distro;
+  const requestRef = useRef(0);
+
   const load = useCallback(async () => {
-    if (!workspace) return;
+    if (!cwd) return;
+    const request = ++requestRef.current;
     setLoading(true);
     const [changes, status] = await Promise.allSettled([
-      session ? api.sessionChanges(session.filePath, session.distro) : Promise.resolve([]),
-      api.gitStatus(workspace.cwd),
+      filePath ? api.sessionChanges(filePath, distro ?? null) : Promise.resolve([]),
+      api.gitStatus(cwd),
     ]);
+    if (request !== requestRef.current) return;
     setFiles(changes.status === "fulfilled" ? changes.value : []);
     setError(changes.status === "rejected" ? errorMessage(changes.reason) : null);
     setGit(status.status === "fulfilled" ? status.value : []);
     setGitError(status.status === "rejected" ? errorMessage(status.reason) : null);
     setLoading(false);
-  }, [workspace, session]);
+  }, [cwd, filePath, distro]);
 
   const reload = useDebounced(() => void load(), 900);
 
@@ -129,13 +145,12 @@ export const ChangesPanel = () => {
     setFiles(null);
     setGit(null);
     void load();
-  }, [workspace?.id]);
+  }, [load]);
 
   useEffect(() => {
     if (session?.modifiedMs) reload();
   }, [session?.modifiedMs, reload]);
 
-  const cwd = workspace?.cwd;
   useEffect(() => {
     if (!cwd) return;
     return subscribeFileChanges((change) => {
@@ -148,7 +163,11 @@ export const ChangesPanel = () => {
     [files, showUnchanged],
   );
   const totals = useMemo(
-    () => visibleFiles.reduce((acc, f) => ({ add: acc.add + f.additions, del: acc.del + f.deletions }), { add: 0, del: 0 }),
+    () =>
+      visibleFiles.reduce(
+        (acc, f) => ({ add: acc.add + f.additions, del: acc.del + f.deletions }),
+        { add: 0, del: 0 },
+      ),
     [visibleFiles],
   );
 
@@ -169,7 +188,9 @@ export const ChangesPanel = () => {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex h-10 shrink-0 items-center justify-between pr-2 pl-3.5">
-        <span className="text-[11px] font-semibold tracking-wider text-muted uppercase">Changes</span>
+        <span className="text-[11px] font-semibold tracking-wider text-muted uppercase">
+          Changes
+        </span>
         <div className="flex items-center gap-0.5">
           <IconButton
             label={showUnchanged ? "Hide restored files" : "Show restored files"}
@@ -204,7 +225,9 @@ export const ChangesPanel = () => {
             >
               {error && <p className="px-2 py-1 text-[11px] text-danger">{error}</p>}
               {visibleFiles.length === 0 && !error && (
-                <p className="px-2 py-1 text-[11.5px] text-faint">Claude hasn't changed any files in this session.</p>
+                <p className="px-2 py-1 text-[11.5px] text-faint">
+                  Claude hasn't changed any files in this session.
+                </p>
               )}
               {visibleFiles.map((file) => (
                 <Row
@@ -223,8 +246,12 @@ export const ChangesPanel = () => {
             </Section>
 
             <Section title="Uncommitted in repo" count={git?.length ?? 0}>
-              {gitError && <p className="px-2 py-1 text-[11px] text-faint">Not a git repository.</p>}
-              {!gitError && git?.length === 0 && <p className="px-2 py-1 text-[11.5px] text-faint">Working tree is clean.</p>}
+              {gitError && (
+                <p className="px-2 py-1 text-[11px] text-faint">Not a git repository.</p>
+              )}
+              {!gitError && git?.length === 0 && (
+                <p className="px-2 py-1 text-[11.5px] text-faint">Working tree is clean.</p>
+              )}
               {(git ?? []).map((change) => (
                 <Row
                   key={change.path}

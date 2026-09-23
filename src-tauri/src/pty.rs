@@ -1,6 +1,7 @@
 use std::{
     collections::HashMap,
     io::{Read, Write},
+    path::{Path, PathBuf},
     sync::{mpsc, Arc},
     thread,
 };
@@ -13,6 +14,8 @@ use tauri::ipc::Channel;
 
 const REPLAY_LIMIT: usize = 2 * 1024 * 1024;
 const SENDER_BATCH_LIMIT: usize = 512 * 1024;
+
+const ALLOWED_PROGRAMS: &[&str] = &["claude", "pwsh", "powershell", "cmd", "wsl", "bash", "zsh", "fish", "nu", "sh"];
 
 const SCRUBBED_ENV: &[&str] = &[
     "CLAUDECODE",
@@ -29,12 +32,6 @@ const SCRUBBED_ENV: &[&str] = &[
 ];
 
 const SCRUBBED_ENV_PREFIXES: &[&str] = &["WARP_", "WT_", "VSCODE_", "TERMINAL_EMULATOR"];
-
-fn inherited_terminal_vars() -> impl Iterator<Item = String> {
-    std::env::vars_os()
-        .filter_map(|(key, _)| key.into_string().ok())
-        .filter(|key| SCRUBBED_ENV_PREFIXES.iter().any(|prefix| key.starts_with(prefix)))
-}
 
 #[derive(Serialize, Clone)]
 #[serde(tag = "type", rename_all = "camelCase")]
@@ -63,6 +60,7 @@ pub struct PtyInfo {
     pub exited: bool,
 }
 
+#[derive(Default)]
 struct Output {
     replay: String,
     channel: Option<Channel<PtyEvent>>,
@@ -70,45 +68,43 @@ struct Output {
     exit_code: Option<u32>,
 }
 
-struct PtyProcess {
-    writer: Mutex<Box<dyn Write + Send>>,
-    master: Mutex<Box<dyn MasterPty + Send>>,
-    killer: Mutex<Box<dyn ChildKiller + Send + Sync>>,
-    pid: Option<u32>,
-    output: Mutex<Output>,
-}
-
-impl PtyProcess {
+impl Output {
     fn emit(&self, event: PtyEvent) {
-        let output = self.output.lock();
-        if let Some(channel) = &output.channel {
+        if let Some(channel) = &self.channel {
             let _ = channel.send(event);
         }
     }
 
-    fn push_data(&self, data: String) {
-        let mut output = self.output.lock();
-        output.replay.push_str(&data);
-        if output.replay.len() > REPLAY_LIMIT {
-            let mut cut = output.replay.len() - REPLAY_LIMIT / 2;
-            while !output.replay.is_char_boundary(cut) {
+    fn push(&mut self, data: String) {
+        self.replay.push_str(&data);
+        if self.replay.len() > REPLAY_LIMIT {
+            let mut cut = self.replay.len() - REPLAY_LIMIT / 2;
+            while !self.replay.is_char_boundary(cut) {
                 cut += 1;
             }
-            output.replay.drain(..cut);
+            self.replay.drain(..cut);
         }
-        if let Some(channel) = &output.channel {
-            let _ = channel.send(PtyEvent::Data { data });
-        }
+        self.emit(PtyEvent::Data { data });
     }
+}
 
+struct PtyProcess {
+    input: Mutex<Option<mpsc::Sender<Vec<u8>>>>,
+    master: Mutex<Option<Box<dyn MasterPty + Send>>>,
+    killer: Mutex<Box<dyn ChildKiller + Send + Sync>>,
+    pid: Option<u32>,
+    output: Arc<Mutex<Output>>,
+}
+
+impl PtyProcess {
     fn info(&self, id: &str) -> PtyInfo {
         let output = self.output.lock();
-        PtyInfo {
-            id: id.to_string(),
-            pid: self.pid,
-            exit_code: output.exit_code,
-            exited: output.exited,
-        }
+        PtyInfo { id: id.to_string(), pid: self.pid, exit_code: output.exit_code, exited: output.exited }
+    }
+
+    fn close(&self) {
+        self.input.lock().take();
+        self.master.lock().take();
     }
 }
 
@@ -117,7 +113,7 @@ pub struct PtyManager {
     processes: Mutex<HashMap<String, Arc<PtyProcess>>>,
 }
 
-fn drain_utf8(pending: &mut Vec<u8>) -> String {
+pub fn drain_utf8(pending: &mut Vec<u8>) -> String {
     let mut out = String::with_capacity(pending.len());
     let mut rest: &[u8] = pending;
     loop {
@@ -143,12 +139,22 @@ fn drain_utf8(pending: &mut Vec<u8>) -> String {
             }
         }
     }
-    let leftover = rest.to_vec();
-    *pending = leftover;
+    *pending = rest.to_vec();
     out
 }
 
-fn resolve_program(program: &str) -> anyhow::Result<std::path::PathBuf> {
+fn program_stem(program: &str) -> String {
+    Path::new(program)
+        .file_stem()
+        .map(|s| s.to_string_lossy().to_lowercase())
+        .unwrap_or_default()
+}
+
+fn resolve_program(program: &str) -> anyhow::Result<PathBuf> {
+    anyhow::ensure!(
+        ALLOWED_PROGRAMS.contains(&program_stem(program).as_str()),
+        "`{program}` is not an allowed terminal program"
+    );
     if let Ok(found) = which::which(program) {
         return Ok(found);
     }
@@ -172,54 +178,73 @@ pub fn default_shell() -> String {
     }
 }
 
+fn build_command(req: &SpawnRequest) -> anyhow::Result<CommandBuilder> {
+    let mut cmd = CommandBuilder::new(resolve_program(&req.program)?);
+    cmd.args(&req.args);
+    cmd.cwd(&req.cwd);
+    let inherited = std::env::vars_os()
+        .filter_map(|(key, _)| key.into_string().ok())
+        .filter(|key| SCRUBBED_ENV_PREFIXES.iter().any(|prefix| key.starts_with(prefix)));
+    for key in SCRUBBED_ENV.iter().map(|k| k.to_string()).chain(inherited) {
+        cmd.env_remove(key);
+    }
+    cmd.env("TERM", "xterm-256color");
+    cmd.env("COLORTERM", "truecolor");
+    cmd.env("TERM_PROGRAM", "claude-deck");
+    if program_stem(&req.program) == "wsl" {
+        let forwarded = std::env::var("WSLENV").unwrap_or_default();
+        let joined = [forwarded.as_str(), "COLORTERM", "TERM_PROGRAM"]
+            .into_iter()
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<_>>()
+            .join(":");
+        cmd.env("WSLENV", joined);
+    }
+    Ok(cmd)
+}
+
+fn size(cols: u16, rows: u16) -> PtySize {
+    PtySize { rows: rows.max(2), cols: cols.max(10), pixel_width: 0, pixel_height: 0 }
+}
+
 impl PtyManager {
     pub fn spawn(&self, req: SpawnRequest, channel: Channel<PtyEvent>) -> anyhow::Result<PtyInfo> {
-        if let Some(existing) = self.processes.lock().get(&req.id).cloned() {
-            existing.output.lock().channel = Some(channel);
-            return Ok(existing.info(&req.id));
+        let mut processes = self.processes.lock();
+        if let Some(existing) = processes.get(&req.id).cloned() {
+            if !existing.output.lock().exited {
+                drop(processes);
+                return self.attach(&req.id, channel);
+            }
+            existing.close();
+            processes.remove(&req.id);
         }
-        anyhow::ensure!(std::path::Path::new(&req.cwd).is_dir(), "Folder does not exist: {}", req.cwd);
+        anyhow::ensure!(Path::new(&req.cwd).is_dir(), "Folder does not exist: {}", req.cwd);
 
         let pair = native_pty_system()
-            .openpty(PtySize { rows: req.rows.max(2), cols: req.cols.max(10), pixel_width: 0, pixel_height: 0 })
+            .openpty(size(req.cols, req.rows))
             .map_err(|e| anyhow!("Could not open a terminal: {e}"))?;
-
-        let mut cmd = CommandBuilder::new(resolve_program(&req.program)?);
-        cmd.args(&req.args);
-        cmd.cwd(&req.cwd);
-        for key in SCRUBBED_ENV.iter().map(|k| k.to_string()).chain(inherited_terminal_vars()) {
-            cmd.env_remove(key);
-        }
-        cmd.env("TERM", "xterm-256color");
-        cmd.env("COLORTERM", "truecolor");
-        cmd.env("TERM_PROGRAM", "claude-deck");
-        if req.program.eq_ignore_ascii_case("wsl.exe") {
-            let forwarded = std::env::var("WSLENV").unwrap_or_default();
-            let joined = [forwarded.as_str(), "COLORTERM", "TERM_PROGRAM"]
-                .into_iter()
-                .filter(|s| !s.is_empty())
-                .collect::<Vec<_>>()
-                .join(":");
-            cmd.env("WSLENV", joined);
-        }
-
-        let mut child = pair.slave.spawn_command(cmd).map_err(|e| anyhow!("Could not start {}: {e}", req.program))?;
+        let mut child = pair
+            .slave
+            .spawn_command(build_command(&req)?)
+            .map_err(|e| anyhow!("Could not start {}: {e}", req.program))?;
         drop(pair.slave);
 
         let reader = pair.master.try_clone_reader().map_err(|e| anyhow!("{e}"))?;
         let writer = pair.master.take_writer().map_err(|e| anyhow!("{e}"))?;
+        let output = Arc::new(Mutex::new(Output { channel: Some(channel), ..Output::default() }));
         let process = Arc::new(PtyProcess {
-            writer: Mutex::new(writer),
-            master: Mutex::new(pair.master),
+            input: Mutex::new(Some(spawn_writer(writer))),
+            master: Mutex::new(Some(pair.master)),
             killer: Mutex::new(child.clone_killer()),
             pid: child.process_id(),
-            output: Mutex::new(Output { replay: String::new(), channel: Some(channel), exited: false, exit_code: None }),
+            output: output.clone(),
         });
-        self.processes.lock().insert(req.id.clone(), process.clone());
+        processes.insert(req.id.clone(), process.clone());
+        drop(processes);
 
         let (tx, rx) = mpsc::channel::<String>();
         spawn_reader(reader, tx);
-        spawn_sender(rx, process.clone());
+        spawn_sender(rx, output.clone());
 
         let waiter = process.clone();
         thread::spawn(move || {
@@ -229,7 +254,7 @@ impl PtyManager {
                 output.exited = true;
                 output.exit_code = code;
             }
-            waiter.emit(PtyEvent::Exit { code });
+            waiter.master.lock().take();
         });
 
         Ok(process.info(&req.id))
@@ -237,16 +262,15 @@ impl PtyManager {
 
     pub fn attach(&self, id: &str, channel: Channel<PtyEvent>) -> anyhow::Result<PtyInfo> {
         let process = self.get(id)?;
-        {
-            let mut output = process.output.lock();
-            if !output.replay.is_empty() {
-                let _ = channel.send(PtyEvent::Data { data: output.replay.clone() });
-            }
-            if output.exited {
-                let _ = channel.send(PtyEvent::Exit { code: output.exit_code });
-            }
-            output.channel = Some(channel);
+        let mut output = process.output.lock();
+        if !output.replay.is_empty() {
+            let _ = channel.send(PtyEvent::Data { data: output.replay.clone() });
         }
+        if output.exited {
+            let _ = channel.send(PtyEvent::Exit { code: output.exit_code });
+        }
+        output.channel = Some(channel);
+        drop(output);
         Ok(process.info(id))
     }
 
@@ -256,27 +280,27 @@ impl PtyManager {
 
     pub fn write(&self, id: &str, data: &str) -> anyhow::Result<()> {
         let process = self.get(id)?;
-        let mut writer = process.writer.lock();
-        writer.write_all(data.as_bytes())?;
-        writer.flush()?;
-        Ok(())
+        let input = process.input.lock();
+        let sender = input.as_ref().ok_or_else(|| anyhow!("terminal {id} has exited"))?;
+        sender.send(data.as_bytes().to_vec()).map_err(|_| anyhow!("terminal {id} has exited"))
     }
 
     pub fn resize(&self, id: &str, cols: u16, rows: u16) -> anyhow::Result<()> {
         let process = self.get(id)?;
         let master = process.master.lock();
-        master
-            .resize(PtySize { rows: rows.max(2), cols: cols.max(10), pixel_width: 0, pixel_height: 0 })
-            .map_err(|e| anyhow!("{e}"))
+        match master.as_ref() {
+            Some(master) => master.resize(size(cols, rows)).map_err(|e| anyhow!("{e}")),
+            None => Ok(()),
+        }
     }
 
-    pub fn kill(&self, id: &str) -> anyhow::Result<()> {
-        let Some(process) = self.processes.lock().remove(id) else { return Ok(()) };
+    pub fn kill(&self, id: &str) {
+        let Some(process) = self.processes.lock().remove(id) else { return };
+        process.output.lock().channel = None;
         if !process.output.lock().exited {
             let _ = process.killer.lock().kill();
         }
-        process.output.lock().channel = None;
-        Ok(())
+        process.close();
     }
 
     pub fn list(&self) -> Vec<PtyInfo> {
@@ -287,8 +311,21 @@ impl PtyManager {
         let processes: Vec<_> = self.processes.lock().drain().collect();
         for (_, process) in processes {
             let _ = process.killer.lock().kill();
+            process.close();
         }
     }
+}
+
+fn spawn_writer(mut writer: Box<dyn Write + Send>) -> mpsc::Sender<Vec<u8>> {
+    let (tx, rx) = mpsc::channel::<Vec<u8>>();
+    thread::spawn(move || {
+        while let Ok(chunk) = rx.recv() {
+            if writer.write_all(&chunk).and_then(|_| writer.flush()).is_err() {
+                break;
+            }
+        }
+    });
+    tx
 }
 
 fn spawn_reader(mut reader: Box<dyn Read + Send>, tx: mpsc::Sender<String>) {
@@ -310,7 +347,7 @@ fn spawn_reader(mut reader: Box<dyn Read + Send>, tx: mpsc::Sender<String>) {
     });
 }
 
-fn spawn_sender(rx: mpsc::Receiver<String>, process: Arc<PtyProcess>) {
+fn spawn_sender(rx: mpsc::Receiver<String>, output: Arc<Mutex<Output>>) {
     thread::spawn(move || {
         while let Ok(mut batch) = rx.recv() {
             while batch.len() < SENDER_BATCH_LIMIT {
@@ -319,14 +356,18 @@ fn spawn_sender(rx: mpsc::Receiver<String>, process: Arc<PtyProcess>) {
                     Err(_) => break,
                 }
             }
-            process.push_data(batch);
+            output.lock().push(batch);
         }
+        let mut output = output.lock();
+        output.exited = true;
+        let code = output.exit_code;
+        output.emit(PtyEvent::Exit { code });
     });
 }
 
 #[cfg(test)]
 mod tests {
-    use super::drain_utf8;
+    use super::{drain_utf8, program_stem, ALLOWED_PROGRAMS};
 
     #[test]
     fn keeps_incomplete_multibyte_sequence_for_next_read() {
@@ -344,5 +385,12 @@ mod tests {
         let mut pending = vec![b'a', 0xff, b'b'];
         assert_eq!(drain_utf8(&mut pending), "a\u{FFFD}b");
         assert!(pending.is_empty());
+    }
+
+    #[test]
+    fn allows_only_terminal_programs() {
+        assert!(ALLOWED_PROGRAMS.contains(&program_stem("C:\\Program Files\\PowerShell\\7\\pwsh.exe").as_str()));
+        assert!(ALLOWED_PROGRAMS.contains(&program_stem("wsl.exe").as_str()));
+        assert!(!ALLOWED_PROGRAMS.contains(&program_stem("calc.exe").as_str()));
     }
 }

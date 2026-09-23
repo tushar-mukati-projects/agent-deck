@@ -14,7 +14,12 @@ Built with **Tauri 2** (Rust backend, system WebView2) + **React 19 / TypeScript
 - **Detects sessions open elsewhere** (from `~/.claude/sessions`) and warns before double-resuming.
 - **Shells per session** — any number of PowerShell tabs in the session folder (`Ctrl+\``).
 - **Explorer + viewer** — virtualized tree with live file watching; markdown preview (GFM, sanitized), syntax-highlighted code with edit & save, images, PDF, audio/video. Files auto-reload when Claude edits them. "Mention in Claude" inserts `@path`.
-- **Command palette** (`Ctrl+Shift+P`) and **quick open** (`Ctrl+P`).
+- **What changed** — files Claude edited in this session (with diffs against its own backups) plus uncommitted git changes.
+- **Project view** (`Ctrl+Shift+J`) — run any `package.json` script in a labelled shell tab, start a session with one of the folder's `.claude/agents`, and browse the folder's media (videos, images, audio, rendered frame folders) in a gallery.
+- **Search inside conversations** (`Ctrl+Shift+F`) — full-text search across every transcript, Windows and WSL.
+- **Attention** — notification, sound and taskbar badge when Claude finishes while you're elsewhere; `Ctrl+Shift+A` or the status bar jumps to the waiting session.
+- **Pin / rename / archive** sessions, 21 themes, clickable file paths in terminal output, drag files from the explorer into a terminal to mention them.
+- **Command palette** (`Ctrl+Shift+P`), **quick open** (`Ctrl+P`) and a shortcut sheet (`Ctrl+/`).
 - Tabs survive app restarts (reopen as previews) and UI reloads (terminals reattach with replayed output).
 
 ## Shortcuts
@@ -26,7 +31,13 @@ Built with **Tauri 2** (Rust backend, system WebView2) + **React 19 / TypeScript
 | New session in current folder | `Ctrl+Shift+N` |
 | Toggle / new shell | ``Ctrl+` `` / ``Ctrl+Shift+` `` |
 | Next / previous tab | `Ctrl+Tab` / `Ctrl+Shift+Tab` |
-| Sessions / Explorer / sidebar | `Ctrl+Shift+S` / `Ctrl+Shift+E` / `Ctrl+Shift+B` |
+| Sessions / Explorer / Changes / Project | `Ctrl+Shift+S` / `E` / `G` / `J` |
+| Toggle sidebar | `Ctrl+Shift+B` |
+| Search conversations | `Ctrl+Shift+F` |
+| Reopen closed tab / jump to waiting session | `Ctrl+Shift+T` / `Ctrl+Shift+A` |
+| Jump to tab | `Ctrl+1…9` |
+| Find in terminal | `Ctrl+F` |
+| All shortcuts | `Ctrl+/` |
 | Close file | `Ctrl+Shift+W` |
 | Terminal font size | `Ctrl+=` / `Ctrl+-` / `Ctrl+0` |
 | Newline in Claude prompt | `Shift+Enter` |
@@ -40,7 +51,7 @@ Requires Node 20+, Rust (stable, MSVC) and the VS C++ build tools.
 npm install
 npm run app:dev      # dev app with hot reload (separate identifier, so it runs beside an installed copy)
 npm run app:build    # release exe + NSIS installer in src-tauri/target/release/bundle/nsis
-npm run typecheck
+npm run check       # typecheck + vitest
 cd src-tauri; cargo test --lib
 ```
 
@@ -48,12 +59,18 @@ cd src-tauri; cargo test --lib
 
 ```
 src-tauri/src/
-  sessions.rs   session index (incremental JSONL parsing, rayon), transcripts, live-session detection
+  commands.rs   every Tauri command (thin wrappers; blocking work off the main thread)
+  sessions.rs   session index (incremental JSONL parsing, rayon), transcripts, search, rename, delete
+  changes.rs    "what changed" from session file-history backups
+  git.rs        hardened git status / HEAD reads
+  project.rs    package scripts, .claude/agents, media index
+  wsl.rs        WSL bridge; wsl_agent.py runs inside the distro
   pty.rs        ConPTY terminals: reader + coalescing sender threads, replay buffer, env scrubbing
   fsx.rs        directory listing, file read/write, gitignore-aware file list
   watcher.rs    debounced file watchers (folders + ~/.claude)
 src/
   lib/terminal/registry.ts   xterm instances live outside React (never lost on tab switch)
+  actions/                   user-level operations (resume, close, delete, mention, run task) used by every UI surface
   stores/                    zustand: workspaces (persisted), terminals, sessions, explorer, viewer, ui, settings
-  features/                  titlebar, sidebar, explorer, viewer, workspace, palette, settings, statusbar
+  features/                  titlebar, sidebar, explorer, viewer, changes, project, media, workspace, palette, settings, statusbar
 ```

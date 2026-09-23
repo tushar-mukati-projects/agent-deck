@@ -1,5 +1,6 @@
 import { FolderOpen, FolderPlus, Sparkles } from "lucide-react";
 
+import { startSessionInPickedFolder } from "@/actions/sessions";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,15 +11,9 @@ import {
 } from "@/components/ui/menu";
 import { useFolders } from "@/hooks/useFolders";
 import { shortcutLabel } from "@/lib/shortcuts";
-import { pickFolder } from "@/lib/tauri/system";
 import { basename, samePath, shortenHome } from "@/lib/utils";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useActiveWorkspace, useWorkspaceStore } from "@/stores/workspace-store";
-
-export const startSessionInPickedFolder = async (defaultPath?: string) => {
-  const folder = await pickFolder(defaultPath);
-  if (folder) useWorkspaceStore.getState().newSession(folder);
-};
 
 export const NewSessionMenu = ({ children }: { children: React.ReactNode }) => {
   const folders = useFolders();
@@ -40,7 +35,10 @@ export const NewSessionMenu = ({ children }: { children: React.ReactNode }) => {
             New session in <span className="font-medium">{basename(active.cwd)}</span>
           </DropdownMenuItem>
         )}
-        <DropdownMenuItem icon={<FolderPlus />} onSelect={() => void startSessionInPickedFolder(active?.cwd)}>
+        <DropdownMenuItem
+          icon={<FolderPlus />}
+          onSelect={() => void startSessionInPickedFolder(active?.cwd)}
+        >
           Choose folder…
         </DropdownMenuItem>
         {recent.length > 0 && (
@@ -48,7 +46,11 @@ export const NewSessionMenu = ({ children }: { children: React.ReactNode }) => {
             <DropdownMenuSeparator />
             <DropdownMenuLabel>Recent folders</DropdownMenuLabel>
             {recent.map((folder) => (
-              <DropdownMenuItem key={folder.cwd} icon={<FolderOpen />} onSelect={() => newSession(folder.cwd)}>
+              <DropdownMenuItem
+                key={folder.cwd}
+                icon={<FolderOpen />}
+                onSelect={() => newSession(folder.cwd)}
+              >
                 <span className="text-fg">{folder.name}</span>
                 <span className="ml-2 text-[11px] text-faint">{shortenHome(folder.cwd, home)}</span>
               </DropdownMenuItem>

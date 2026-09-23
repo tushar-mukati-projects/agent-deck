@@ -24,7 +24,12 @@ interface SettingsState {
   showArchived: boolean;
   togglePinned: (sessionId: string) => void;
   toggleArchived: (sessionId: string) => void;
-  set: (patch: Partial<Omit<SettingsState, "set" | "togglePinned" | "toggleArchived">>) => void;
+  forgetSession: (sessionId: string) => void;
+  set: (
+    patch: Partial<
+      Omit<SettingsState, "set" | "togglePinned" | "toggleArchived" | "forgetSession">
+    >,
+  ) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -47,17 +52,26 @@ export const useSettingsStore = create<SettingsState>()(
       togglePinned: (sessionId) => {
         const pinned = get().pinnedSessions;
         set({
-          pinnedSessions: pinned.includes(sessionId) ? pinned.filter((id) => id !== sessionId) : [sessionId, ...pinned],
+          pinnedSessions: pinned.includes(sessionId)
+            ? pinned.filter((id) => id !== sessionId)
+            : [sessionId, ...pinned],
           archivedSessions: get().archivedSessions.filter((id) => id !== sessionId),
         });
       },
       toggleArchived: (sessionId) => {
         const archived = get().archivedSessions;
         set({
-          archivedSessions: archived.includes(sessionId) ? archived.filter((id) => id !== sessionId) : [...archived, sessionId],
+          archivedSessions: archived.includes(sessionId)
+            ? archived.filter((id) => id !== sessionId)
+            : [...archived, sessionId],
           pinnedSessions: get().pinnedSessions.filter((id) => id !== sessionId),
         });
       },
+      forgetSession: (sessionId) =>
+        set({
+          pinnedSessions: get().pinnedSessions.filter((id) => id !== sessionId),
+          archivedSessions: get().archivedSessions.filter((id) => id !== sessionId),
+        }),
       set: (patch) => set(patch),
     }),
     {
@@ -71,6 +85,3 @@ export const useSettingsStore = create<SettingsState>()(
     },
   ),
 );
-
-export const parseArgs = (raw: string) =>
-  (raw.match(/"[^"]*"|\S+/g) ?? []).map((arg) => arg.replace(/^"|"$/g, ""));

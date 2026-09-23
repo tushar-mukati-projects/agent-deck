@@ -2,7 +2,7 @@ import { create } from "zustand";
 
 import type { SessionInfo, SidebarView } from "@/types";
 
-export type PaletteMode = "all" | "files" | "commands";
+export type PaletteMode = "all" | "files" | "commands" | "chats";
 
 interface ConfirmRequest {
   title: string;
@@ -17,14 +17,16 @@ interface UiState {
   sidebarOpen: boolean;
   paletteMode: PaletteMode | null;
   settingsOpen: boolean;
+  shortcutsOpen: boolean;
   confirm: ConfirmRequest | null;
   renameTarget: SessionInfo | null;
-  setRenameTarget: (session: SessionInfo | null) => void;
   setSidebarView: (view: SidebarView) => void;
   toggleSidebar: () => void;
   openPalette: (mode: PaletteMode) => void;
   closePalette: () => void;
   setSettingsOpen: (open: boolean) => void;
+  setShortcutsOpen: (open: boolean) => void;
+  setRenameTarget: (session: SessionInfo | null) => void;
   askConfirm: (request: Omit<ConfirmRequest, "resolve">) => Promise<boolean>;
   resolveConfirm: (confirmed: boolean) => void;
 }
@@ -34,14 +36,16 @@ export const useUiStore = create<UiState>((set, get) => ({
   sidebarOpen: true,
   paletteMode: null,
   settingsOpen: false,
+  shortcutsOpen: false,
   confirm: null,
   renameTarget: null,
-  setRenameTarget: (session) => set({ renameTarget: session }),
   setSidebarView: (view) => set({ sidebarView: view, sidebarOpen: true }),
   toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
   openPalette: (mode) => set({ paletteMode: mode }),
   closePalette: () => set({ paletteMode: null }),
   setSettingsOpen: (open) => set({ settingsOpen: open }),
+  setShortcutsOpen: (open) => set({ shortcutsOpen: open }),
+  setRenameTarget: (session) => set({ renameTarget: session }),
   askConfirm: (request) =>
     new Promise<boolean>((resolve) => {
       get().confirm?.resolve(false);

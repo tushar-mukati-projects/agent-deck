@@ -27,6 +27,9 @@ anyhow = "1"
 trash = "5"
 base64 = "0.22"
 similar = "2"
+memchr = "2"
+dunce = "1"
+wait-timeout = "0.2"
 tauri-plugin-notification = "2"
 
 [target.'cfg(windows)'.dependencies]

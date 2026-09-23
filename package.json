@@ -9,7 +9,10 @@
     "typecheck": "tsc -b",
     "tauri": "tauri",
     "app:dev": "tauri dev --config src-tauri/tauri.dev.conf.json",
-    "app:build": "tauri build"
+    "app:build": "tauri build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "tsc -b && vitest run"
   },
   "dependencies": {
     "@codemirror/commands": "^6.11.1",
@@ -64,6 +67,7 @@
     "@vitejs/plugin-react": "^6.1.1",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
-    "vite": "^8.3.0"
+    "vite": "^8.3.0",
+    "vitest": "^5.0.1"
   }
 }

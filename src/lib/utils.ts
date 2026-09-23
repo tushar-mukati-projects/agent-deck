@@ -8,8 +8,12 @@ export const cn = (...inputs: ClassValue[]) => twMerge(clsx(inputs));
 
 const trimTrailingSeparators = (path: string) => path.replace(/[\\/]+$/, "");
 
-export const normalizePath = (path: string) =>
-  trimTrailingSeparators(path).replace(/\//g, "\\").toLowerCase();
+export const normalizePath = (path: string) => {
+  const unified = trimTrailingSeparators(path)
+    .replace(/\//g, "\\")
+    .replace(/^\\\\wsl\$\\/i, "\\\\wsl.localhost\\");
+  return parseWslPath(unified) ? unified : unified.toLowerCase();
+};
 
 export const samePath = (a: string, b: string) => normalizePath(a) === normalizePath(b);
 
@@ -57,7 +61,9 @@ export const extension = (path: string) => {
 export const shortenHome = (path: string, home: string) => {
   const wsl = parseWslPath(path);
   if (wsl) return wslDisplayPath(wsl);
-  return home && isWithin(path, home) ? `~${path.slice(trimTrailingSeparators(home).length)}` : path;
+  return home && isWithin(path, home)
+    ? `~${path.slice(trimTrailingSeparators(home).length)}`
+    : path;
 };
 
 export const formatBytes = (bytes: number) => {

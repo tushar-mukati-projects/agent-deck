@@ -10,6 +10,7 @@ import {
   SquareTerminal,
 } from "lucide-react";
 
+import { canMention, mentionInClaude } from "@/actions/files";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -20,12 +21,12 @@ import {
 import { fileIcon, folderIcon } from "@/lib/file-icons";
 import { api } from "@/lib/tauri/commands";
 import { copyText, openExternal, revealInExplorer } from "@/lib/tauri/system";
-import { pasteIntoTerminal } from "@/lib/terminal/registry";
+import { DECK_PATH_MIME } from "@/lib/terminal/input";
 import { cn, normalizePath, relativePath } from "@/lib/utils";
 import { useExplorerStore } from "@/stores/explorer-store";
 import { useSettingsStore } from "@/stores/settings-store";
-import { useWorkspaceStore, type WorkspaceRecord } from "@/stores/workspace-store";
-import type { DirEntry } from "@/types";
+import { useWorkspaceStore } from "@/stores/workspace-store";
+import type { DirEntry, Workspace } from "@/types";
 
 const ROW_HEIGHT = 22;
 const OVERSCAN = 12;
@@ -63,34 +64,37 @@ const RowMenu = ({
   children,
 }: {
   row: Row;
-  workspace: WorkspaceRecord;
+  workspace: Workspace;
   children: React.ReactNode;
 }) => {
   const { entry } = row;
   const rel = relativePath(entry.path, workspace.cwd);
   const store = useWorkspaceStore.getState;
-  const canMention = workspace.mode === "live" && !!workspace.claudeTerminalId;
-
-  const mention = () => {
-    if (!workspace.claudeTerminalId) return;
-    pasteIntoTerminal(workspace.claudeTerminalId, `@${rel.replace(/\\/g, "/")} `);
-  };
-
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
       <ContextMenuContent>
         {!entry.isDir && (
-          <ContextMenuItem icon={<Code2 />} onSelect={() => store().openFile(workspace.id, entry.path)}>
+          <ContextMenuItem
+            icon={<Code2 />}
+            onSelect={() => store().openFile(workspace.id, entry.path)}
+          >
             Open
           </ContextMenuItem>
         )}
-        <ContextMenuItem icon={<AtSign />} disabled={!canMention} onSelect={mention}>
+        <ContextMenuItem
+          icon={<AtSign />}
+          disabled={!canMention(workspace)}
+          onSelect={() => mentionInClaude(workspace, entry.path)}
+        >
           Mention in Claude
         </ContextMenuItem>
         {entry.isDir && (
           <>
-            <ContextMenuItem icon={<SquareTerminal />} onSelect={() => store().openShell(workspace.id, entry.path)}>
+            <ContextMenuItem
+              icon={<SquareTerminal />}
+              onSelect={() => store().openShell(workspace.id, { cwd: entry.path })}
+            >
               Open shell here
             </ContextMenuItem>
             <ContextMenuItem icon={<Sparkles />} onSelect={() => store().newSession(entry.path)}>
@@ -122,7 +126,7 @@ const RowMenu = ({
   );
 };
 
-export const FileTree = ({ workspace }: { workspace: WorkspaceRecord }) => {
+export const FileTree = ({ workspace }: { workspace: Workspace }) => {
   const root = workspace.cwd;
   const rows = useRows(root);
   const selected = useExplorerStore((s) => s.selected);
@@ -143,7 +147,9 @@ export const FileTree = ({ workspace }: { workspace: WorkspaceRecord }) => {
     return () => observer.disconnect();
   }, []);
 
-  const selectedIndex = rows.findIndex((r) => selected && normalizePath(r.entry.path) === normalizePath(selected));
+  const selectedIndex = rows.findIndex(
+    (r) => selected && normalizePath(r.entry.path) === normalizePath(selected),
+  );
 
   useEffect(() => {
     const element = containerRef.current;
@@ -180,7 +186,9 @@ export const FileTree = ({ workspace }: { workspace: WorkspaceRecord }) => {
       case "ArrowLeft":
         if (current?.entry.isDir && current.expanded) collapse(current.entry.path);
         else if (current) {
-          const parentIndex = rows.slice(0, selectedIndex).findLastIndex((r) => r.depth === current.depth - 1);
+          const parentIndex = rows
+            .slice(0, selectedIndex)
+            .findLastIndex((r) => r.depth === current.depth - 1);
           if (parentIndex >= 0) move(parentIndex);
         }
         break;
@@ -200,7 +208,10 @@ export const FileTree = ({ workspace }: { workspace: WorkspaceRecord }) => {
   };
 
   const start = Math.max(0, Math.floor(viewport.top / ROW_HEIGHT) - OVERSCAN);
-  const end = Math.min(rows.length, Math.ceil((viewport.top + viewport.height) / ROW_HEIGHT) + OVERSCAN);
+  const end = Math.min(
+    rows.length,
+    Math.ceil((viewport.top + viewport.height) / ROW_HEIGHT) + OVERSCAN,
+  );
 
   return (
     <div
@@ -218,7 +229,8 @@ export const FileTree = ({ workspace }: { workspace: WorkspaceRecord }) => {
           const index = start + offset;
           const { entry } = row;
           const isSelected = index === selectedIndex;
-          const isOpenFile = !!activeFile && normalizePath(activeFile) === normalizePath(entry.path);
+          const isOpenFile =
+            !!activeFile && normalizePath(activeFile) === normalizePath(entry.path);
           const spec = entry.isDir ? folderIcon(entry.name, row.expanded) : fileIcon(entry.path);
           const Icon = spec.icon;
           const isLoading = entry.isDir && loading[normalizePath(entry.path)];
@@ -228,12 +240,22 @@ export const FileTree = ({ workspace }: { workspace: WorkspaceRecord }) => {
                 role="treeitem"
                 aria-expanded={entry.isDir ? row.expanded : undefined}
                 aria-selected={isSelected}
+                draggable
+                onDragStart={(e) => e.dataTransfer.setData(DECK_PATH_MIME, entry.path)}
                 onClick={() => activate(row)}
                 onContextMenu={() => select(entry.path)}
-                style={{ top: index * ROW_HEIGHT, height: ROW_HEIGHT, paddingLeft: 8 + row.depth * INDENT }}
+                style={{
+                  top: index * ROW_HEIGHT,
+                  height: ROW_HEIGHT,
+                  paddingLeft: 8 + row.depth * INDENT,
+                }}
                 className={cn(
                   "absolute inset-x-0 flex cursor-default items-center gap-1.5 pr-2 text-[12.5px]",
-                  isSelected ? "bg-active text-fg" : isOpenFile ? "bg-hover text-fg" : "text-fg/85 hover:bg-hover/70",
+                  isSelected
+                    ? "bg-active text-fg"
+                    : isOpenFile
+                      ? "bg-hover text-fg"
+                      : "text-fg/85 hover:bg-hover/70",
                   entry.hidden && "opacity-60",
                 )}
               >

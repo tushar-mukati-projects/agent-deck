@@ -29,7 +29,9 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
         <p className="text-[13px] font-medium text-fg">Something went wrong in this view</p>
-        <p className="max-w-[520px] font-mono text-[11px] break-words text-faint select-text">{error.message}</p>
+        <p className="max-w-[520px] font-mono text-[11px] break-words text-faint select-text">
+          {error.message}
+        </p>
         <button
           type="button"
           onClick={this.reset}

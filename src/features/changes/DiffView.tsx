@@ -6,13 +6,14 @@ import { FileCode2, FolderOpen } from "lucide-react";
 
 import { EmptyState, Spinner } from "@/components/ui/feedback";
 import { IconButton } from "@/components/ui/icon-button";
-import { deckTheme, useLanguage } from "@/features/viewer/CodeView";
+import { useDeckTheme, useLanguage } from "@/features/viewer/CodeView";
 import type { DiffTab } from "@/lib/diff-tabs";
 import { api } from "@/lib/tauri/commands";
 import { revealInExplorer } from "@/lib/tauri/system";
 import { basename, errorMessage, relativePath } from "@/lib/utils";
 import { useSessionsStore } from "@/stores/sessions-store";
-import { useWorkspaceStore, type WorkspaceRecord } from "@/stores/workspace-store";
+import { useWorkspaceStore } from "@/stores/workspace-store";
+import type { Workspace } from "@/types";
 
 interface DiffContent {
   before: string;
@@ -33,17 +34,29 @@ const loadDiff = async (tab: DiffTab, sessionId: string): Promise<DiffContent> =
   }
   const session = useSessionsStore.getState().byId[sessionId];
   const before =
-    tab.backup && session ? await api.sessionBackup(session.filePath, tab.backup, session.distro) : "";
+    tab.backup && session
+      ? await api.sessionBackup(session.filePath, tab.backup, session.distro)
+      : "";
   return { before, after, beforeLabel: "before this session" };
 };
 
 const diffTheme = EditorView.theme({
-  ".cm-changedLine": { backgroundColor: "color-mix(in srgb, var(--color-add) 7%, transparent) !important" },
-  ".cm-changedText": { background: "color-mix(in srgb, var(--color-add) 13%, transparent) !important" },
+  ".cm-changedLine": {
+    backgroundColor: "color-mix(in srgb, var(--color-add) 7%, transparent) !important",
+  },
+  ".cm-changedText": {
+    background: "color-mix(in srgb, var(--color-add) 13%, transparent) !important",
+  },
   ".cm-deletedChunk": { backgroundColor: "color-mix(in srgb, var(--color-del) 7%, transparent)" },
-  ".cm-deletedChunk .cm-deletedText": { background: "color-mix(in srgb, var(--color-del) 15%, transparent)" },
-  ".cm-insertedLine, .cm-changedLineGutter": { backgroundColor: "color-mix(in srgb, var(--color-add) 45%, transparent)" },
-  ".cm-deletedLineGutter": { backgroundColor: "color-mix(in srgb, var(--color-del) 50%, transparent)" },
+  ".cm-deletedChunk .cm-deletedText": {
+    background: "color-mix(in srgb, var(--color-del) 15%, transparent)",
+  },
+  ".cm-insertedLine, .cm-changedLineGutter": {
+    backgroundColor: "color-mix(in srgb, var(--color-add) 45%, transparent)",
+  },
+  ".cm-deletedLineGutter": {
+    backgroundColor: "color-mix(in srgb, var(--color-del) 50%, transparent)",
+  },
   ".cm-collapsedLines": {
     background: "var(--color-panel)",
     color: "var(--color-faint)",
@@ -54,10 +67,11 @@ const diffTheme = EditorView.theme({
   },
 });
 
-export const DiffView = ({ tab, workspace }: { tab: DiffTab; workspace: WorkspaceRecord }) => {
+export const DiffView = ({ tab, workspace }: { tab: DiffTab; workspace: Workspace }) => {
   const [content, setContent] = useState<DiffContent | null>(null);
   const [error, setError] = useState<string | null>(null);
   const language = useLanguage(tab.path);
+  const theme = useDeckTheme();
   const openFile = useWorkspaceStore((s) => s.openFile);
 
   useEffect(() => {
@@ -108,23 +122,37 @@ export const DiffView = ({ tab, workspace }: { tab: DiffTab; workspace: Workspac
       </div>
       <div className="min-h-0 flex-1 overflow-hidden bg-code-bg">
         {error ? (
-          <EmptyState className="h-full" icon={<FileCode2 />} title={`Couldn't diff ${basename(tab.path)}`} description={error} />
+          <EmptyState
+            className="h-full"
+            icon={<FileCode2 />}
+            title={`Couldn't diff ${basename(tab.path)}`}
+            description={error}
+          />
         ) : !content ? (
           <div className="flex h-full items-center justify-center">
             <Spinner />
           </div>
         ) : content.before === content.after ? (
-          <EmptyState className="h-full" icon={<FileCode2 />} title="No differences" description="The file matches its earlier version." />
+          <EmptyState
+            className="h-full"
+            icon={<FileCode2 />}
+            title="No differences"
+            description="The file matches its earlier version."
+          />
         ) : (
           <CodeMirror
             value={content.after}
             height="100%"
             className="h-full"
-            theme={deckTheme}
+            theme={theme}
             editable={false}
             readOnly
             extensions={extensions}
-            basicSetup={{ foldGutter: false, highlightActiveLine: false, highlightActiveLineGutter: false }}
+            basicSetup={{
+              foldGutter: false,
+              highlightActiveLine: false,
+              highlightActiveLineGutter: false,
+            }}
           />
         )}
       </div>

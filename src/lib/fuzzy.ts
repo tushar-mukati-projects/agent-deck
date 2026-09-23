@@ -1,7 +1,14 @@
 const isBoundary = (text: string, index: number) => {
   if (index === 0) return true;
   const previous = text[index - 1];
-  return previous === "/" || previous === "\\" || previous === " " || previous === "-" || previous === "_" || previous === ".";
+  return (
+    previous === "/" ||
+    previous === "\\" ||
+    previous === " " ||
+    previous === "-" ||
+    previous === "_" ||
+    previous === "."
+  );
 };
 
 const termScore = (query: string, target: string): number | null => {
@@ -21,7 +28,8 @@ export const fuzzyScore = (query: string, target: string): number | null => {
   if (/\s/.test(query.trim())) return termScore(query.trim(), target);
   const text = target.toLowerCase();
   const direct = text.indexOf(query);
-  if (direct >= 0) return 1000 - direct + (isBoundary(text, direct) ? 200 : 0) - target.length * 0.5;
+  if (direct >= 0)
+    return 1000 - direct + (isBoundary(text, direct) ? 200 : 0) - target.length * 0.5;
 
   let score = 0;
   let textIndex = 0;
