@@ -7,7 +7,7 @@ import {
 } from "@tauri-apps/plugin-notification";
 import { toast } from "sonner";
 
-import { playChime } from "@/lib/chime";
+import { playChime, unlockAudio } from "@/lib/chime";
 import { onClaudeIdle, type IdleEvent } from "@/lib/terminal/activity";
 import { api } from "@/lib/tauri/commands";
 import { appWindow } from "@/lib/tauri/system";
@@ -26,10 +26,10 @@ const notificationsAllowed = () => {
 };
 
 const handleIdle = async (event: IdleEvent) => {
-  if (event.visible) return;
   const { sound, notifications } = useSettingsStore.getState();
-  if (sound) playChime(event.needsInput ? "input" : "done");
-  if (!notifications) return;
+  // The chime plays even while you watch; notifications are only for sessions you're away from.
+  if (sound) void playChime(event.needsInput ? "input" : "done");
+  if (event.visible || !notifications) return;
   const workspace = findWorkspace(event.workspaceId);
   const title = event.needsInput ? "Claude needs your approval" : "Claude finished";
   const body = workspace ? `${workspace.title} · ${basename(workspace.cwd)}` : basename(event.cwd);
@@ -54,6 +54,7 @@ const clearVisibleAttention = () => {
 
 export const useAttentionAlerts = () => {
   useEffect(() => {
+    unlockAudio();
     const unsubscribeIdle = onClaudeIdle((event) => void handleIdle(event));
     const unlistenFocus = appWindow.onFocusChanged(
       ({ payload: focused }) => focused && clearVisibleAttention(),

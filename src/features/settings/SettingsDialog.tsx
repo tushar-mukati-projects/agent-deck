@@ -92,7 +92,7 @@ export const SettingsDialog = () => {
             ]}
           />
         </Field>
-        <Field label="When Claude finishes" hint="Only for sessions you're not looking at.">
+        <Field label="When Claude finishes" hint="Sound plays every time; notifications only for sessions you're not looking at.">
           <div className="flex items-center gap-2">
             <Segmented<"on" | "off">
               value={settings.notifications ? "on" : "off"}
@@ -110,7 +110,7 @@ export const SettingsDialog = () => {
                 { value: "off", label: "Silent" },
               ]}
             />
-            <Button size="sm" variant="ghost" onClick={() => playChime("done")}>
+            <Button size="sm" variant="ghost" onClick={() => void playChime("done")}>
               Test
             </Button>
           </div>

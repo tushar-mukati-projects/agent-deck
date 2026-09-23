@@ -1,5 +1,25 @@
 let context: AudioContext | null = null;
 
+const audio = () => (context ??= new AudioContext());
+
+/**
+ * WebView2 keeps an AudioContext created outside a user gesture suspended, so a chime fired
+ * later by terminal output would be silent. Create and resume it on the first click or key.
+ */
+export const unlockAudio = () => {
+  const unlock = () => {
+    try {
+      void audio().resume();
+    } catch {
+      return;
+    }
+    window.removeEventListener("pointerdown", unlock, true);
+    window.removeEventListener("keydown", unlock, true);
+  };
+  window.addEventListener("pointerdown", unlock, true);
+  window.addEventListener("keydown", unlock, true);
+};
+
 const tone = (
   ctx: AudioContext,
   frequency: number,
@@ -21,11 +41,10 @@ const tone = (
 
 export type ChimeKind = "done" | "input";
 
-export const playChime = (kind: ChimeKind) => {
+export const playChime = async (kind: ChimeKind) => {
   try {
-    context ??= new AudioContext();
-    const ctx = context;
-    if (ctx.state === "suspended") void ctx.resume();
+    const ctx = audio();
+    if (ctx.state !== "running") await ctx.resume();
     const now = ctx.currentTime + 0.02;
     if (kind === "done") {
       tone(ctx, 659.25, now, 0.45, 0.07);
