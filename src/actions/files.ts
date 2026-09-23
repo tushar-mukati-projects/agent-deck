@@ -25,21 +25,31 @@ export const mentionInClaude = (workspace: Workspace, path: string) => {
   pasteIntoTerminal(workspace.claudeTerminalId, mentionText(path, workspace.cwd));
 };
 
-export const closeFileWithConfirm = async (workspaceId: string, path: string) => {
+export const closeFilesWithConfirm = async (workspaceId: string, tabs: string[]) => {
   const { drafts, setDraft, setEditing } = useViewerStore.getState();
-  if (normalizePath(path) in drafts) {
+  const dirty = tabs.filter((tab) => normalizePath(tab) in drafts);
+  if (dirty.length) {
     const confirmed = await useUiStore.getState().askConfirm({
-      title: `Discard changes to ${basename(path)}?`,
+      title:
+        dirty.length === 1
+          ? `Discard changes to ${basename(dirty[0])}?`
+          : `Discard changes to ${dirty.length} files?`,
       description: "Your unsaved edits will be lost.",
       confirmLabel: "Discard",
       destructive: true,
     });
     if (!confirmed) return;
   }
-  setDraft(path, null);
-  setEditing(path, false);
-  useWorkspaceStore.getState().closeFile(workspaceId, path);
+  const { closeFile } = useWorkspaceStore.getState();
+  for (const tab of tabs) {
+    setDraft(tab, null);
+    setEditing(tab, false);
+    closeFile(workspaceId, tab);
+  }
 };
+
+export const closeFileWithConfirm = (workspaceId: string, tab: string) =>
+  closeFilesWithConfirm(workspaceId, [tab]);
 
 export const openPathFromTerminal = async (workspaceId: string, target: PathLinkTarget) => {
   if (!findWorkspace(workspaceId)) return;

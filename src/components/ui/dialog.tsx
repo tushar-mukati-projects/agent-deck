@@ -22,7 +22,6 @@ export const Dialog = ({
   hideHeader,
   children,
 }: DialogProps) => {
-  // Dialogs are opened from the store, not a trigger, so remember what had focus (often a terminal) and return to it.
   const previousFocus = useRef<HTMLElement | null>(null);
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>

@@ -1,9 +1,9 @@
-import { FolderKanban, Files, GitCompare, Keyboard, MessagesSquare, Settings } from "lucide-react";
+import { BrainCircuit, Files, GitCompare, Keyboard, MessagesSquare, Settings } from "lucide-react";
 
 import { IconButton } from "@/components/ui/icon-button";
 import { ChangesPanel } from "@/features/changes/ChangesPanel";
 import { ExplorerPanel } from "@/features/explorer/ExplorerPanel";
-import { ProjectPanel } from "@/features/project/ProjectPanel";
+import { ClaudePanel } from "@/features/claude/ClaudePanel";
 import { SessionsPanel } from "@/features/sidebar/SessionsPanel";
 import { shortcutLabel } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
@@ -25,10 +25,10 @@ const VIEWS: { view: SidebarView; label: string; icon: typeof Files; shortcut: s
     shortcut: shortcutLabel("showChanges"),
   },
   {
-    view: "project",
-    label: "Project: tasks, agents, media",
-    icon: FolderKanban,
-    shortcut: shortcutLabel("showProject"),
+    view: "claude",
+    label: "Claude: memory, MCP, skills, agents",
+    icon: BrainCircuit,
+    shortcut: shortcutLabel("showClaude"),
   },
 ];
 
@@ -99,7 +99,7 @@ export const SidePanel = () => {
         <ExplorerPanel />
       </div>
       {sidebarView === "changes" && <ChangesPanel />}
-      {sidebarView === "project" && <ProjectPanel />}
+      {sidebarView === "claude" && <ClaudePanel />}
     </aside>
   );
 };

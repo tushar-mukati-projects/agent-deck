@@ -1,8 +1,10 @@
 use serde::Serialize;
-use tauri::{ipc::Channel, AppHandle, State};
+use tauri::{ipc::Channel, AppHandle, Manager, State};
 
 use crate::{
-    changes, fsx, git, project,
+    changes, claude_config, fsx, git,
+    mcp::{self, McpManager},
+    pg::{self, PgManager},
     pty::{self, PtyEvent, PtyInfo, PtyManager, SpawnRequest},
     sessions::{self, LiveSession, SearchHit, SessionInfo, TranscriptItem},
     watcher::Watchers,
@@ -142,18 +144,54 @@ pub async fn git_head_file(path: String) -> CmdResult<String> {
 }
 
 #[tauri::command]
-pub async fn project_tasks(root: String) -> CmdResult<Vec<project::TaskPackage>> {
-    blocking(move || Ok(project::tasks(&root))).await
+pub async fn claude_overview(cwd: String) -> CmdResult<claude_config::Overview> {
+    blocking(move || claude_config::overview(&cwd)).await
 }
 
 #[tauri::command]
-pub async fn project_agents(root: String) -> CmdResult<Vec<project::ProjectAgent>> {
-    blocking(move || Ok(project::agents(&root))).await
+pub async fn create_memory_file(path: String) -> CmdResult<()> {
+    blocking(move || claude_config::create_memory_file(&path)).await
 }
 
 #[tauri::command]
-pub async fn project_media(root: String) -> CmdResult<project::MediaIndex> {
-    blocking(move || Ok(project::media(&root))).await
+pub async fn mcp_describe(app: AppHandle, cwd: String, id: String) -> CmdResult<mcp::Description> {
+    blocking(move || app.state::<McpManager>().describe(&cwd, &id)).await
+}
+
+#[tauri::command]
+pub async fn mcp_call(app: AppHandle, cwd: String, id: String, tool: String, arguments: serde_json::Value) -> CmdResult<serde_json::Value> {
+    blocking(move || app.state::<McpManager>().call(&cwd, &id, &tool, arguments)).await
+}
+
+#[tauri::command]
+pub async fn mcp_read_resource(app: AppHandle, cwd: String, id: String, uri: String) -> CmdResult<serde_json::Value> {
+    blocking(move || app.state::<McpManager>().read_resource(&cwd, &id, &uri)).await
+}
+
+#[tauri::command]
+pub fn mcp_disconnect(state: State<McpManager>, cwd: String, id: String) {
+    state.disconnect(&cwd, &id);
+}
+
+#[tauri::command]
+pub async fn pg_info(app: AppHandle, cwd: String, id: String) -> CmdResult<pg::ConnectionInfo> {
+    blocking(move || app.state::<PgManager>().info(&cwd, &id)).await
+}
+
+#[tauri::command]
+pub async fn pg_query(app: AppHandle, cwd: String, id: String, sql: String) -> CmdResult<pg::QueryOutput> {
+    blocking(move || {
+        let pg = app.state::<PgManager>();
+        pg.query(&cwd, &id, &sql).or_else(|first| {
+            if first.to_string().contains("closed") || first.to_string().contains("connection") {
+                pg.disconnect(&cwd, &id);
+                pg.query(&cwd, &id, &sql)
+            } else {
+                Err(first)
+            }
+        })
+    })
+    .await
 }
 
 #[tauri::command(async)]

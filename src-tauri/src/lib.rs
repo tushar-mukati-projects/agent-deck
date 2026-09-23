@@ -1,8 +1,10 @@
 mod changes;
+mod claude_config;
 mod commands;
 mod fsx;
 mod git;
-mod project;
+mod mcp;
+mod pg;
 mod pty;
 mod sessions;
 mod util;
@@ -11,6 +13,8 @@ mod wsl;
 
 use tauri::{Manager, RunEvent};
 
+use mcp::McpManager;
+use pg::PgManager;
 use pty::PtyManager;
 use watcher::Watchers;
 
@@ -24,6 +28,8 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .manage(PtyManager::default())
         .manage(Watchers::default())
+        .manage(McpManager::default())
+        .manage(PgManager::default())
         .setup(|app| {
             app.manage(ClaudeHomeWatcher(watcher::watch_claude_home(app.handle().clone())));
             Ok(())
@@ -43,9 +49,14 @@ pub fn run() {
             commands::session_backup,
             commands::git_status,
             commands::git_head_file,
-            commands::project_tasks,
-            commands::project_agents,
-            commands::project_media,
+            commands::claude_overview,
+            commands::create_memory_file,
+            commands::mcp_describe,
+            commands::mcp_call,
+            commands::mcp_read_resource,
+            commands::mcp_disconnect,
+            commands::pg_info,
+            commands::pg_query,
             commands::pty_spawn,
             commands::pty_attach,
             commands::pty_write,
@@ -68,6 +79,7 @@ pub fn run() {
     app.run(|handle, event| {
         if let RunEvent::Exit = event {
             handle.state::<PtyManager>().kill_all();
+            handle.state::<McpManager>().shutdown_all();
         }
     });
 }

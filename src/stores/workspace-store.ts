@@ -303,7 +303,15 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       migrate: (persisted) => persisted as Pick<WorkspaceState, "workspaces" | "activeId">,
       merge: (persisted, current) => {
         const saved = (persisted ?? {}) as Partial<Pick<WorkspaceState, "workspaces" | "activeId">>;
-        const workspaces = (saved.workspaces ?? []).map((w) => ({ ...blankWorkspace(w), ...w }));
+        const workspaces = (saved.workspaces ?? []).map((w) => {
+          const workspace = { ...blankWorkspace(w), ...w };
+          const openFiles = workspace.openFiles.filter((f) => !f.startsWith("media::"));
+          const activeFile =
+            workspace.activeFile && openFiles.includes(workspace.activeFile)
+              ? workspace.activeFile
+              : (openFiles[0] ?? null);
+          return { ...workspace, openFiles, activeFile };
+        });
         return { ...current, workspaces, activeId: saved.activeId ?? null };
       },
     },

@@ -2,10 +2,6 @@ let context: AudioContext | null = null;
 
 const audio = () => (context ??= new AudioContext());
 
-/**
- * WebView2 keeps an AudioContext created outside a user gesture suspended, so a chime fired
- * later by terminal output would be silent. Create and resume it on the first click or key.
- */
 export const unlockAudio = () => {
   const unlock = () => {
     try {

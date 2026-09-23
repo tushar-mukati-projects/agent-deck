@@ -27,7 +27,6 @@ const notificationsAllowed = () => {
 
 const handleIdle = async (event: IdleEvent) => {
   const { sound, notifications } = useSettingsStore.getState();
-  // The chime plays even while you watch; notifications are only for sessions you're away from.
   if (sound) void playChime(event.needsInput ? "input" : "done");
   if (event.visible || !notifications) return;
   const workspace = findWorkspace(event.workspaceId);

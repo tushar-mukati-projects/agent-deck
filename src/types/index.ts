@@ -97,44 +97,128 @@ export interface SearchHit {
   timestamp: string | null;
 }
 
-export interface TaskScript {
-  name: string;
-  command: string;
-}
+export type ConfigScope = "user" | "project" | "local" | "plugin" | "auto";
 
-export interface TaskPackage {
-  dir: string;
-  name: string;
-  scripts: TaskScript[];
-  runner: string;
-}
-
-export interface ProjectAgent {
-  name: string;
+export interface MemoryFile {
+  scope: ConfigScope;
+  label: string;
+  path: string;
+  exists: boolean;
   description: string | null;
-  path: string;
-}
-
-export type MediaKind = "video" | "image" | "audio";
-
-export interface MediaItem {
-  path: string;
-  kind: MediaKind;
   size: number;
   modifiedMs: number;
 }
 
-export interface MediaSequence {
-  dir: string;
-  count: number;
-  sample: string;
-  modifiedMs: number;
+export interface McpServer {
+  id: string;
+  name: string;
+  scope: ConfigScope;
+  plugin: string | null;
+  source: string;
+  transport: string;
+  command: string | null;
+  args: string[];
+  url: string | null;
+  envKeys: string[];
+  headerKeys: string[];
+  postgres: boolean;
+  disabled: boolean;
 }
 
-export interface MediaIndex {
-  items: MediaItem[];
-  sequences: MediaSequence[];
+export interface ConfigItem {
+  name: string;
+  description: string | null;
+  path: string;
+  scope: ConfigScope;
+  plugin: string | null;
+}
+
+export interface ConfigHook {
+  event: string;
+  matcher: string | null;
+  command: string;
+  scope: ConfigScope;
+  plugin: string | null;
+  source: string;
+}
+
+export interface SettingsFile {
+  scope: ConfigScope;
+  label: string;
+  path: string;
+  exists: boolean;
+  model: string | null;
+  defaultMode: string | null;
+  allow: string[];
+  deny: string[];
+  ask: string[];
+  envKeys: string[];
+}
+
+export interface ConfigPlugin {
+  name: string;
+  version: string | null;
+  scope: string;
+  enabled: boolean;
+  path: string;
+}
+
+export interface ClaudeOverview {
+  claudeHome: string;
+  distro: string | null;
+  memory: MemoryFile[];
+  mcp: McpServer[];
+  skills: ConfigItem[];
+  agents: ConfigItem[];
+  commands: ConfigItem[];
+  hooks: ConfigHook[];
+  settings: SettingsFile[];
+  plugins: ConfigPlugin[];
+}
+
+export interface McpTool {
+  name: string;
+  title?: string;
+  description?: string;
+  inputSchema?: JsonSchema;
+  annotations?: { readOnlyHint?: boolean; destructiveHint?: boolean; title?: string };
+}
+
+export interface JsonSchema {
+  type?: string | string[];
+  description?: string;
+  properties?: Record<string, JsonSchema>;
+  required?: string[];
+  default?: unknown;
+  enum?: unknown[];
+  items?: JsonSchema;
+}
+
+export interface McpDescription {
+  serverInfo: { name?: string; title?: string; version?: string } | null;
+  instructions: string | null;
+  tools: McpTool[];
+  resources: { uri: string; name?: string; description?: string; mimeType?: string }[];
+  prompts: { name: string; description?: string }[];
+}
+
+export interface PgResult {
+  columns: string[];
+  rows: (string | null)[][];
+  rowCount: number;
   truncated: boolean;
+}
+
+export interface PgOutput {
+  results: PgResult[];
+  elapsedMs: number;
+}
+
+export interface PgInfo {
+  host: string;
+  port: number;
+  database: string;
+  user: string;
 }
 
 export interface WslDistro {
@@ -197,4 +281,4 @@ export interface Workspace {
   activeFile: string | null;
 }
 
-export type SidebarView = "sessions" | "explorer" | "changes" | "project";
+export type SidebarView = "sessions" | "explorer" | "changes" | "claude";

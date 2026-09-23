@@ -15,7 +15,7 @@ Built with **Tauri 2** (Rust backend, system WebView2) + **React 19 / TypeScript
 - **Shells per session** — any number of PowerShell tabs in the session folder (`Ctrl+\``).
 - **Explorer + viewer** — virtualized tree with live file watching; markdown preview (GFM, sanitized), syntax-highlighted code with edit & save, images, PDF, audio/video. Files auto-reload when Claude edits them. "Mention in Claude" inserts `@path`.
 - **What changed** — files Claude edited in this session (with diffs against its own backups) plus uncommitted git changes.
-- **Project view** (`Ctrl+Shift+J`) — run any `package.json` script in a labelled shell tab, start a session with one of the folder's `.claude/agents`, and browse the folder's media (videos, images, audio, rendered frame folders) in a gallery.
+- **Claude view** (`Ctrl+Shift+J`) — everything Claude loads for the open folder: memory (CLAUDE.md files and auto memory), MCP servers, skills, agents, slash commands, hooks, permission rules, plugins and settings files. Click an MCP server to start it and try its tools; Postgres servers also get a table browser and SQL editor using the server's own credentials (secrets never reach the UI).
 - **Search inside conversations** (`Ctrl+Shift+F`) — full-text search across every transcript, Windows and WSL.
 - **Attention** — notification, sound and taskbar badge when Claude finishes while you're elsewhere; `Ctrl+Shift+A` or the status bar jumps to the waiting session.
 - **Pin / rename / archive** sessions, 21 themes, clickable file paths in terminal output, drag files from the explorer into a terminal to mention them.
@@ -31,7 +31,7 @@ Built with **Tauri 2** (Rust backend, system WebView2) + **React 19 / TypeScript
 | New session in current folder | `Ctrl+Shift+N` |
 | Toggle / new shell | ``Ctrl+` `` / ``Ctrl+Shift+` `` |
 | Next / previous tab | `Ctrl+Tab` / `Ctrl+Shift+Tab` |
-| Sessions / Explorer / Changes / Project | `Ctrl+Shift+S` / `E` / `G` / `J` |
+| Sessions / Explorer / Changes / Claude | `Ctrl+Shift+S` / `E` / `G` / `J` |
 | Toggle sidebar | `Ctrl+Shift+B` |
 | Search conversations | `Ctrl+Shift+F` |
 | Reopen closed tab / jump to waiting session | `Ctrl+Shift+T` / `Ctrl+Shift+A` |
@@ -63,7 +63,9 @@ src-tauri/src/
   sessions.rs   session index (incremental JSONL parsing, rayon), transcripts, search, rename, delete
   changes.rs    "what changed" from session file-history backups
   git.rs        hardened git status / HEAD reads
-  project.rs    package scripts, .claude/agents, media index
+  claude_config.rs  memory, MCP servers, skills, agents, commands, hooks, settings, plugins
+  mcp.rs        MCP client (stdio + streamable HTTP)
+  pg.rs         Postgres browser for database MCP servers
   wsl.rs        WSL bridge; wsl_agent.py runs inside the distro
   pty.rs        ConPTY terminals: reader + coalescing sender threads, replay buffer, env scrubbing
   fsx.rs        directory listing, file read/write, gitignore-aware file list
@@ -72,5 +74,5 @@ src/
   lib/terminal/registry.ts   xterm instances live outside React (never lost on tab switch)
   actions/                   user-level operations (resume, close, delete, mention, run task) used by every UI surface
   stores/                    zustand: workspaces (persisted), terminals, sessions, explorer, viewer, ui, settings
-  features/                  titlebar, sidebar, explorer, viewer, changes, project, media, workspace, palette, settings, statusbar
+  features/                  titlebar, sidebar, explorer, viewer, changes, claude, mcp, workspace, palette, settings, statusbar
 ```

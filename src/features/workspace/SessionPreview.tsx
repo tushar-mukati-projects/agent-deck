@@ -34,7 +34,6 @@ const PAGE = 60;
 const CACHE_LIMIT = 24;
 const NEAR_BOTTOM_PX = 120;
 
-/** Transcripts keyed by file, remembering which modification they were read at. */
 const cache = new Map<string, { stamp: number; items: TranscriptItem[] }>();
 
 const remember = (filePath: string, stamp: number, items: TranscriptItem[]) => {
@@ -182,7 +181,6 @@ export const SessionPreview = ({ workspace }: { workspace: Workspace }) => {
   const shown = deferredQuery ? matches : matches.slice(Math.max(0, matches.length - visible));
   const hiddenCount = matches.length - shown.length;
 
-  // Follow new messages only when the reader is already at the bottom; keep position when loading earlier ones.
   useLayoutEffect(() => {
     const element = scrollRef.current;
     if (!element) return;
@@ -194,7 +192,6 @@ export const SessionPreview = ({ workspace }: { workspace: Workspace }) => {
     }
   }, [shown.length, items]);
 
-  // Markdown, code highlighting and images settle after the first paint; keep following the bottom while they do.
   useEffect(() => {
     const element = scrollRef.current;
     const content = contentRef.current;

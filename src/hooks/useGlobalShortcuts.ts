@@ -28,7 +28,7 @@ const handlers: Record<ShortcutAction, () => void> = {
   showSessions: () => ui().setSidebarView("sessions"),
   showExplorer: () => ui().setSidebarView("explorer"),
   showChanges: () => ui().setSidebarView("changes"),
-  showProject: () => ui().setSidebarView("project"),
+  showClaude: () => ui().setSidebarView("claude"),
   toggleShell: toggleShellPanel,
   newShell: () => {
     const workspace = getActiveWorkspace();

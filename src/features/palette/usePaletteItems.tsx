@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import {
   AppWindow,
   Bell,
+  BrainCircuit,
   Copy,
-  FolderKanban,
   FolderOpen,
   FolderPlus,
   GitCompare,
@@ -150,7 +150,7 @@ const buildCommands = (workspace: Workspace | null): CommandDef[] => {
     shortcut("showSessions", "Show sessions", <MessagesSquare />),
     shortcut("showExplorer", "Show explorer", <FolderOpen />),
     shortcut("showChanges", "Show what changed", <GitCompare />),
-    shortcut("showProject", "Show project tasks, agents and media", <FolderKanban />),
+    shortcut("showClaude", "Show Claude memory, MCP servers, skills and agents", <BrainCircuit />),
     shortcut("toggleSidebar", "Toggle sidebar", <PanelLeft />),
     {
       id: "refresh",
@@ -248,8 +248,6 @@ export const usePaletteItems = (mode: PaletteMode, rawQuery: string) => {
 
   const workspaceId = workspace?.id;
   const workspaceMode = workspace?.mode;
-  // Rebuild commands only when something they depend on changes, not on every keystroke.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const commands = useMemo(() => buildCommands(workspace), [workspaceId, workspaceMode]);
 
   const items = useMemo(() => {

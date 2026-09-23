@@ -6,13 +6,13 @@ import { Button } from "@/components/ui/button";
 import { EmptyState, Spinner } from "@/components/ui/feedback";
 import { Alert } from "@/components/ui/panel";
 import { DiffView } from "@/features/changes/DiffView";
-import { MediaGallery } from "@/features/media/MediaGallery";
+import { McpView } from "@/features/mcp/McpView";
 import { FileTabs } from "@/features/viewer/FileTabs";
 import { FileToolbar } from "@/features/viewer/FileToolbar";
 import { MarkdownView } from "@/features/viewer/MarkdownView";
 import { useFileContent } from "@/features/viewer/useFileContent";
 import { isTextKind, viewKind } from "@/features/viewer/view-kind";
-import { decodeDiffTab, decodeMediaTab } from "@/lib/diff-tabs";
+import { decodeDiffTab, decodeMcpTab } from "@/lib/diff-tabs";
 import { api } from "@/lib/tauri/commands";
 import { assetUrl, openExternal, revealInExplorer } from "@/lib/tauri/system";
 import { basename, dirname, errorMessage, normalizePath } from "@/lib/utils";
@@ -56,9 +56,9 @@ const MediaFile = ({ path, kind }: { path: string; kind: "image" | "pdf" | "vide
 
 const FileBody = ({ workspace, tab }: { workspace: Workspace; tab: string }) => {
   const diff = useMemo(() => decodeDiffTab(tab), [tab]);
-  const mediaRoot = useMemo(() => decodeMediaTab(tab), [tab]);
+  const serverId = useMemo(() => decodeMcpTab(tab), [tab]);
   if (diff) return <DiffView tab={diff} workspace={workspace} />;
-  if (mediaRoot !== null) return <MediaGallery root={mediaRoot} workspace={workspace} />;
+  if (serverId !== null) return <McpView workspace={workspace} serverId={serverId} />;
   return <DocumentBody workspace={workspace} path={tab} />;
 };
 

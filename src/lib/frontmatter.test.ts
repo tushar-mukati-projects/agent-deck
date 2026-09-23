@@ -4,7 +4,9 @@ import { splitFrontmatter } from "@/lib/frontmatter";
 
 describe("splitFrontmatter", () => {
   it("extracts simple fields and the body", () => {
-    const { fields, body } = splitFrontmatter('---\nname: agent\ndescription: "Does things"\n---\n# Title\n');
+    const { fields, body } = splitFrontmatter(
+      '---\nname: agent\ndescription: "Does things"\n---\n# Title\n',
+    );
     expect(fields).toEqual([
       ["name", "agent"],
       ["description", "Does things"],

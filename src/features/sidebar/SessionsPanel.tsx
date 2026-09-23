@@ -181,7 +181,6 @@ export const SessionsPanel = () => {
   const tones = useSessionTones();
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query);
-  // Explicit open/closed choices per folder; folders without a choice follow the automatic rule below.
   const [expanded, setExpanded] = useState<Map<string, boolean>>(new Map());
   const listRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);

@@ -361,6 +361,37 @@ pub fn search(query: &str) -> Vec<SearchHit> {
         .collect()
 }
 
+pub fn is_running(distro: &str) -> bool {
+    distro_names(&["--running"]).iter().any(|name| name == distro)
+}
+
+static HOMES: LazyLock<Mutex<HashMap<String, String>>> = LazyLock::new(Mutex::default);
+
+pub fn home_for(distro: &str, linux_cwd: &str) -> anyhow::Result<String> {
+    let mut parts = linux_cwd.split('/').filter(|p| !p.is_empty());
+    match (parts.next(), parts.next()) {
+        (Some("home"), Some(user)) => return Ok(format!("/home/{user}")),
+        (Some("root"), _) => return Ok("/root".into()),
+        _ => {}
+    }
+    if let Some(home) = HOMES.lock().get(distro) {
+        return Ok(home.clone());
+    }
+    let output = run_with_timeout(
+        Command::new("wsl.exe").args(["-d", distro, "-e", "sh", "-c", "printf %s \"$HOME\""]),
+        None,
+        LIST_TIMEOUT,
+    )?;
+    let home = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    anyhow::ensure!(home.starts_with('/'), "Couldn't find the home folder in WSL {distro}");
+    HOMES.lock().insert(distro.to_string(), home.clone());
+    Ok(home)
+}
+
+pub fn login_shell(distro: &str) -> String {
+    CACHE.lock().distros.get(distro).and_then(|d| d.shell.clone()).unwrap_or_else(|| "bash".into())
+}
+
 pub fn start(distro: &str) -> anyhow::Result<()> {
     let output = run_with_timeout(Command::new("wsl.exe").args(["-d", distro, "-e", "true"]), None, INDEX_TIMEOUT)?;
     anyhow::ensure!(output.status.success(), "Couldn't start WSL distro {distro}");

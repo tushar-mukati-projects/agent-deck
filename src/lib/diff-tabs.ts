@@ -1,5 +1,5 @@
 const DIFF_PREFIX = "diff::";
-const MEDIA_PREFIX = "media::";
+const MCP_PREFIX = "mcp::";
 
 export type DiffSource = "session" | "git";
 
@@ -21,10 +21,9 @@ export const decodeDiffTab = (value: string): DiffTab | null => {
 
 export const isDiffTab = (value: string) => value.startsWith(DIFF_PREFIX);
 
-export const encodeMediaTab = (root: string) => `${MEDIA_PREFIX}${root}`;
+export const encodeMcpTab = (serverId: string) => `${MCP_PREFIX}${serverId}`;
 
-export const decodeMediaTab = (value: string) =>
-  value.startsWith(MEDIA_PREFIX) ? value.slice(MEDIA_PREFIX.length) : null;
+export const decodeMcpTab = (value: string) =>
+  value.startsWith(MCP_PREFIX) ? value.slice(MCP_PREFIX.length) : null;
 
-export const tabTargetPath = (value: string) =>
-  decodeDiffTab(value)?.path ?? decodeMediaTab(value) ?? value;
+export const tabTargetPath = (value: string) => decodeDiffTab(value)?.path ?? value;

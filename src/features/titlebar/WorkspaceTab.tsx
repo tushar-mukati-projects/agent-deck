@@ -11,7 +11,13 @@ import {
 } from "lucide-react";
 
 import { renameSession, resumeWorkspace } from "@/actions/sessions";
-import { closeOtherWorkspaces, closeWorkspace, closeWorkspacesToRight } from "@/actions/workspaces";
+import {
+  closeIdleWorkspaces,
+  closeOtherWorkspaces,
+  closeWorkspace,
+  closeWorkspaces,
+  closeWorkspacesToRight,
+} from "@/actions/workspaces";
 import { StatusDot } from "@/components/ui/feedback";
 import {
   ContextMenu,
@@ -137,6 +143,17 @@ export const WorkspaceTab = ({ workspace }: { workspace: Workspace }) => {
           onSelect={() => void closeWorkspacesToRight(workspace.id)}
         >
           Close tabs to the right
+        </ContextMenuItem>
+        <ContextMenuItem icon={<XCircle />} onSelect={() => void closeIdleWorkspaces()}>
+          Close tabs with nothing running
+        </ContextMenuItem>
+        <ContextMenuItem
+          icon={<XCircle />}
+          onSelect={() =>
+            void closeWorkspaces(useWorkspaceStore.getState().workspaces.map((w) => w.id))
+          }
+        >
+          Close all
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>

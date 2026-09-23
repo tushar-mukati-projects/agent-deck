@@ -147,3 +147,56 @@ export const Segmented = <T extends string>({
     ))}
   </div>
 );
+
+interface CollapsibleSectionProps {
+  title: string;
+  count?: number | null;
+  icon?: React.ReactNode;
+  open: boolean;
+  onToggle: () => void;
+  actions?: React.ReactNode;
+  summary?: React.ReactNode;
+  children: React.ReactNode;
+}
+
+export const CollapsibleSection = ({
+  title,
+  count,
+  icon,
+  open,
+  onToggle,
+  actions,
+  summary,
+  children,
+}: CollapsibleSectionProps) => (
+  <section className="mb-1">
+    <div className="group/section flex h-7 items-center pr-1.5">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={onToggle}
+        className="flex h-full min-w-0 flex-1 items-center gap-1.5 px-2.5 text-[11px] font-semibold tracking-wide text-muted hover:text-fg [&>svg:not(:first-child)]:size-3.5 [&>svg:not(:first-child)]:shrink-0"
+      >
+        <Chevron open={open} />
+        {icon}
+        <span className="truncate">{title}</span>
+        {count !== undefined && count !== null && (
+          <span className="font-normal text-faint tabular-nums">{count}</span>
+        )}
+        {summary && <span className="ml-auto font-mono font-normal">{summary}</span>}
+      </button>
+      {actions && (
+        <div className="flex items-center opacity-0 group-hover/section:opacity-100 focus-within:opacity-100">
+          {actions}
+        </div>
+      )}
+    </div>
+    {open && <div className="flex flex-col px-1.5">{children}</div>}
+  </section>
+);
+
+export const ScopeBadge = ({ children }: { children: React.ReactNode }) => (
+  <span className="shrink-0 rounded border border-border px-1 text-[9.5px] leading-[14px] tracking-wide text-faint uppercase">
+    {children}
+  </span>
+);

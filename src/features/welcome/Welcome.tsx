@@ -14,7 +14,7 @@ const TIPS: { action: ShortcutAction; label: string }[] = [
   { action: "toggleShell", label: "Toggle shell panel" },
   { action: "searchChats", label: "Search inside conversations" },
   { action: "nextAttention", label: "Jump to session waiting for you" },
-  { action: "showProject", label: "Project tasks, agents & media" },
+  { action: "showClaude", label: "Memory, MCP servers, skills & agents" },
   { action: "shortcuts", label: "All keyboard shortcuts" },
 ];
 

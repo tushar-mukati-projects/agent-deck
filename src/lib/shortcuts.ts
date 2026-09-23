@@ -6,7 +6,7 @@ export type ShortcutAction =
   | "showSessions"
   | "showExplorer"
   | "showChanges"
-  | "showProject"
+  | "showClaude"
   | "toggleShell"
   | "newShell"
   | "newSession"
@@ -159,12 +159,12 @@ export const SHORTCUTS: Shortcut[] = [
     group: "Views",
   },
   {
-    action: "showProject",
+    action: "showClaude",
     key: "j",
     ctrl: true,
     shift: true,
     label: "Ctrl Shift J",
-    description: "Project: tasks, agents, media",
+    description: "Claude: memory, MCP, skills, agents",
     group: "Views",
   },
   {

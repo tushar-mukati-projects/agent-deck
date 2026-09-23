@@ -7,6 +7,7 @@ import { createRoot } from "react-dom/client";
 
 import { openPathFromTerminal } from "@/actions/files";
 import { App } from "@/App";
+import { suppressBrowserChrome } from "@/lib/browser-chrome";
 import { api } from "@/lib/tauri/commands";
 import { appWindow } from "@/lib/tauri/system";
 import { setPathLinkHandler, setRunningPtys } from "@/lib/terminal/registry";
@@ -15,6 +16,7 @@ import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { referencedTerminalIds, useWorkspaceStore } from "@/stores/workspace-store";
 
+suppressBrowserChrome();
 applyTheme(findTheme(useSettingsStore.getState().themeId));
 useSettingsStore.subscribe((state, previous) => {
   if (state.themeId !== previous.themeId) applyTheme(findTheme(state.themeId));
