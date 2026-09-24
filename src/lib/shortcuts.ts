@@ -2,7 +2,8 @@ export type ShortcutAction =
   | "palette"
   | "quickOpen"
   | "searchChats"
-  | "toggleSidebar"
+  | "toggleSessions"
+  | "toggleContext"
   | "showSessions"
   | "showExplorer"
   | "showChanges"
@@ -28,6 +29,7 @@ interface Shortcut {
   key: string;
   ctrl?: boolean;
   shift?: boolean;
+  alt?: boolean;
   label: string;
   description: string;
   group: ShortcutGroup;
@@ -123,12 +125,21 @@ export const SHORTCUTS: Shortcut[] = [
     group: "Sessions & tabs",
   },
   {
-    action: "toggleSidebar",
+    action: "toggleSessions",
     key: "b",
     ctrl: true,
     shift: true,
     label: "Ctrl Shift B",
-    description: "Toggle sidebar",
+    description: "Show or hide the sessions list",
+    group: "Views",
+  },
+  {
+    action: "toggleContext",
+    key: "b",
+    ctrl: true,
+    alt: true,
+    label: "Ctrl Alt B",
+    description: "Show or hide the session panel (files, changes, Claude)",
     group: "Views",
   },
   {
@@ -137,7 +148,7 @@ export const SHORTCUTS: Shortcut[] = [
     ctrl: true,
     shift: true,
     label: "Ctrl Shift S",
-    description: "Sessions",
+    description: "Search sessions",
     group: "Views",
   },
   {
@@ -146,7 +157,7 @@ export const SHORTCUTS: Shortcut[] = [
     ctrl: true,
     shift: true,
     label: "Ctrl Shift E",
-    description: "Explorer",
+    description: "Files of this session",
     group: "Views",
   },
   {
@@ -155,7 +166,7 @@ export const SHORTCUTS: Shortcut[] = [
     ctrl: true,
     shift: true,
     label: "Ctrl Shift G",
-    description: "What changed",
+    description: "What changed in this session",
     group: "Views",
   },
   {
@@ -232,15 +243,20 @@ const normalizedKey = (event: KeyboardEvent) => {
   if (event.code === "Equal") return "=";
   if (event.code === "Minus") return "-";
   if (event.code === "Slash") return "/";
+  if (/^Key[A-Z]$/.test(event.code)) return event.code.slice(3).toLowerCase();
   return event.key.toLowerCase();
 };
 
 const find = (event: KeyboardEvent) => {
-  if (event.type !== "keydown" || event.altKey || event.metaKey) return null;
+  if (event.type !== "keydown" || event.metaKey) return null;
   const key = normalizedKey(event);
   return (
     SHORTCUTS.find(
-      (s) => s.key === key && !!s.ctrl === event.ctrlKey && !!s.shift === event.shiftKey,
+      (s) =>
+        s.key === key &&
+        !!s.ctrl === event.ctrlKey &&
+        !!s.shift === event.shiftKey &&
+        !!s.alt === event.altKey,
     ) ?? null
   );
 };

@@ -34,7 +34,7 @@ import { encodeMcpTab } from "@/lib/diff-tabs";
 import { api } from "@/lib/tauri/commands";
 import { revealInExplorer } from "@/lib/tauri/system";
 import { appWindow } from "@/lib/tauri/system";
-import { cn, errorMessage, timeAgo } from "@/lib/utils";
+import { basename, cn, errorMessage, timeAgo } from "@/lib/utils";
 import { parseWslPath } from "@/lib/wsl";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useViewerStore } from "@/stores/viewer-store";
@@ -470,7 +470,7 @@ export const ClaudePanel = () => {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <PanelHeader title="Claude">
+      <PanelHeader title={basename(workspace.cwd)}>
         <IconButton label="Refresh" onClick={() => void reload()}>
           <RefreshCw className={cn(loading && "animate-spin")} />
         </IconButton>

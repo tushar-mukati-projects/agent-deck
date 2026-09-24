@@ -43,3 +43,22 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     );
   }
 }
+
+export const CrashScreen = ({ error }: { error: Error }) => (
+  <div className="flex h-full flex-col items-center justify-center gap-3 bg-bg p-8 text-center">
+    <p className="text-[14px] font-medium text-fg">Claude Deck hit an unexpected error</p>
+    <p className="max-w-[560px] font-mono text-[11px] break-words text-faint select-text">
+      {error.message}
+    </p>
+    <p className="max-w-[480px] text-[12px] text-muted">
+      Your sessions keep running in the background. Reloading reconnects to them.
+    </p>
+    <button
+      type="button"
+      onClick={() => location.reload()}
+      className="h-8 rounded-md bg-accent px-4 text-xs font-medium text-on-accent hover:bg-accent-strong"
+    >
+      Reload
+    </button>
+  </div>
+);

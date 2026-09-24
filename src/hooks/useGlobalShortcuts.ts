@@ -24,11 +24,15 @@ const handlers: Record<ShortcutAction, () => void> = {
   palette: () => ui().openPalette("all"),
   quickOpen: () => ui().openPalette("files"),
   searchChats: () => ui().openPalette("chats"),
-  toggleSidebar: () => ui().toggleSidebar(),
-  showSessions: () => ui().setSidebarView("sessions"),
-  showExplorer: () => ui().setSidebarView("explorer"),
-  showChanges: () => ui().setSidebarView("changes"),
-  showClaude: () => ui().setSidebarView("claude"),
+  toggleSessions: () => ui().toggleSessions(),
+  toggleContext: () => ui().toggleContext(),
+  showSessions: () => {
+    ui().setSessionsOpen(true);
+    requestAnimationFrame(() => document.getElementById("sessions-search")?.focus());
+  },
+  showExplorer: () => ui().toggleContextView("explorer"),
+  showChanges: () => ui().toggleContextView("changes"),
+  showClaude: () => ui().toggleContextView("claude"),
   toggleShell: toggleShellPanel,
   newShell: () => {
     const workspace = getActiveWorkspace();

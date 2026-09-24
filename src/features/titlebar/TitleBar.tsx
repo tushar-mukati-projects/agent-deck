@@ -1,5 +1,16 @@
 import { useEffect, useState } from "react";
-import { Copy, Minus, Plus, Search, Square, X } from "lucide-react";
+import {
+  Copy,
+  Keyboard,
+  Minus,
+  PanelLeft,
+  PanelRight,
+  Plus,
+  Search,
+  Settings,
+  Square,
+  X,
+} from "lucide-react";
 
 import { IconButton } from "@/components/ui/icon-button";
 import { Kbd } from "@/components/ui/kbd";
@@ -8,7 +19,7 @@ import { WorkspaceTab } from "@/features/titlebar/WorkspaceTab";
 import { shortcutLabel } from "@/lib/shortcuts";
 import { appWindow } from "@/lib/tauri/system";
 import { useUiStore } from "@/stores/ui-store";
-import { useWorkspaceStore } from "@/stores/workspace-store";
+import { useActiveWorkspace, useWorkspaceStore } from "@/stores/workspace-store";
 
 const WindowControls = () => {
   const [maximized, setMaximized] = useState(false);
@@ -60,11 +71,24 @@ const WindowControls = () => {
 export const TitleBar = () => {
   const workspaces = useWorkspaceStore((s) => s.workspaces);
   const openPalette = useUiStore((s) => s.openPalette);
+  const sessionsOpen = useUiStore((s) => s.sessionsOpen);
+  const contextOpen = useUiStore((s) => s.contextOpen);
+  const hasWorkspace = !!useActiveWorkspace();
+  const { toggleSessions, toggleContext, setShortcutsOpen, setSettingsOpen } =
+    useUiStore.getState();
 
   return (
     <header className="relative flex h-[38px] shrink-0 items-stretch border-b border-border bg-panel">
-      <div data-tauri-drag-region className="flex w-12 shrink-0 items-center justify-center">
+      <div data-tauri-drag-region className="flex shrink-0 items-center gap-1 pr-1 pl-3">
         <img src="/app-icon.svg" alt="" className="pointer-events-none size-[18px]" />
+        <IconButton
+          label={sessionsOpen ? "Hide sessions list" : "Show sessions list"}
+          shortcut={shortcutLabel("toggleSessions")}
+          active={sessionsOpen}
+          onClick={toggleSessions}
+        >
+          <PanelLeft />
+        </IconButton>
       </div>
 
       <div className="flex min-w-0 flex-1 items-stretch">
@@ -100,6 +124,35 @@ export const TitleBar = () => {
           </span>
           <Kbd keys={shortcutLabel("palette")} />
         </button>
+      </div>
+
+      <div className="flex shrink-0 items-center gap-0.5 pr-2">
+        {hasWorkspace && (
+          <IconButton
+            label={
+              contextOpen ? "Hide session panel" : "Show files, changes and Claude for this session"
+            }
+            shortcut={shortcutLabel("toggleContext")}
+            active={contextOpen}
+            onClick={toggleContext}
+          >
+            <PanelRight />
+          </IconButton>
+        )}
+        <IconButton
+          label="Keyboard shortcuts"
+          shortcut={shortcutLabel("shortcuts")}
+          onClick={() => setShortcutsOpen(true)}
+        >
+          <Keyboard />
+        </IconButton>
+        <IconButton
+          label="Settings"
+          shortcut={shortcutLabel("settings")}
+          onClick={() => setSettingsOpen(true)}
+        >
+          <Settings />
+        </IconButton>
       </div>
 
       <WindowControls />

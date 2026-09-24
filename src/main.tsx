@@ -7,6 +7,7 @@ import { createRoot } from "react-dom/client";
 
 import { openPathFromTerminal } from "@/actions/files";
 import { App } from "@/App";
+import { CrashScreen, ErrorBoundary } from "@/components/ErrorBoundary";
 import { suppressBrowserChrome } from "@/lib/browser-chrome";
 import { api } from "@/lib/tauri/commands";
 import { appWindow } from "@/lib/tauri/system";
@@ -43,7 +44,9 @@ const reattachTerminals = async () => {
 const render = () =>
   createRoot(document.getElementById("root")!).render(
     <StrictMode>
-      <App />
+      <ErrorBoundary fallback={(error) => <CrashScreen error={error} />}>
+        <App />
+      </ErrorBoundary>
     </StrictMode>,
   );
 

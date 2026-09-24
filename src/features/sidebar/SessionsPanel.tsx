@@ -282,6 +282,7 @@ export const SessionsPanel = () => {
 
       <div className="px-2 pb-2">
         <SearchInput
+          id="sessions-search"
           inputRef={searchRef}
           value={query}
           onChange={setQuery}

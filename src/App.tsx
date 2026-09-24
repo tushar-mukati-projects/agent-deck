@@ -9,7 +9,7 @@ import { ConfirmDialog } from "@/features/settings/ConfirmDialog";
 import { SettingsDialog } from "@/features/settings/SettingsDialog";
 import { ShortcutsDialog } from "@/features/shortcuts/ShortcutsDialog";
 import { RenameDialog } from "@/features/sidebar/RenameDialog";
-import { ActivityBar, SidePanel } from "@/features/sidebar/Sidebar";
+import { ContextPanel, SessionsSidebar } from "@/features/sidebar/Sidebar";
 import { StatusBar } from "@/features/statusbar/StatusBar";
 import { TitleBar } from "@/features/titlebar/TitleBar";
 import { Welcome } from "@/features/welcome/Welcome";
@@ -22,21 +22,27 @@ import { useSettingsStore } from "@/stores/settings-store";
 import { useUiStore } from "@/stores/ui-store";
 import { useActiveWorkspace } from "@/stores/workspace-store";
 
-const useSidebarPanel = () => {
+type PanelFlag = "sessionsOpen" | "contextOpen";
+
+const useCollapsible = (flag: PanelFlag, available = true) => {
   const panelRef = usePanelRef();
-  const sidebarOpen = useUiStore((s) => s.sidebarOpen);
+  const open = useUiStore((s) => s[flag]) && available;
 
   useEffect(() => {
-    const panel = panelRef.current;
-    if (!panel) return;
-    if (sidebarOpen && panel.isCollapsed()) panel.expand();
-    if (!sidebarOpen && !panel.isCollapsed()) panel.collapse();
-  }, [sidebarOpen, panelRef]);
+    const frame = requestAnimationFrame(() => {
+      const panel = panelRef.current;
+      if (!panel) return;
+      if (open && panel.isCollapsed()) panel.expand();
+      if (!open && !panel.isCollapsed()) panel.collapse();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [open, panelRef]);
 
   const syncFromDrag = () => {
-    const collapsed = panelRef.current?.isCollapsed() ?? false;
-    if (collapsed === useUiStore.getState().sidebarOpen)
-      useUiStore.setState({ sidebarOpen: !collapsed });
+    const panel = panelRef.current;
+    if (!panel || !available) return;
+    const collapsed = panel.isCollapsed();
+    if (collapsed === useUiStore.getState()[flag]) useUiStore.setState({ [flag]: !collapsed });
   };
 
   return { panelRef, syncFromDrag };
@@ -45,9 +51,10 @@ const useSidebarPanel = () => {
 export const App = () => {
   const workspace = useActiveWorkspace();
   const themeKind = useSettingsStore((s) => findTheme(s.themeId).kind);
-  const { panelRef, syncFromDrag } = useSidebarPanel();
+  const sessions = useCollapsible("sessionsOpen");
+  const context = useCollapsible("contextOpen", !!workspace);
   const layout = useDefaultLayout({
-    id: "deck-shell",
+    id: "deck-shell-v2",
     storage: localStorage,
     onlySaveAfterUserInteractions: true,
   });
@@ -59,40 +66,46 @@ export const App = () => {
     <TooltipProvider>
       <div className="flex h-full flex-col">
         <TitleBar />
-        <div className="flex min-h-0 flex-1">
-          <ActivityBar />
-          <Group
-            orientation="horizontal"
-            className="min-w-0 flex-1"
-            defaultLayout={layout.defaultLayout}
-            onLayoutChanged={layout.onLayoutChanged}
+        <Group
+          orientation="horizontal"
+          className="min-h-0 flex-1"
+          defaultLayout={layout.defaultLayout}
+          onLayoutChanged={layout.onLayoutChanged}
+        >
+          <Panel
+            id="sessions"
+            panelRef={sessions.panelRef}
+            defaultSize={280}
+            minSize={220}
+            maxSize={520}
+            collapsible
+            groupResizeBehavior="preserve-pixel-size"
+            onResize={sessions.syncFromDrag}
           >
-            <Panel
-              id="sidebar"
-              panelRef={panelRef}
-              defaultSize={300}
-              minSize={220}
-              maxSize={560}
-              collapsible
-              groupResizeBehavior="preserve-pixel-size"
-              onResize={syncFromDrag}
-            >
-              <ErrorBoundary>
-                <SidePanel />
-              </ErrorBoundary>
-            </Panel>
-            <ResizeHandle orientation="horizontal" />
-            <Panel id="content" minSize={420}>
-              <ErrorBoundary key={workspace?.id ?? "welcome"}>
-                {workspace ? (
-                  <WorkspaceView key={workspace.id} workspace={workspace} />
-                ) : (
-                  <Welcome />
-                )}
-              </ErrorBoundary>
-            </Panel>
-          </Group>
-        </div>
+            <ErrorBoundary>
+              <SessionsSidebar />
+            </ErrorBoundary>
+          </Panel>
+          <ResizeHandle orientation="horizontal" />
+          <Panel id="content" minSize={420}>
+            <ErrorBoundary key={workspace?.id ?? "welcome"}>
+              {workspace ? <WorkspaceView key={workspace.id} workspace={workspace} /> : <Welcome />}
+            </ErrorBoundary>
+          </Panel>
+          <ResizeHandle orientation="horizontal" />
+          <Panel
+            id="context"
+            panelRef={context.panelRef}
+            defaultSize={320}
+            minSize={240}
+            maxSize={640}
+            collapsible
+            groupResizeBehavior="preserve-pixel-size"
+            onResize={context.syncFromDrag}
+          >
+            <ErrorBoundary>{workspace && <ContextPanel />}</ErrorBoundary>
+          </Panel>
+        </Group>
         <StatusBar />
       </div>
       <CommandPalette />

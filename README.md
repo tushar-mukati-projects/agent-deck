@@ -6,6 +6,7 @@ Built with **Tauri 2** (Rust backend, system WebView2) + **React 19 / TypeScript
 
 ## Features
 
+- **Layout** — sessions (all folders) on the left; the open session in the middle; on the right a session panel with **Files / Changes / Claude** that always follows the active session. Both side panels resize and collapse (`Ctrl+Shift+B` / `Ctrl+Alt+B`).
 - **All sessions, every folder** — indexes `~/.claude/projects/**/*.jsonl` (incrementally, by byte offset), grouped by real working folder. Filter to one folder (with or without subfolders) or browse to any folder.
 - **Preview before resuming** — read a conversation (markdown rendered, tool calls summarized) without starting a process.
 - **Resume / fork / new** — runs `claude --resume <id>`, `--fork-session`, or `--session-id <uuid>` in a real ConPTY. Sessions keep running in the background while you switch tabs; tabs show *working* (pulsing) and *done while you were away* (blue) states.
@@ -31,8 +32,9 @@ Built with **Tauri 2** (Rust backend, system WebView2) + **React 19 / TypeScript
 | New session in current folder | `Ctrl+Shift+N` |
 | Toggle / new shell | ``Ctrl+` `` / ``Ctrl+Shift+` `` |
 | Next / previous tab | `Ctrl+Tab` / `Ctrl+Shift+Tab` |
-| Sessions / Explorer / Changes / Claude | `Ctrl+Shift+S` / `E` / `G` / `J` |
-| Toggle sidebar | `Ctrl+Shift+B` |
+| Search sessions | `Ctrl+Shift+S` |
+| Session panel: Files / Changes / Claude | `Ctrl+Shift+E` / `G` / `J` |
+| Toggle sessions list / session panel | `Ctrl+Shift+B` / `Ctrl+Alt+B` |
 | Search conversations | `Ctrl+Shift+F` |
 | Reopen closed tab / jump to waiting session | `Ctrl+Shift+T` / `Ctrl+Shift+A` |
 | Jump to tab | `Ctrl+1…9` |

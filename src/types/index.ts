@@ -281,4 +281,4 @@ export interface Workspace {
   activeFile: string | null;
 }
 
-export type SidebarView = "sessions" | "explorer" | "changes" | "claude";
+export type ContextView = "explorer" | "changes" | "claude";
