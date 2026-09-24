@@ -1,5 +1,16 @@
 
-use std::{collections::HashMap, path::Path, sync::Arc, time::{Duration, Instant}};
+use std::{
+    collections::HashMap,
+    io,
+    net::{Shutdown, TcpListener},
+    path::Path,
+    process::{Command, Stdio},
+    sync::Arc,
+    thread,
+    time::{Duration, Instant},
+};
+
+use base64::Engine;
 
 use anyhow::{anyhow, Context};
 use parking_lot::Mutex;
@@ -8,7 +19,10 @@ use postgres_native_tls::MakeTlsConnector;
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::claude_config::{self, ResolvedServer};
+use crate::{
+    claude_config::{self, ResolvedServer},
+    util::hidden,
+};
 
 const MAX_ROWS: usize = 2000;
 const STATEMENT_TIMEOUT_MS: u64 = 60_000;
@@ -90,19 +104,113 @@ fn config_for(server: &ResolvedServer) -> anyhow::Result<Config> {
     Ok(config)
 }
 
-fn connect(config: &Config) -> anyhow::Result<Client> {
-    let lenient = matches!(config.get_ssl_mode(), postgres::config::SslMode::Require);
-    let tls = native_tls::TlsConnector::builder().danger_accept_invalid_certs(lenient).build()?;
-    config.connect(MakeTlsConnector::new(tls)).map_err(|error| {
+fn tcp_target(config: &Config) -> (String, u16) {
+    let host = match config.get_hosts().first() {
+        Some(postgres::config::Host::Tcp(h)) => h.clone(),
+        _ => "localhost".into(),
+    };
+    (host, config.get_ports().first().copied().unwrap_or(5432))
+}
+
+fn retarget(config: &Config, host: &str, port: u16) -> Config {
+    let mut next = Config::new();
+    next.host(host).port(port).ssl_mode(config.get_ssl_mode()).application_name("claude-deck");
+    if let Some(user) = config.get_user() {
+        next.user(user);
+    }
+    if let Some(password) = config.get_password() {
+        next.password(password);
+    }
+    if let Some(db) = config.get_dbname() {
+        next.dbname(db);
+    }
+    if let Some(options) = config.get_options() {
+        next.options(options);
+    }
+    if let Some(timeout) = config.get_connect_timeout() {
+        next.connect_timeout(*timeout);
+    }
+    next
+}
+
+const RELAY: &str = r#"import socket, sys, threading
+s = socket.create_connection((sys.argv[1], int(sys.argv[2])), 10)
+def upstream():
+    while True:
+        data = sys.stdin.buffer.read1(65536)
+        if not data:
+            break
+        s.sendall(data)
+    try:
+        s.shutdown(socket.SHUT_WR)
+    except OSError:
+        pass
+threading.Thread(target=upstream, daemon=True).start()
+out = sys.stdout.buffer
+while True:
+    data = s.recv(65536)
+    if not data:
+        break
+    out.write(data)
+    out.flush()
+"#;
+
+fn wsl_relay(distro: &str, host: &str, port: u16) -> anyhow::Result<u16> {
+    let listener = TcpListener::bind(("127.0.0.1", 0))?;
+    let local_port = listener.local_addr()?.port();
+    listener.set_nonblocking(true)?;
+    let code = base64::engine::general_purpose::STANDARD.encode(RELAY);
+    let script = format!("import base64;exec(base64.b64decode('{code}'))");
+    let (distro, host) = (distro.to_string(), host.to_string());
+    thread::spawn(move || {
+        let deadline = Instant::now() + Duration::from_secs(30);
+        let stream = loop {
+            match listener.accept() {
+                Ok((stream, _)) => break stream,
+                Err(_) if Instant::now() < deadline => thread::sleep(Duration::from_millis(20)),
+                Err(_) => return,
+            }
+        };
+        let _ = stream.set_nonblocking(false);
+        let mut command = Command::new("wsl.exe");
+        command
+            .args(["-d", &distro, "-e", "python3", "-c", &script, &host, &port.to_string()])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null());
+        let Ok(mut child) = hidden(&mut command).spawn() else { return };
+        let (Some(mut stdin), Some(mut stdout)) = (child.stdin.take(), child.stdout.take()) else { return };
+        let Ok(mut reader) = stream.try_clone() else { return };
+        let mut writer = stream;
+        let up = thread::spawn(move || {
+            let _ = io::copy(&mut reader, &mut stdin);
+        });
+        let _ = io::copy(&mut stdout, &mut writer);
+        let _ = writer.shutdown(Shutdown::Both);
+        let _ = child.kill();
+        let _ = child.wait();
+        let _ = up.join();
+    });
+    Ok(local_port)
+}
+
+fn connect(server: &ResolvedServer, config: &Config) -> anyhow::Result<Client> {
+    let tls = native_tls::TlsConnector::builder()
+        .danger_accept_invalid_certs(true)
+        .danger_accept_invalid_hostnames(true)
+        .build()?;
+    let (host, port) = tcp_target(config);
+    let dial = if host.eq_ignore_ascii_case("localhost") { "127.0.0.1" } else { host.as_str() };
+    let target = match &server.distro {
+        Some(distro) => retarget(config, "127.0.0.1", wsl_relay(distro, dial, port)?),
+        None => retarget(config, dial, port),
+    };
+    target.connect(MakeTlsConnector::new(tls)).map_err(|error| {
         if error.as_db_error().is_some() {
             return describe(error);
         }
-        let host = match config.get_hosts().first() {
-            Some(postgres::config::Host::Tcp(h)) => h.clone(),
-            _ => "the database".into(),
-        };
-        let port = config.get_ports().first().copied().unwrap_or(5432);
-        anyhow!("Couldn't connect to {host}:{port}. Is the database (or the tunnel / port-forward to it) running?\n\n{}", describe(error))
+        let place = server.distro.as_ref().map(|d| format!(" from WSL {d}")).unwrap_or_default();
+        anyhow!("Couldn't connect to {host}:{port}{place}. Is the database (or the tunnel / port-forward to it) running?\n\n{}", describe(error))
     })
 }
 
@@ -164,7 +272,7 @@ impl PgManager {
             return Ok(client);
         }
         let server = claude_config::resolve_server(Path::new(cwd), id)?;
-        let client = Arc::new(Mutex::new(connect(&config_for(&server)?)?));
+        let client = Arc::new(Mutex::new(connect(&server, &config_for(&server)?)?));
         self.clients.lock().insert(key, client.clone());
         Ok(client)
     }
