@@ -13,8 +13,13 @@ interface ConfirmRequest {
   resolve: (confirmed: boolean) => void;
 }
 
+export type SidePanel = "sessions" | "context";
+
 interface UiState {
   sessionsOpen: boolean;
+  sessionsWidth: number;
+  contextWidth: number;
+  setPanelWidth: (panel: SidePanel, width: number) => void;
   contextOpen: boolean;
   contextView: ContextView;
   paletteMode: PaletteMode | null;
@@ -41,6 +46,10 @@ export const useUiStore = create<UiState>()(
   persist(
     (set, get) => ({
       sessionsOpen: true,
+      sessionsWidth: 280,
+      contextWidth: 320,
+      setPanelWidth: (panel, width) =>
+        set(panel === "sessions" ? { sessionsWidth: width } : { contextWidth: width }),
       contextOpen: true,
       contextView: "explorer",
       paletteMode: null,
@@ -78,7 +87,9 @@ export const useUiStore = create<UiState>()(
       name: "claude-deck-ui",
       partialize: (s) => ({
         sessionsOpen: s.sessionsOpen,
+        sessionsWidth: s.sessionsWidth,
         contextOpen: s.contextOpen,
+        contextWidth: s.contextWidth,
         contextView: s.contextView,
       }),
     },
