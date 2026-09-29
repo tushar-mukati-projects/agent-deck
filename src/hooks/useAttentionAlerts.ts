@@ -47,7 +47,7 @@ const handleIdle = async (event: IdleEvent) => {
 };
 
 const clearVisibleAttention = () => {
-  const terminalId = getActiveWorkspace()?.claudeTerminalId;
+  const terminalId = getActiveWorkspace()?.agentTerminalId;
   if (terminalId) useTerminalStore.getState().update(terminalId, { attention: false });
 };
 

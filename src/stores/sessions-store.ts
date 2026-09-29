@@ -29,6 +29,16 @@ interface SessionsState {
   patchSession: (id: string, patch: Partial<SessionInfo>) => void;
 }
 
+const withTitles = (sessions: SessionInfo[]) => {
+  const titles = useSettingsStore.getState().sessionTitles;
+  return sessions.map((s) =>
+    titles[s.id] ? { ...s, title: titles[s.id], customTitle: titles[s.id] } : s,
+  );
+};
+
+const merged = (windowsSessions: SessionInfo[], wslSessions: SessionInfo[]) =>
+  mergeSessions(withTitles(windowsSessions), withTitles(wslSessions));
+
 export const useSessionsStore = create<SessionsState>((set, get) => {
   const setSessions = (windowsSessions: SessionInfo[], wslSessions: SessionInfo[]) => {
     const state = get();
@@ -40,7 +50,7 @@ export const useSessionsStore = create<SessionsState>((set, get) => {
       windowsSessions,
       wslSessions,
       loaded: true,
-      ...mergeSessions(windowsSessions, wslSessions),
+      ...merged(windowsSessions, wslSessions),
     });
   };
 
@@ -111,12 +121,12 @@ export const useSessionsStore = create<SessionsState>((set, get) => {
         list.map((s) => (s.id === id ? { ...s, ...patch } : s));
       const windowsSessions = apply(get().windowsSessions);
       const wslSessions = apply(get().wslSessions);
-      set({ windowsSessions, wslSessions, ...mergeSessions(windowsSessions, wslSessions) });
+      set({ windowsSessions, wslSessions, ...merged(windowsSessions, wslSessions) });
     },
     removeSession: (id) => {
       const windowsSessions = get().windowsSessions.filter((s) => s.id !== id);
       const wslSessions = get().wslSessions.filter((s) => s.id !== id);
-      set({ windowsSessions, wslSessions, ...mergeSessions(windowsSessions, wslSessions) });
+      set({ windowsSessions, wslSessions, ...merged(windowsSessions, wslSessions) });
     },
   };
 });

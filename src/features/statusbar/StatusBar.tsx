@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Bell, Cpu, FolderOpen, GitBranch, Hash, SquareTerminal } from "lucide-react";
+import { Bell, FolderOpen, GitBranch, Hash, SquareTerminal } from "lucide-react";
 import { toast } from "sonner";
 
 import { focusNextAttention, toggleShellPanel } from "@/actions/workspaces";
@@ -35,16 +35,14 @@ export const StatusBar = () => {
   const workspace = useActiveWorkspace();
   const session = useSessionsStore((s) => (workspace ? s.byId[workspace.sessionId] : undefined));
   const home = useSessionsStore((s) => s.environment?.home ?? "");
-  const sessionCount = useSessionsStore((s) => s.sessions.length);
   const terminals = useTerminalStore((s) => s.terminals);
 
-  const { claudeRunning, claudeBusy, shells, waiting } = useMemo(() => {
+  const { agentsRunning, agentsBusy, waiting } = useMemo(() => {
     const list = Object.values(terminals).filter((t) => t.status === "running");
     return {
-      waiting: list.filter((t) => t.kind === "claude" && t.attention).length,
-      claudeRunning: list.filter((t) => t.kind === "claude").length,
-      claudeBusy: list.filter((t) => t.kind === "claude" && t.busy).length,
-      shells: list.filter((t) => t.kind === "shell").length,
+      waiting: list.filter((t) => t.kind === "agent" && t.attention).length,
+      agentsRunning: list.filter((t) => t.kind === "agent").length,
+      agentsBusy: list.filter((t) => t.kind === "agent" && t.busy).length,
     };
   }, [terminals]);
 
@@ -97,19 +95,12 @@ export const StatusBar = () => {
             <span className="text-fg">{waiting} waiting for you</span>
           </Item>
         )}
-        {claudeRunning > 0 && (
-          <Item title="Claude sessions running in Deck">
-            <StatusDot tone={claudeBusy > 0 ? "busy" : "running"} className="size-1.5" />
-            {claudeRunning} running{claudeBusy > 0 ? ` · ${claudeBusy} working` : ""}
+        {agentsRunning > 0 && (
+          <Item title="Agent sessions running in Deck">
+            <StatusDot tone={agentsBusy > 0 ? "busy" : "running"} className="size-1.5" />
+            {agentsRunning} running{agentsBusy > 0 ? ` · ${agentsBusy} working` : ""}
           </Item>
         )}
-        {shells > 0 && (
-          <Item>
-            <Cpu />
-            {shells} shell{shells > 1 ? "s" : ""}
-          </Item>
-        )}
-        <Item>{sessionCount} sessions</Item>
       </div>
     </footer>
   );

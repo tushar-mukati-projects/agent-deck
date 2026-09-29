@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
 import { DEFAULT_THEME_ID } from "@/lib/themes";
+import type { AgentId, CustomAgent } from "@/types";
 
 export type ClickBehavior = "preview" | "resume";
 
@@ -9,6 +10,11 @@ export const DEFAULT_FONT_SIZE = 12;
 
 interface SettingsState {
   claudeArgs: string;
+  codexArgs: string;
+  defaultAgent: AgentId;
+  agentFilter: AgentId | "all";
+  customAgents: CustomAgent[];
+  sessionTitles: Record<string, string>;
   shellProgram: string;
   fontSize: number;
   themeId: string;
@@ -25,9 +31,13 @@ interface SettingsState {
   togglePinned: (sessionId: string) => void;
   toggleArchived: (sessionId: string) => void;
   forgetSession: (sessionId: string) => void;
+  setSessionTitle: (sessionId: string, title: string) => void;
   set: (
     patch: Partial<
-      Omit<SettingsState, "set" | "togglePinned" | "toggleArchived" | "forgetSession">
+      Omit<
+        SettingsState,
+        "set" | "togglePinned" | "toggleArchived" | "forgetSession" | "setSessionTitle"
+      >
     >,
   ) => void;
 }
@@ -36,6 +46,11 @@ export const useSettingsStore = create<SettingsState>()(
   persist(
     (set, get) => ({
       claudeArgs: "",
+      codexArgs: "",
+      defaultAgent: "claude",
+      agentFilter: "all",
+      customAgents: [],
+      sessionTitles: {},
       shellProgram: "",
       fontSize: DEFAULT_FONT_SIZE,
       themeId: DEFAULT_THEME_ID,
@@ -67,11 +82,16 @@ export const useSettingsStore = create<SettingsState>()(
           pinnedSessions: get().pinnedSessions.filter((id) => id !== sessionId),
         });
       },
-      forgetSession: (sessionId) =>
+      setSessionTitle: (sessionId, title) =>
+        set({ sessionTitles: { ...get().sessionTitles, [sessionId]: title } }),
+      forgetSession: (sessionId) => {
+        const { [sessionId]: _title, ...sessionTitles } = get().sessionTitles;
         set({
           pinnedSessions: get().pinnedSessions.filter((id) => id !== sessionId),
           archivedSessions: get().archivedSessions.filter((id) => id !== sessionId),
-        }),
+          sessionTitles,
+        });
+      },
       set: (patch) => set(patch),
     }),
     {

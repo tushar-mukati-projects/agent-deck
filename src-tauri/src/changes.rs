@@ -148,6 +148,9 @@ fn describe(path: PathBuf, info: Tracked, backups_dir: &Path) -> Option<ChangedF
 
 pub fn session_changes(jsonl: &str) -> anyhow::Result<Vec<ChangedFile>> {
     let (path, session_id) = session_file(jsonl)?;
+    if crate::codex::is_rollout(&path) {
+        return crate::codex::session_changes(&path);
+    }
     let backups_dir = claude_home().join("file-history").join(&session_id);
     let (cwd, tracked) = collect_tracked(&path)?;
 

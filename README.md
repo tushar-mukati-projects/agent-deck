@@ -6,6 +6,9 @@ Built with **Tauri 2** (Rust backend, system WebView2) + **React 19 / TypeScript
 
 ## Features
 
+- **Claude, Codex and any other agent** — Codex sessions (`~/.codex/sessions`, on Windows and inside WSL) are listed, previewed, searched and resumed/forked (`codex resume|fork <id>`) next to Claude sessions, with a Codex badge and an agent filter. New sessions can use Claude, Codex, or any CLI you add in Settings → Other agents (Gemini, Aider, OpenCode…). Pick the default agent in Settings.
+- **Tree follows the open file** — switching or opening a file expands the Files tree to it; paste any path (Windows, WSL/Linux, relative, `file.ts:12`) into search to open it.
+- **Readable themes** — every theme is checked against minimum contrast (text, borders, status colors, syntax); light themes also raise terminal contrast so any CLI stays legible.
 - **Layout** — sessions (all folders) on the left; the open session in the middle; on the right a session panel with **Files / Changes / Claude** that always follows the active session. Both side panels resize and collapse (`Ctrl+Shift+B` / `Ctrl+Alt+B`).
 - **All sessions, every folder** — indexes `~/.claude/projects/**/*.jsonl` (incrementally, by byte offset), grouped by real working folder. Filter to one folder (with or without subfolders) or browse to any folder.
 - **Preview before resuming** — read a conversation (markdown rendered, tool calls summarized) without starting a process.

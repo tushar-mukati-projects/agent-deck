@@ -27,6 +27,7 @@ import {
 
 import {
   openSessionByClick,
+  startNewSession,
   resumeWorkspace,
   startSessionInPickedFolder,
 } from "@/actions/sessions";
@@ -38,6 +39,7 @@ import { fuzzyPathScore, fuzzyScore } from "@/lib/fuzzy";
 import { shortcutLabel, type ShortcutAction } from "@/lib/shortcuts";
 import { api } from "@/lib/tauri/commands";
 import { copyText, revealInExplorer } from "@/lib/tauri/system";
+import { agentName, listAgents } from "@/lib/agents/registry";
 import { THEMES } from "@/lib/themes";
 import { parseTypedPath } from "@/lib/typed-path";
 import { basename, joinPath, shortenHome, timeAgo } from "@/lib/utils";
@@ -129,18 +131,17 @@ const shortcut = (action: ShortcutAction, title: string, icon: React.ReactNode):
 });
 
 const buildCommands = (workspace: Workspace | null): CommandDef[] => {
-  const store = useWorkspaceStore.getState();
   const settings = useSettingsStore.getState();
   const commands: CommandDef[] = [
-    workspace
-      ? {
-          id: "new-here",
-          title: `New session in ${basename(workspace.cwd)}`,
+    ...(workspace
+      ? listAgents().map((agent) => ({
+          id: `new-here:${agent.id}`,
+          title: `New ${agent.name} session in ${basename(workspace.cwd)}`,
           icon: <Sparkles />,
-          shortcut: "newSession",
-          run: () => store.newSession(workspace.cwd),
-        }
-      : shortcut("newSession", "New session in folder…", <Sparkles />),
+          shortcut: agent.id === settings.defaultAgent ? ("newSession" as const) : undefined,
+          run: () => void startNewSession(workspace.cwd, agent.id),
+        }))
+      : [shortcut("newSession", "New session in folder…", <Sparkles />)]),
     {
       id: "new-folder",
       title: "New session in another folder…",
@@ -303,7 +304,7 @@ export const usePaletteItems = (mode: PaletteMode, rawQuery: string) => {
             id: `chat:${hit.sessionId}:${index}`,
             group: session.title ?? "Untitled session",
             title: hit.snippet,
-            subtitle: `${hit.role === "user" ? "You" : "Claude"} · ${basename(session.cwd)} · ${timeAgo(session.modifiedMs)}`,
+            subtitle: `${hit.role === "user" ? "You" : agentName(session.agent)} · ${basename(session.cwd)} · ${timeAgo(session.modifiedMs)}`,
             icon: <MessageSquareText />,
             score: -index,
             run: () => openSessionByClick(session),

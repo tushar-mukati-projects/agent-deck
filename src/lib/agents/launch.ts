@@ -1,4 +1,4 @@
-import { parseArgs } from "@/lib/args";
+import { CLAUDE, findAgent, type LaunchContext } from "@/lib/agents/registry";
 import type { TerminalSpec } from "@/lib/terminal/registry";
 import { newId } from "@/lib/utils";
 import { parseWslPath, shellQuote } from "@/lib/wsl";
@@ -6,17 +6,15 @@ import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import type { ShellTab, Workspace } from "@/types";
 
-export interface LaunchOptions {
+export interface LaunchOptions extends LaunchContext {
   fork?: boolean;
-  agent?: string;
 }
 
 export interface LaunchPlan {
   sessionId: string;
   args: string[];
+  pending: boolean;
 }
-
-const extraArgs = () => parseArgs(useSettingsStore.getState().claudeArgs);
 
 const windowsHome = () => useSessionsStore.getState().environment?.home ?? "C:\\";
 
@@ -24,30 +22,26 @@ export const isPersisted = (workspace: Pick<Workspace, "sessionId" | "filePath">
   !!workspace.filePath || !!useSessionsStore.getState().byId[workspace.sessionId];
 
 export const planLaunch = (workspace: Workspace, options: LaunchOptions = {}): LaunchPlan => {
-  const agent = options.agent ? ["--agent", options.agent] : [];
-  if (!isPersisted(workspace)) {
+  const agent = findAgent(workspace.agent);
+  if (!isPersisted(workspace) || !agent.history) {
     return {
       sessionId: workspace.sessionId,
-      args: ["--session-id", workspace.sessionId, ...agent, ...extraArgs()],
+      args: agent.newArgs(workspace.sessionId, options),
+      pending: agent.history && !agent.assignsSessionIds,
     };
   }
-  if (options.fork) {
+  if (options.fork && agent.canFork) {
     const sessionId = newId();
     return {
       sessionId,
-      args: [
-        "--resume",
-        workspace.sessionId,
-        "--fork-session",
-        "--session-id",
-        sessionId,
-        ...extraArgs(),
-      ],
+      args: agent.forkArgs(workspace.sessionId, sessionId),
+      pending: !agent.assignsSessionIds,
     };
   }
   return {
     sessionId: workspace.sessionId,
-    args: ["--resume", workspace.sessionId, ...extraArgs()],
+    args: agent.resumeArgs(workspace.sessionId),
+    pending: false,
   };
 };
 
@@ -55,6 +49,13 @@ export const defaultShellProgram = () =>
   useSettingsStore.getState().shellProgram.trim() ||
   useSessionsStore.getState().environment?.shell ||
   "powershell.exe";
+
+const powershellProgram = () => {
+  const shell = defaultShellProgram();
+  return /pwsh|powershell/i.test(shell) ? shell : "powershell.exe";
+};
+
+const powershellQuote = (arg: string) => `'${arg.replace(/'/g, "''")}'`;
 
 const wslLaunch = (root: string, command: string[] | null) => {
   const location = parseWslPath(root);
@@ -69,17 +70,27 @@ const wslLaunch = (root: string, command: string[] | null) => {
   };
 };
 
-export const claudeSpec = (workspace: Workspace & { claudeTerminalId: string }): TerminalSpec => ({
-  id: workspace.claudeTerminalId,
-  kind: "claude",
-  workspaceId: workspace.id,
-  root: workspace.cwd,
-  ...(wslLaunch(workspace.cwd, ["claude", ...workspace.claudeArgs]) ?? {
+const windowsLaunch = (workspace: Workspace, command: string[]) => {
+  if (workspace.agent === CLAUDE || !workspace.agent) {
+    return { cwd: workspace.cwd, program: command[0], args: command.slice(1) };
+  }
+  return {
     cwd: workspace.cwd,
-    program: "claude",
-    args: workspace.claudeArgs,
-  }),
-});
+    program: powershellProgram(),
+    args: ["-NoLogo", "-Command", `& ${command.map(powershellQuote).join(" ")}`],
+  };
+};
+
+export const agentSpec = (workspace: Workspace & { agentTerminalId: string }): TerminalSpec => {
+  const command = [...findAgent(workspace.agent).command, ...workspace.agentArgs];
+  return {
+    id: workspace.agentTerminalId,
+    kind: "agent",
+    workspaceId: workspace.id,
+    root: workspace.cwd,
+    ...(wslLaunch(workspace.cwd, command) ?? windowsLaunch(workspace, command)),
+  };
+};
 
 export const shellSpec = (workspaceId: string, shell: ShellTab): TerminalSpec => ({
   id: shell.id,

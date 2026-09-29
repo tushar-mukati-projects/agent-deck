@@ -130,7 +130,9 @@ export const TitleBar = () => {
         {hasWorkspace && (
           <IconButton
             label={
-              contextOpen ? "Hide session panel" : "Show files, changes and Claude for this session"
+              contextOpen
+                ? "Hide session panel"
+                : "Show files, changes and agent config for this session"
             }
             shortcut={shortcutLabel("toggleContext")}
             active={contextOpen}

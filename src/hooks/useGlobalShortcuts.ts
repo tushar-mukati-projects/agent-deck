@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 
 import { closeFileWithConfirm } from "@/actions/files";
-import { startSessionInPickedFolder } from "@/actions/sessions";
+import { startNewSession, startSessionInPickedFolder } from "@/actions/sessions";
 import {
   activateWorkspaceAt,
   focusNextAttention,
@@ -40,7 +40,7 @@ const handlers: Record<ShortcutAction, () => void> = {
   },
   newSession: () => {
     const workspace = getActiveWorkspace();
-    if (workspace) useWorkspaceStore.getState().newSession(workspace.cwd);
+    if (workspace) startNewSession(workspace.cwd);
     else void startSessionInPickedFolder();
   },
   nextWorkspace: () => useWorkspaceStore.getState().cycle(1),

@@ -1,13 +1,16 @@
 import { basename } from "@/lib/utils";
 import type { SessionInfo, Workspace } from "@/types";
 
-type WorkspaceSeed = Pick<Workspace, "id" | "sessionId" | "cwd" | "title" | "filePath">;
+type WorkspaceSeed = Pick<Workspace, "id" | "sessionId" | "cwd" | "title" | "filePath"> &
+  Partial<Pick<Workspace, "agent">>;
 
 export const blankWorkspace = (seed: WorkspaceSeed): Workspace => ({
   ...seed,
+  agent: seed.agent ?? "claude",
+  pendingSince: null,
   mode: "preview",
-  claudeTerminalId: null,
-  claudeArgs: [],
+  agentTerminalId: null,
+  agentArgs: [],
   shells: [],
   activeShellId: null,
   shellPanelOpen: false,
@@ -22,4 +25,5 @@ export const workspaceFromSession = (session: SessionInfo) =>
     cwd: session.cwd,
     title: session.title ?? basename(session.cwd),
     filePath: session.filePath,
+    agent: session.agent,
   });

@@ -15,7 +15,7 @@ use tauri::ipc::Channel;
 const REPLAY_LIMIT: usize = 2 * 1024 * 1024;
 const SENDER_BATCH_LIMIT: usize = 512 * 1024;
 
-const ALLOWED_PROGRAMS: &[&str] = &["claude", "pwsh", "powershell", "cmd", "wsl", "bash", "zsh", "fish", "nu", "sh"];
+const ALLOWED_PROGRAMS: &[&str] = &["claude", "codex", "pwsh", "powershell", "cmd", "wsl", "bash", "zsh", "fish", "nu", "sh"];
 
 const SCRUBBED_ENV: &[&str] = &[
     "CLAUDECODE",

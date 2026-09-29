@@ -33,6 +33,8 @@ import {
 } from "@/components/ui/menu";
 import { copyText, revealInExplorer } from "@/lib/tauri/system";
 import { cn, timeAgo } from "@/lib/utils";
+import { AgentBadge } from "@/components/ui/agent-badge";
+import { CLAUDE, findAgent } from "@/lib/agents/registry";
 import { parseWslPath } from "@/lib/wsl";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
@@ -47,15 +49,17 @@ interface SessionItemProps {
 }
 
 const resumeCommand = (session: SessionInfo) => {
+  const agent = findAgent(session.agent);
+  const command = [...agent.command, ...agent.resumeArgs(session.id)].join(" ");
   const wsl = parseWslPath(session.cwd);
   return wsl
-    ? `wsl -d ${wsl.distro} --cd "${wsl.linuxPath}" -- claude --resume ${session.id}`
-    : `cd "${session.cwd}"; claude --resume ${session.id}`;
+    ? `wsl -d ${wsl.distro} --cd "${wsl.linuxPath}" -- ${command}`
+    : `cd "${session.cwd}"; ${command}`;
 };
 
 const toneLabel: Record<DotTone, string> = {
   running: "Running in Deck",
-  busy: "Claude is working",
+  busy: "Working",
   attention: "Finished — needs your attention",
   external: "Open in another terminal",
   exited: "Process exited",
@@ -106,6 +110,7 @@ export const SessionItem = memo(
               >
                 {session.title ?? "Untitled session"}
               </span>
+              {session.agent !== CLAUDE && <AgentBadge agent={session.agent} />}
               {pinned && <Pin className="size-3 shrink-0 fill-current text-faint" />}
               <span className="shrink-0 text-[10.5px] text-faint tabular-nums">
                 {timeAgo(session.modifiedMs)}

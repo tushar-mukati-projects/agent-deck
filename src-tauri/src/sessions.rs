@@ -12,7 +12,10 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::value::RawValue;
 
-use crate::util::{canonical, is_session_id, mtime_ms};
+use crate::{
+    codex,
+    util::{canonical, is_session_id, mtime_ms},
+};
 
 const PROMPT_PREVIEW_CHARS: usize = 280;
 const TRANSCRIPT_TEXT_CHARS: usize = 24_000;
@@ -21,6 +24,8 @@ const TRANSCRIPT_TEXT_CHARS: usize = 24_000;
 #[serde(rename_all = "camelCase")]
 pub struct SessionInfo {
     pub id: String,
+    #[serde(default = "default_agent")]
+    pub agent: String,
     pub distro: Option<String>,
     pub file_path: String,
     pub project_key: String,
@@ -36,6 +41,15 @@ pub struct SessionInfo {
     pub prompt_count: u32,
     pub size: u64,
     pub version: Option<String>,
+}
+
+fn default_agent() -> String {
+    "claude".into()
+}
+
+pub fn session_id_for(file_name: &str) -> String {
+    let stem = file_name.trim_end_matches(".jsonl");
+    codex::id_from_name(stem).filter(|_| stem.starts_with("rollout-")).unwrap_or(stem).to_string()
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -191,13 +205,20 @@ fn decode_project_key(key: &str) -> String {
 
 impl Accumulator {
     fn new(path: &Path, project_key: &str) -> Self {
-        let id = path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
-        Self::with_ids(id, path.to_string_lossy().to_string(), project_key, None)
+        let name = path.file_name().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
+        Self::with_ids(session_id_for(&name), path.to_string_lossy().to_string(), project_key, None)
     }
 
     pub(crate) fn with_ids(id: String, file_path: String, project_key: &str, distro: Option<String>) -> Self {
         Self {
-            info: SessionInfo { id, distro, file_path, project_key: project_key.to_string(), ..SessionInfo::default() },
+            info: SessionInfo {
+                id,
+                agent: default_agent(),
+                distro,
+                file_path,
+                project_key: project_key.to_string(),
+                ..SessionInfo::default()
+            },
             ai_title: None,
             last_user_text: None,
             offset: 0,
@@ -212,10 +233,49 @@ impl Accumulator {
         self.offset = offset;
     }
 
+    fn note_prompt(&mut self, text: &str) {
+        self.info.prompt_count += 1;
+        let preview = truncate_chars(&collapse_whitespace(text), PROMPT_PREVIEW_CHARS);
+        if self.info.first_prompt.is_none() {
+            self.info.first_prompt = Some(preview.clone());
+        }
+        self.last_user_text = Some(preview);
+    }
+
+    fn feed_codex(&mut self, line: &str) {
+        let Some(record) = codex::parse(line) else { return };
+        self.info.agent = codex::AGENT.into();
+        if let Some(ts) = record.timestamp {
+            if self.info.started_at.is_none() {
+                self.info.started_at = Some(ts.clone());
+            }
+            self.info.last_message_at = Some(ts);
+        }
+        match record.event {
+            codex::Event::Meta { id, cwd, version, branch } => {
+                if let Some(id) = id.filter(|i| is_session_id(i)) {
+                    self.info.id = id;
+                }
+                if let Some(cwd) = cwd.filter(|c| !c.is_empty()) {
+                    self.info.cwd = cwd;
+                }
+                self.info.version = version.or(self.info.version.take());
+                self.info.git_branch = branch.or(self.info.git_branch.take());
+            }
+            codex::Event::Cwd(cwd) if self.info.cwd.is_empty() => self.info.cwd = cwd,
+            codex::Event::User(text) if !is_system_text(&text) => self.note_prompt(&text),
+            _ => {}
+        }
+    }
+
     pub(crate) fn feed(&mut self, line: &str) {
         let Ok(raw) = serde_json::from_str::<RawLine>(line) else { return };
-        let info = &mut self.info;
         let kind = raw.kind.as_deref().unwrap_or("");
+        if codex::is_codex_kind(kind) {
+            self.feed_codex(line);
+            return;
+        }
+        let info = &mut self.info;
         match kind {
             "custom-title" => info.custom_title = raw.custom_title.filter(|t| !t.trim().is_empty()),
             "ai-title" => self.ai_title = raw.ai_title.or(self.ai_title.take()),
@@ -247,12 +307,7 @@ impl Accumulator {
                 }
                 if kind == "user" && raw.is_meta != Some(true) {
                     if let Some(text) = raw.message.and_then(|m| m.content).and_then(user_prompt_text) {
-                        info.prompt_count += 1;
-                        let preview = truncate_chars(&collapse_whitespace(&text), PROMPT_PREVIEW_CHARS);
-                        if info.first_prompt.is_none() {
-                            info.first_prompt = Some(preview.clone());
-                        }
-                        self.last_user_text = Some(preview);
+                        self.note_prompt(&text);
                     }
                 }
             }
@@ -311,7 +366,8 @@ impl Accumulator {
 }
 
 fn session_files() -> Vec<(PathBuf, String, fs::Metadata)> {
-    let Ok(projects) = fs::read_dir(projects_dir()) else { return Vec::new() };
+    let codex = codex::session_files().into_iter().map(|(path, meta)| (path, String::new(), meta));
+    let Ok(projects) = fs::read_dir(projects_dir()) else { return codex.collect() };
     projects
         .flatten()
         .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
@@ -328,6 +384,7 @@ fn session_files() -> Vec<(PathBuf, String, fs::Metadata)> {
                 })
                 .collect::<Vec<_>>()
         })
+        .chain(codex)
         .collect()
 }
 
@@ -438,6 +495,13 @@ fn summarize_tool(name: &str, input: Option<&serde_json::Value>) -> String {
 
 pub fn session_file(file_path: &str) -> anyhow::Result<(PathBuf, String)> {
     let path = canonical(Path::new(file_path))?;
+    if codex::is_rollout(&path) {
+        let root = canonical(&codex::sessions_dir())?;
+        let name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+        let session_id = session_id_for(&name);
+        anyhow::ensure!(path.starts_with(&root) && is_session_id(&session_id), "not a Codex session file");
+        return Ok((path, session_id));
+    }
     let projects = canonical(&projects_dir())?;
     let session_id = path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
     anyhow::ensure!(
@@ -461,6 +525,10 @@ pub(crate) fn transcript_from_lines(lines: impl Iterator<Item = String>) -> Vec<
     for line_str in lines {
         let Ok(raw) = serde_json::from_str::<RawLine>(&line_str) else { continue };
         let kind = raw.kind.as_deref().unwrap_or("");
+        if codex::is_codex_kind(kind) {
+            items.extend(codex_item(&line_str));
+            continue;
+        }
         if raw.is_sidechain == Some(true) || !(kind == "user" || kind == "assistant") {
             continue;
         }
@@ -512,6 +580,42 @@ pub(crate) fn transcript_from_lines(lines: impl Iterator<Item = String>) -> Vec<
     items
 }
 
+fn codex_item(line: &str) -> Option<TranscriptItem> {
+    let record = codex::parse(line)?;
+    let item = |role: &str, kind: &str, text: String| TranscriptItem {
+        role: role.into(),
+        kind: kind.into(),
+        text,
+        timestamp: record.timestamp.clone(),
+    };
+    match record.event {
+        codex::Event::User(text) if !is_system_text(&text) => {
+            Some(item("user", "text", truncate_chars(&text, TRANSCRIPT_TEXT_CHARS)))
+        }
+        codex::Event::Assistant(text) if !text.trim().is_empty() => {
+            Some(item("assistant", "text", truncate_chars(&text, TRANSCRIPT_TEXT_CHARS)))
+        }
+        codex::Event::Tool { name, detail } => Some(item(
+            "assistant",
+            "tool",
+            match detail {
+                Some(d) => format!("{name} · {}", truncate_chars(&collapse_whitespace(&d), 160)),
+                None => name,
+            },
+        )),
+        codex::Event::Patch(patch) => {
+            let files: Vec<&str> = patch
+                .lines()
+                .filter_map(|l| {
+                    ["*** Update File: ", "*** Add File: ", "*** Delete File: "].iter().find_map(|p| l.strip_prefix(p))
+                })
+                .collect();
+            Some(item("assistant", "tool", format!("apply_patch · {}", truncate_chars(&files.join(", "), 160))))
+        }
+        _ => None,
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct SearchHit {
@@ -540,7 +644,7 @@ pub fn snippet_around(text: &str, needle_lower: &str) -> Option<String> {
 
 fn search_file(path: &Path, needle_lower: &str) -> Vec<SearchHit> {
     let Ok(file) = fs::File::open(path) else { return Vec::new() };
-    let session_id = path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
+    let session_id = session_id_for(&path.file_name().map(|s| s.to_string_lossy().to_string()).unwrap_or_default());
     let finder = memchr::memmem::Finder::new(needle_lower.as_bytes());
     let mut hits = Vec::new();
     for line in BufReader::with_capacity(256 * 1024, file).split(b'\n').map_while(Result::ok) {
@@ -573,6 +677,11 @@ pub fn search(query: &str) -> Vec<SearchHit> {
 
 pub fn delete_session(file_path: &str) -> anyhow::Result<()> {
     let (path, id) = session_file(file_path)?;
+    if codex::is_rollout(&path) {
+        trash::delete(&path).context("Couldn't move the session to the Recycle Bin")?;
+        CACHE.lock().retain(|cached, _| dunce::canonicalize(cached).map(|c| c != path).unwrap_or(false));
+        return Ok(());
+    }
     anyhow::ensure!(
         !live_sessions().iter().any(|l| l.session_id == id),
         "This session is still running. Close it first."
@@ -592,6 +701,7 @@ pub fn delete_session(file_path: &str) -> anyhow::Result<()> {
 
 pub fn rename_session(file_path: &str, title: &str) -> anyhow::Result<()> {
     let (path, session_id) = session_file(file_path)?;
+    anyhow::ensure!(!codex::is_rollout(&path), "Codex sessions are renamed inside Deck");
     let title = title.trim();
     anyhow::ensure!(!title.is_empty(), "Title can't be empty");
     let record = serde_json::json!({ "type": "custom-title", "customTitle": title, "sessionId": session_id });

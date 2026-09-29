@@ -216,7 +216,7 @@ fn index_distro(distro: &str) -> anyhow::Result<()> {
     let changed = !response.changes.is_empty() || state.entries.len() != response.files.len();
     for change in response.changes {
         let fresh = || {
-            let id = change.path.rsplit('/').next().unwrap_or_default().trim_end_matches(".jsonl").to_string();
+            let id = crate::sessions::session_id_for(change.path.rsplit('/').next().unwrap_or_default());
             Accumulator::with_ids(id, change.path.clone(), &change.project_key, Some(distro.to_string()))
         };
         let mut acc = match state.entries.get(&change.path) {
@@ -294,7 +294,7 @@ pub fn transcript(distro: &str, path: &str) -> anyhow::Result<Vec<TranscriptItem
 }
 
 pub fn delete_session(distro: &str, path: &str) -> anyhow::Result<()> {
-    let session_id = path.rsplit('/').next().unwrap_or_default().trim_end_matches(".jsonl");
+    let session_id = crate::sessions::session_id_for(path.rsplit('/').next().unwrap_or_default());
     anyhow::ensure!(
         !live_sessions().iter().any(|l| l.session_id == session_id),
         "This session is still running in WSL. Close it first."
@@ -328,7 +328,12 @@ fn text_field(value: Value) -> anyhow::Result<String> {
 
 pub fn session_changes(distro: &str, path: &str) -> anyhow::Result<Vec<ChangedFile>> {
     let value = run_agent(distro, &["changes", path], None)?;
-    let files: Vec<ChangedFile> = serde_json::from_value(value.get("files").cloned().unwrap_or_default())?;
+    let files: Vec<ChangedFile> = match value.get("lines").and_then(Value::as_array) {
+        Some(lines) => crate::codex::changes_from_lines(lines.iter().map(|l| l.to_string()), |p| {
+            std::path::Path::new(&host_path(distro, p)).is_file()
+        }),
+        None => serde_json::from_value(value.get("files").cloned().unwrap_or_default())?,
+    };
     Ok(files.into_iter().map(|f| ChangedFile { path: host_path(distro, &f.path), ..f }).collect())
 }
 

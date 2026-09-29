@@ -133,7 +133,7 @@ export const TerminalView = ({ terminalId, dropRoot }: TerminalViewProps) => {
       />
       {dragging && (
         <div className="pointer-events-none absolute inset-1 flex items-center justify-center rounded-lg border-2 border-dashed border-accent/60 bg-accent/5 text-xs font-medium text-accent">
-          Drop to mention in Claude
+          Drop to mention in this session
         </div>
       )}
       {finding && <FindBar terminalId={terminalId} onClose={() => setFinding(false)} />}

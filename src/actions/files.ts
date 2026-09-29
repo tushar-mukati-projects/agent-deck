@@ -5,6 +5,7 @@ import { pasteIntoTerminal } from "@/lib/terminal/registry";
 import { api } from "@/lib/tauri/commands";
 import { revealInExplorer } from "@/lib/tauri/system";
 import { basename, isWithin, normalizePath, relativePath } from "@/lib/utils";
+import { agentName } from "@/lib/agents/registry";
 import { useExplorerStore } from "@/stores/explorer-store";
 import { useUiStore } from "@/stores/ui-store";
 import { useViewerStore } from "@/stores/viewer-store";
@@ -17,14 +18,14 @@ export const mentionText = (path: string, root: string) => {
 };
 
 export const canMention = (workspace: Workspace) =>
-  workspace.mode === "live" && !!workspace.claudeTerminalId;
+  workspace.mode === "live" && !!workspace.agentTerminalId;
 
-export const mentionInClaude = (workspace: Workspace, path: string) => {
-  if (!workspace.claudeTerminalId || workspace.mode !== "live") {
-    toast("Resume the session first to mention files in Claude");
+export const mentionInAgent = (workspace: Workspace, path: string) => {
+  if (!workspace.agentTerminalId || workspace.mode !== "live") {
+    toast(`Resume the session first to mention files in ${agentName(workspace.agent)}`);
     return;
   }
-  pasteIntoTerminal(workspace.claudeTerminalId, mentionText(path, workspace.cwd));
+  pasteIntoTerminal(workspace.agentTerminalId, mentionText(path, workspace.cwd));
 };
 
 export const closeFilesWithConfirm = async (workspaceId: string, tabs: string[]) => {

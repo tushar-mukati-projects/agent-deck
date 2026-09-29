@@ -10,7 +10,9 @@ import {
   SquareTerminal,
 } from "lucide-react";
 
-import { canMention, mentionInClaude } from "@/actions/files";
+import { canMention, mentionInAgent } from "@/actions/files";
+import { startNewSession } from "@/actions/sessions";
+import { agentName } from "@/lib/agents/registry";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -85,9 +87,9 @@ const RowMenu = ({
         <ContextMenuItem
           icon={<AtSign />}
           disabled={!canMention(workspace)}
-          onSelect={() => mentionInClaude(workspace, entry.path)}
+          onSelect={() => mentionInAgent(workspace, entry.path)}
         >
-          Mention in Claude
+          Mention in {agentName(workspace.agent)}
         </ContextMenuItem>
         {entry.isDir && (
           <>
@@ -97,8 +99,8 @@ const RowMenu = ({
             >
               Open shell here
             </ContextMenuItem>
-            <ContextMenuItem icon={<Sparkles />} onSelect={() => store().newSession(entry.path)}>
-              New Claude session here
+            <ContextMenuItem icon={<Sparkles />} onSelect={() => startNewSession(entry.path)}>
+              New session here
             </ContextMenuItem>
           </>
         )}

@@ -1,16 +1,17 @@
 import { useDeferredValue, useMemo, useRef, useState } from "react";
 import { Archive, FolderOpen, Pin, Plus, Power, RefreshCw, Sparkles } from "lucide-react";
 
-import { startSessionInPickedFolder } from "@/actions/sessions";
+import { startNewSession, startSessionInPickedFolder } from "@/actions/sessions";
 
 import { Button } from "@/components/ui/button";
 import { EmptyState, Spinner, type DotTone } from "@/components/ui/feedback";
 import { IconButton } from "@/components/ui/icon-button";
-import { Chevron, PanelHeader, SearchInput } from "@/components/ui/panel";
+import { Chevron, PanelHeader, SearchInput, Segmented } from "@/components/ui/panel";
 import { FolderFilter } from "@/features/sidebar/FolderFilter";
 import { SessionItem } from "@/features/sidebar/SessionItem";
 import { terminalTone } from "@/hooks/useWorkspaceStatus";
 import { basename, cn, isWithin, normalizePath, samePath, shortenHome } from "@/lib/utils";
+import { agentName } from "@/lib/agents/registry";
 import { parseWslPath } from "@/lib/wsl";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -58,8 +59,8 @@ const useSessionTones = () => {
     const ownPids = new Set(Object.values(terminals).map((t) => t.pid));
     for (const entry of live) if (!ownPids.has(entry.pid)) tones.set(entry.sessionId, "external");
     for (const workspace of workspaces) {
-      const tone = workspace.claudeTerminalId
-        ? terminalTone(terminals[workspace.claudeTerminalId])
+      const tone = workspace.agentTerminalId
+        ? terminalTone(terminals[workspace.agentTerminalId])
         : null;
       if (tone) tones.set(workspace.sessionId, tone);
     }
@@ -77,7 +78,6 @@ const FolderHeader = ({
   onToggle: () => void;
 }) => {
   const home = useSessionsStore((s) => s.environment?.home ?? "");
-  const newSession = useWorkspaceStore((s) => s.newSession);
   const wsl = parseWslPath(group.cwd);
   return (
     <div className="group sticky top-0 z-10 flex h-8 items-center gap-1 bg-panel/95 pr-1 pl-1 backdrop-blur-sm">
@@ -107,7 +107,7 @@ const FolderHeader = ({
       <IconButton
         label={`New session in ${basename(group.cwd)}`}
         className="hidden group-focus-within:inline-flex group-hover:inline-flex"
-        onClick={() => newSession(group.cwd)}
+        onClick={() => startNewSession(group.cwd)}
       >
         <Plus />
       </IconButton>
@@ -177,7 +177,6 @@ export const SessionsPanel = () => {
   );
   const openSessionKey = useWorkspaceStore((s) => s.workspaces.map((w) => w.sessionId).join(","));
   const openSessionIds = useMemo(() => new Set(openSessionKey.split(",")), [openSessionKey]);
-  const newSession = useWorkspaceStore((s) => s.newSession);
   const tones = useSessionTones();
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query);
@@ -188,9 +187,16 @@ export const SessionsPanel = () => {
     (s) => s.workspaces.find((w) => w.id === s.activeId)?.cwd ?? null,
   );
 
+  const agentFilter = useSettingsStore((s) => s.agentFilter);
+  const agentsPresent = useMemo(
+    () => [...new Set(sessions.map((s) => s.agent))].sort(),
+    [sessions],
+  );
+
   const filtered = useMemo(() => {
     const terms = deferredQuery.toLowerCase().split(/\s+/).filter(Boolean);
     return sessions.filter((session) => {
+      if (agentFilter !== "all" && session.agent !== agentFilter) return false;
       if (folderFilter) {
         const inFolder = includeSubfolders
           ? isWithin(session.cwd, folderFilter)
@@ -199,7 +205,7 @@ export const SessionsPanel = () => {
       }
       return terms.length === 0 || matchesQuery(session, terms);
     });
-  }, [sessions, folderFilter, includeSubfolders, deferredQuery]);
+  }, [sessions, folderFilter, includeSubfolders, deferredQuery, agentFilter]);
 
   const pinnedIds = useSettingsStore((s) => s.pinnedSessions);
   const archivedIds = useSettingsStore((s) => s.archivedSessions);
@@ -271,7 +277,7 @@ export const SessionsPanel = () => {
             folderFilter ? `New session in ${basename(folderFilter)}` : "New session in folder…"
           }
           onClick={() =>
-            folderFilter ? newSession(folderFilter) : void startSessionInPickedFolder()
+            folderFilter ? startNewSession(folderFilter) : void startSessionInPickedFolder()
           }
         >
           <Plus />
@@ -293,6 +299,19 @@ export const SessionsPanel = () => {
           }}
           placeholder="Search title, prompt, branch…"
         />
+        {agentsPresent.length > 1 && (
+          <div className="mt-1.5">
+            <Segmented<string>
+              size="sm"
+              value={agentsPresent.includes(agentFilter) ? agentFilter : "all"}
+              onChange={(value) => useSettingsStore.getState().set({ agentFilter: value })}
+              options={[
+                { value: "all", label: "All agents" },
+                ...agentsPresent.map((id) => ({ value: id, label: agentName(id) })),
+              ]}
+            />
+          </div>
+        )}
       </div>
 
       <WslStatus />
@@ -317,7 +336,7 @@ export const SessionsPanel = () => {
             }
             action={
               folderFilter && !query ? (
-                <Button variant="primary" size="sm" onClick={() => newSession(folderFilter)}>
+                <Button variant="primary" size="sm" onClick={() => startNewSession(folderFilter)}>
                   <Plus /> New session
                 </Button>
               ) : undefined

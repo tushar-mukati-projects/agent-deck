@@ -1,8 +1,10 @@
 import { FolderPlus, MessageSquare, Play, Search } from "lucide-react";
 
 import { previewSession, resumeSession, startSessionInPickedFolder } from "@/actions/sessions";
+import { AgentBadge } from "@/components/ui/agent-badge";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
+import { CLAUDE } from "@/lib/agents/registry";
 import { shortcutLabel, type ShortcutAction } from "@/lib/shortcuts";
 import { basename, timeAgo } from "@/lib/utils";
 import { useSessionsStore } from "@/stores/sessions-store";
@@ -71,6 +73,7 @@ export const Welcome = () => {
                     <span className="min-w-0 flex-1 truncate text-[13px] font-medium">
                       {session.title ?? "Untitled session"}
                     </span>
+                    {session.agent !== CLAUDE && <AgentBadge agent={session.agent} />}
                     <Play className="size-3.5 text-faint opacity-0 transition-opacity group-hover:opacity-100" />
                   </div>
                   <div className="flex items-center gap-2 text-[11px] text-faint">

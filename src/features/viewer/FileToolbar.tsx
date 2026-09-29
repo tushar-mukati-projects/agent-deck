@@ -12,8 +12,9 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { canMention, mentionInClaude } from "@/actions/files";
+import { canMention, mentionInAgent } from "@/actions/files";
 import { Button } from "@/components/ui/button";
+import { agentName } from "@/lib/agents/registry";
 import { IconButton } from "@/components/ui/icon-button";
 import {
   DropdownMenu,
@@ -107,9 +108,13 @@ export const FileToolbar = ({
         </IconButton>
       )}
       <IconButton
-        label={canMention(workspace) ? "Mention in Claude" : "Resume the session to mention files"}
+        label={
+          canMention(workspace)
+            ? `Mention in ${agentName(workspace.agent)}`
+            : "Resume the session to mention files"
+        }
         className={cn(!canMention(workspace) && "opacity-40")}
-        onClick={() => mentionInClaude(workspace, path)}
+        onClick={() => mentionInAgent(workspace, path)}
       >
         <AtSign />
       </IconButton>

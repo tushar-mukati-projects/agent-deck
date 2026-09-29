@@ -49,7 +49,7 @@ export const createKeyHandler = (owner: InputOwner) => (event: KeyboardEvent) =>
     !event.ctrlKey &&
     !event.altKey &&
     key === "enter" &&
-    owner.kind === "claude"
+    owner.kind === "agent"
   ) {
     owner.send("\x1b\r");
     event.preventDefault();
@@ -60,7 +60,7 @@ export const createKeyHandler = (owner: InputOwner) => (event: KeyboardEvent) =>
 
 export const createPasteHandler = (owner: InputOwner) => (event: ClipboardEvent) => {
   const data = event.clipboardData;
-  if (!data || data.getData("text/plain") || owner.kind !== "claude") return;
+  if (!data || data.getData("text/plain") || owner.kind !== "agent") return;
   if (!Array.from(data.items).some((item) => item.type.startsWith("image/"))) return;
   event.preventDefault();
   event.stopPropagation();

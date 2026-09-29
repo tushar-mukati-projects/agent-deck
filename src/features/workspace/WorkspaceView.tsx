@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Group, Panel, Separator } from "react-resizable-panels";
 
-import { ClaudePane } from "@/features/workspace/ClaudePane";
+import { AgentPane } from "@/features/workspace/AgentPane";
 import { SessionPreview } from "@/features/workspace/SessionPreview";
 import { ShellPanel } from "@/features/workspace/ShellPanel";
 import { FileViewer } from "@/features/viewer/FileViewer";
@@ -34,7 +34,7 @@ export const WorkspaceView = ({ workspace }: { workspace: Workspace }) => {
         <Group orientation="vertical" className="h-full">
           <Panel id="primary" minSize={120}>
             {workspace.mode === "live" ? (
-              <ClaudePane workspace={workspace} />
+              <AgentPane workspace={workspace} />
             ) : (
               <SessionPreview workspace={workspace} />
             )}

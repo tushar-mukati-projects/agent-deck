@@ -45,6 +45,7 @@ pub struct Environment {
     claude_home: String,
     shell: String,
     claude_found: bool,
+    codex_found: bool,
 }
 
 #[tauri::command]
@@ -55,6 +56,7 @@ pub fn environment() -> Environment {
         claude_home: sessions::claude_home().to_string_lossy().to_string(),
         shell: pty::default_shell(),
         claude_found: which::which("claude").is_ok() || home.join(".local").join("bin").join("claude.exe").is_file(),
+        codex_found: which::which("codex").is_ok(),
     }
 }
 

@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { api } from "@/lib/tauri/commands";
 import { errorMessage } from "@/lib/utils";
+import { agentName, CLAUDE } from "@/lib/agents/registry";
 import { useSessionsStore } from "@/stores/sessions-store";
+import { useSettingsStore } from "@/stores/settings-store";
 import { useUiStore } from "@/stores/ui-store";
 
 export const RenameDialog = () => {
@@ -23,7 +25,8 @@ export const RenameDialog = () => {
     if (!target || !next || saving) return;
     setSaving(true);
     try {
-      await api.renameSession(target.filePath, target.distro, next);
+      if (target.agent === CLAUDE) await api.renameSession(target.filePath, target.distro, next);
+      else useSettingsStore.getState().setSessionTitle(target.id, next);
       useSessionsStore.getState().patchSession(target.id, { title: next, customTitle: next });
       setRenameTarget(null);
       void (target.distro
@@ -41,7 +44,11 @@ export const RenameDialog = () => {
       open={!!target}
       onOpenChange={(open) => !open && setRenameTarget(null)}
       title="Rename session"
-      description="Saved into the session itself, so the name also shows in claude --resume."
+      description={
+        target?.agent === CLAUDE || !target
+          ? "Saved into the session itself, so the name also shows in claude --resume."
+          : `Saved in Deck. ${agentName(target.agent)} keeps its own session list.`
+      }
       className="w-[min(460px,calc(100vw-48px))]"
     >
       <form

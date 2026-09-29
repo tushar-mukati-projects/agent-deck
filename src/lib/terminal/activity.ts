@@ -8,7 +8,7 @@ const ECHO_WINDOW_MS = 400;
 const RESIZE_WINDOW_MS = 600;
 export const MIN_BUSY_FOR_ALERT_MS = 3000;
 const INPUT_PROMPT_PATTERN =
-  /Do you want to|Would you like to|\(y\/n\)|❯ 1\. Yes|Enter to confirm|Esc to cancel|Allow this/i;
+  /Do you want to|Would you like to|\(y\/n\)|\[y\/N\]|❯ 1\. Yes|Yes, proceed|Enter to confirm|Esc to cancel|Allow this|Approve|allow command/i;
 
 export interface IdleEvent {
   terminalId: string;
@@ -75,7 +75,7 @@ const settle = (owner: ActivityOwner) => {
   activity.busy = false;
   const busyMs = performance.now() - activity.busySince - IDLE_AFTER_MS;
   const visible = owner.element.isConnected && document.hasFocus();
-  const meaningful = owner.kind === "claude" && busyMs >= MIN_BUSY_FOR_ALERT_MS;
+  const meaningful = owner.kind === "agent" && busyMs >= MIN_BUSY_FOR_ALERT_MS;
   update(owner.id, { busy: false, ...(meaningful && !visible ? { attention: true } : {}) });
   if (!meaningful) return;
   const event: IdleEvent = {

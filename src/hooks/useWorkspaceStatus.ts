@@ -29,7 +29,7 @@ export const useExternalLive = (sessionId: string | null | undefined) => {
 };
 
 export const useWorkspaceTone = (workspace: Workspace): DotTone | null => {
-  const terminal = useTerminal(workspace.claudeTerminalId);
+  const terminal = useTerminal(workspace.agentTerminalId);
   const external = useSessionsStore((s) => s.live.some((l) => l.sessionId === workspace.sessionId));
   if (workspace.mode === "live") return terminalTone(terminal);
   return external ? "external" : null;

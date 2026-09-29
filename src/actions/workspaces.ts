@@ -7,7 +7,7 @@ import { getActiveWorkspace, useWorkspaceStore } from "@/stores/workspace-store"
 import type { Workspace } from "@/types";
 
 const runningTerminals = (workspace: Workspace) => ({
-  claude: isTerminalAlive(workspace.claudeTerminalId),
+  claude: isTerminalAlive(workspace.agentTerminalId),
   shells: workspace.shells.filter((s) => isTerminalAlive(s.id)).length,
 });
 
@@ -63,7 +63,7 @@ export const closeIdleWorkspaces = () =>
     useWorkspaceStore
       .getState()
       .workspaces.filter(
-        (w) => !isTerminalAlive(w.claudeTerminalId) && !w.shells.some((s) => isTerminalAlive(s.id)),
+        (w) => !isTerminalAlive(w.agentTerminalId) && !w.shells.some((s) => isTerminalAlive(s.id)),
       )
       .map((w) => w.id),
   );
@@ -91,7 +91,7 @@ export const focusNextAttention = () => {
   const { terminals } = useTerminalStore.getState();
   const start = workspaces.findIndex((w) => w.id === activeId);
   const ordered = [...workspaces.slice(start + 1), ...workspaces.slice(0, start + 1)];
-  const next = ordered.find((w) => w.claudeTerminalId && terminals[w.claudeTerminalId]?.attention);
+  const next = ordered.find((w) => w.agentTerminalId && terminals[w.agentTerminalId]?.attention);
   if (next) activate(next.id);
   else toast("No sessions are waiting for you");
 };

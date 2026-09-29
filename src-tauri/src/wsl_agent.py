@@ -23,6 +23,10 @@ META_RE = re.compile(rb'"isMeta":(true|false)')
 RELEVANT = (b'"type":"user"', b'"type":"assistant"', b'-title"', b'"last-prompt"')
 SESSION_ID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 GIT = ["git", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null"]
+CODEX_KINDS = ("session_meta", "event_msg", "response_item", "turn_context")
+CODEX_INDEX_MARKERS = (b'"session_meta"', b'"user_message"', b'"turn_context"')
+CODEX_TRANSCRIPT_MARKERS = CODEX_INDEX_MARKERS + (b'"agent_message"', b'"function_call"', b'"custom_tool_call"')
+TIMESTAMP_RE = re.compile(rb'"timestamp":"([^"]+)"')
 
 
 def claude_homes():
@@ -38,6 +42,71 @@ def claude_homes():
             seen.add(real)
             result.append(home)
     return result
+
+
+def codex_homes():
+    homes = []
+    override = os.environ.get("CODEX_HOME")
+    if override:
+        homes.append(override)
+    homes += sorted(glob.glob("/home/*/.codex")) + ["/root/.codex"]
+    seen, result = set(), []
+    for home in homes:
+        real = os.path.realpath(home)
+        if real not in seen and os.path.isdir(os.path.join(home, "sessions")):
+            seen.add(real)
+            result.append(home)
+    return result
+
+
+def codex_files():
+    for home in codex_homes():
+        yield from glob.glob(os.path.join(home, "sessions", "*", "*", "*", "rollout-*.jsonl"))
+
+
+def is_codex(path):
+    real = os.path.realpath(path)
+    return os.path.basename(real).startswith("rollout-") and real.endswith(".jsonl") and any(
+        real.startswith(os.path.realpath(os.path.join(home, "sessions")) + os.sep) for home in codex_homes()
+    )
+
+
+def reduce_codex(line, full):
+    if not any(marker in line for marker in (CODEX_TRANSCRIPT_MARKERS if full else CODEX_INDEX_MARKERS)):
+        return None
+    try:
+        data = json.loads(line)
+    except ValueError:
+        return None
+    kind, payload = data.get("type"), data.get("payload") or {}
+    if kind not in CODEX_KINDS:
+        return None
+    limit = TEXT_CHARS if full else PROMPT_CHARS
+    record = {"timestamp": data.get("timestamp"), "type": kind}
+    if kind == "session_meta":
+        record["payload"] = {k: payload.get(k) for k in ("id", "cwd", "cli_version")}
+        record["payload"]["git"] = {"branch": (payload.get("git") or {}).get("branch")}
+    elif kind == "turn_context":
+        record["payload"] = {"cwd": payload.get("cwd")}
+    elif payload.get("type") in ("user_message", "agent_message"):
+        if payload["type"] == "agent_message" and not full:
+            return None
+        record["payload"] = {"type": payload["type"], "message": (payload.get("message") or "")[:limit]}
+    elif full and payload.get("type") in ("function_call", "custom_tool_call"):
+        record["payload"] = {
+            "type": payload["type"],
+            "name": payload.get("name"),
+            "arguments": (payload.get("arguments") or "")[:2000],
+            "input": (payload.get("input") or "")[:200000] if payload.get("name") == "apply_patch" else None,
+        }
+    else:
+        return None
+    return record
+
+
+def codex_lines(path, full):
+    with open(path, "rb") as handle:
+        return [record for line in handle if (record := reduce_codex(line, full))]
 
 
 def decode(raw):
@@ -184,6 +253,31 @@ def index(request):
                 "end": end,
                 "records": records,
             })
+    for path in codex_files():
+        try:
+            stat = os.stat(path)
+        except OSError:
+            continue
+        files.append(path)
+        stamp = int(stat.st_mtime * 1000)
+        known = offsets.get(path)
+        if known and known["size"] == stat.st_size and known["mtime"] == stamp:
+            continue
+        start = known["offset"] if known and stat.st_size >= known["offset"] else 0
+        lines, end = read_complete_lines(path, start)
+        records = [record for line in lines if (record := reduce_codex(line, False))]
+        last = next((m.group(1).decode() for line in reversed(lines) if (m := TIMESTAMP_RE.search(line[:400]))), None)
+        if last:
+            records.append({"timestamp": last, "type": "event_msg", "payload": {"type": "activity"}})
+        changes.append({
+            "path": path,
+            "projectKey": "",
+            "size": stat.st_size,
+            "mtime": stamp,
+            "start": start,
+            "end": end,
+            "records": records,
+        })
     return {"files": files, "changes": changes, "live": live_sessions(), "shell": login_shell()}
 
 
@@ -227,6 +321,8 @@ def session_id_of(path):
 
 
 def transcript(path):
+    if is_codex(path):
+        return {"lines": codex_lines(path, True)}
     session_home(path)
     out = []
     with open(path, "rb") as handle:
@@ -271,6 +367,9 @@ def in_projects(path):
 
 
 def delete(path):
+    if is_codex(path):
+        os.remove(path)
+        return {"deleted": path}
     if not in_projects(path):
         raise ValueError("not a Claude session file")
     session_id = session_id_of(path)
@@ -340,6 +439,8 @@ def line_stats(before, after):
 
 
 def changes(path):
+    if is_codex(path):
+        return {"lines": codex_lines(path, True)}
     home = session_home(path)
     session_id = os.path.basename(path)[: -len(".jsonl")]
     backups = os.path.join(home, "file-history", session_id)
@@ -486,6 +587,30 @@ def search(query):
                         found += 1
                     if found >= 3:
                         break
+    for path in codex_files():
+        session_id = os.path.basename(path)[: -len(".jsonl")][-36:]
+        found = 0
+        with open(path, "rb") as handle:
+            for line in handle:
+                if raw_needle not in line.lower():
+                    continue
+                record = reduce_codex(line, True)
+                message = ((record or {}).get("payload") or {}).get("message")
+                if not message:
+                    continue
+                index = message.lower().find(needle)
+                if index < 0:
+                    continue
+                start, end = max(0, index - 90), min(len(message), index + len(needle) + 90)
+                hits.append({
+                    "sessionId": session_id,
+                    "role": "user" if record["payload"]["type"] == "user_message" else "assistant",
+                    "snippet": ("…" if start else "") + " ".join(message[start:end].split()) + ("…" if end < len(message) else ""),
+                    "timestamp": record.get("timestamp"),
+                })
+                found += 1
+                if found >= 3:
+                    break
     return {"hits": hits}
 
 

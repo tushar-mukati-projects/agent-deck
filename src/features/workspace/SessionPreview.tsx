@@ -22,6 +22,7 @@ import { IconButton } from "@/components/ui/icon-button";
 import { Kbd } from "@/components/ui/kbd";
 import { Alert, SearchInput } from "@/components/ui/panel";
 import { MarkdownView } from "@/features/viewer/MarkdownView";
+import { CLAUDE, findAgent } from "@/lib/agents/registry";
 import { useExternalLive } from "@/hooks/useWorkspaceStatus";
 import { api } from "@/lib/tauri/commands";
 import { revealInExplorer } from "@/lib/tauri/system";
@@ -148,6 +149,7 @@ const Meta = ({ workspace }: { workspace: Workspace }) => {
 };
 
 export const SessionPreview = ({ workspace }: { workspace: Workspace }) => {
+  const agent = findAgent(workspace.agent);
   const session = useSessionsStore((s) => s.byId[workspace.sessionId]);
   const external = useExternalLive(workspace.sessionId);
   const folderExists = useFolderExists(workspace.cwd);
@@ -269,13 +271,18 @@ export const SessionPreview = ({ workspace }: { workspace: Workspace }) => {
             disabled={!folderExists}
             onClick={() => void resumeWorkspace(workspace.id)}
           >
-            <Play className="fill-current" /> {session ? "Resume session" : "Start session"}
+            <Play className="fill-current" />{" "}
+            {session
+              ? agent.id === CLAUDE
+                ? "Resume session"
+                : `Resume in ${agent.name}`
+              : `Start ${agent.name}`}
             <Kbd
               keys="Enter"
               className="ml-0.5 opacity-60 [&_kbd]:border-on-accent/25 [&_kbd]:bg-on-accent/10 [&_kbd]:text-on-accent"
             />
           </Button>
-          {session && (
+          {session && agent.canFork && (
             <Button
               size="sm"
               disabled={!folderExists}

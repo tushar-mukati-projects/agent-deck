@@ -1,5 +1,6 @@
 mod changes;
 mod claude_config;
+mod codex;
 mod commands;
 mod fsx;
 mod git;

@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
+import { CustomAgentsEditor, DefaultAgentPicker } from "@/features/settings/AgentSettings";
 import { ThemePicker } from "@/features/settings/ThemePicker";
 import { playChime } from "@/lib/chime";
 import { cn } from "@/lib/utils";
@@ -73,7 +74,13 @@ export const SettingsDialog = () => {
         <Field label="Theme" hint="Colors for the whole app, terminals, code and diffs.">
           <ThemePicker />
         </Field>
-        <Field label="Extra Claude flags" hint="Added to every session you start or resume.">
+        <Field
+          label="Default agent"
+          hint="Used by New session (Ctrl Shift N), folder + buttons and Choose folder."
+        >
+          <DefaultAgentPicker />
+        </Field>
+        <Field label="Extra Claude flags" hint="Added to every Claude session you start or resume.">
           <input
             className={inputClass}
             value={settings.claudeArgs}
@@ -81,6 +88,24 @@ export const SettingsDialog = () => {
             onChange={(e) => settings.set({ claudeArgs: e.target.value })}
             spellCheck={false}
           />
+        </Field>
+        <Field
+          label="Extra Codex flags"
+          hint="Added to every Codex session you start, resume or fork."
+        >
+          <input
+            className={inputClass}
+            value={settings.codexArgs}
+            placeholder="e.g. --model gpt-5 --sandbox workspace-write"
+            onChange={(e) => settings.set({ codexArgs: e.target.value })}
+            spellCheck={false}
+          />
+        </Field>
+        <Field
+          label="Other agents"
+          hint="Any CLI agent (Gemini, Aider, OpenCode…) can start new sessions from Deck. Resume and history are available for Claude and Codex."
+        >
+          <CustomAgentsEditor />
         </Field>
         <Field label="Clicking a session" hint="Double-click always resumes.">
           <Segmented<ClickBehavior>
@@ -93,7 +118,7 @@ export const SettingsDialog = () => {
           />
         </Field>
         <Field
-          label="When Claude finishes"
+          label="When an agent finishes"
           hint="Sound plays every time; notifications only for sessions you're not looking at."
         >
           <div className="flex items-center gap-2">

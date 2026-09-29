@@ -281,9 +281,18 @@ pub fn project_key(path: &str) -> String {
 
 fn memory(ctx: &Ctx, cwd: &Path) -> Vec<MemoryFile> {
     let mut files = vec![memory_file(Scope::User, "CLAUDE.md · all folders".into(), ctx.claude_home.join("CLAUDE.md"))];
+    let codex_agents = ctx.home.join(".codex").join("AGENTS.md");
+    if codex_agents.is_file() {
+        files.push(memory_file(Scope::User, "AGENTS.md · Codex, all folders".into(), codex_agents));
+    }
     for (index, dir) in project_dirs(ctx, cwd).iter().enumerate() {
         let folder = dir.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| dir.to_string_lossy().to_string());
-        for (name, scope) in [("CLAUDE.md", Scope::Project), (".claude/CLAUDE.md", Scope::Project), ("CLAUDE.local.md", Scope::Local)] {
+        for (name, scope) in [
+            ("CLAUDE.md", Scope::Project),
+            (".claude/CLAUDE.md", Scope::Project),
+            ("CLAUDE.local.md", Scope::Local),
+            ("AGENTS.md", Scope::Project),
+        ] {
             let path = dir.join(name);
             if path.is_file() || (index == 0 && name == "CLAUDE.md") {
                 files.push(memory_file(scope, format!("{name} · {folder}"), path));

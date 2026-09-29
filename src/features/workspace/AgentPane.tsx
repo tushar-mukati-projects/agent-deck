@@ -5,13 +5,15 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/feedback";
 import { TerminalView } from "@/features/terminal/TerminalView";
 import { useTerminal } from "@/hooks/useWorkspaceStatus";
+import { findAgent } from "@/lib/agents/registry";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import type { Workspace } from "@/types";
 
-export const ClaudePane = ({ workspace }: { workspace: Workspace }) => {
-  const terminalId = workspace.claudeTerminalId;
+export const AgentPane = ({ workspace }: { workspace: Workspace }) => {
+  const terminalId = workspace.agentTerminalId;
   const terminal = useTerminal(terminalId);
-  const restartClaude = useWorkspaceStore((s) => s.restartClaude);
+  const restartAgent = useWorkspaceStore((s) => s.restartAgent);
+  const agent = findAgent(workspace.agent);
   if (!terminalId) return null;
 
   return (
@@ -20,15 +22,15 @@ export const ClaudePane = ({ workspace }: { workspace: Workspace }) => {
 
       {terminal?.status === "starting" && (
         <div className="pointer-events-none absolute top-3 right-4 flex items-center gap-2 rounded-md border border-border bg-panel/90 px-2.5 py-1 text-[11.5px] text-muted">
-          <Spinner className="size-3" /> Starting Claude…
+          <Spinner className="size-3" /> Starting {agent.name}…
         </div>
       )}
 
       {terminal?.status === "error" && (
         <div className="absolute inset-0 flex items-center justify-center bg-bg/80 p-4 backdrop-blur-sm">
-          <div className="animate-pop-in w-[min(440px,100%)] rounded-xl border border-border-strong bg-panel p-5 shadow-2xl">
+          <div className="animate-pop-in w-[min(440px,100%)] rounded-xl border border-border-strong bg-panel p-5 shadow-2xl shadow-shadow">
             <div className="flex items-center gap-2 text-[14px] font-semibold text-fg">
-              <AlertTriangle className="size-4 text-danger" /> Couldn't start Claude
+              <AlertTriangle className="size-4 text-danger" /> Couldn&apos;t start {agent.name}
             </div>
             <p className="mt-2 font-mono text-xs leading-relaxed break-words text-muted select-text">
               {terminal.error}
@@ -37,7 +39,7 @@ export const ClaudePane = ({ workspace }: { workspace: Workspace }) => {
               <Button size="sm" variant="ghost" onClick={() => void closeWorkspace(workspace.id)}>
                 Close tab
               </Button>
-              <Button size="sm" variant="primary" onClick={() => restartClaude(workspace.id)}>
+              <Button size="sm" variant="primary" onClick={() => restartAgent(workspace.id)}>
                 <RotateCw /> Try again
               </Button>
             </div>
@@ -46,14 +48,14 @@ export const ClaudePane = ({ workspace }: { workspace: Workspace }) => {
       )}
 
       {terminal?.status === "exited" && (
-        <div className="animate-pop-in absolute right-4 bottom-4 left-4 mx-auto flex max-w-[560px] flex-wrap items-center gap-3 rounded-xl border border-border-strong bg-panel/95 px-4 py-2.5 shadow-2xl backdrop-blur">
+        <div className="animate-pop-in absolute right-4 bottom-4 left-4 mx-auto flex max-w-[560px] flex-wrap items-center gap-3 rounded-xl border border-border-strong bg-panel/95 px-4 py-2.5 shadow-2xl shadow-shadow backdrop-blur">
           <span className="size-2 rounded-full bg-faint" />
           <span className="min-w-0 flex-1 text-[12.5px] text-muted">
-            Claude exited{terminal.exitCode ? ` with code ${terminal.exitCode}` : ""}. The
-            conversation is saved.
+            {agent.name} exited{terminal.exitCode ? ` with code ${terminal.exitCode}` : ""}.
+            {agent.history ? " The conversation is saved." : ""}
           </span>
-          <Button size="sm" variant="primary" onClick={() => restartClaude(workspace.id)}>
-            <RotateCw /> Resume again
+          <Button size="sm" variant="primary" onClick={() => restartAgent(workspace.id)}>
+            <RotateCw /> {agent.history ? "Resume again" : "Start again"}
           </Button>
           <Button size="sm" variant="ghost" onClick={() => void closeWorkspace(workspace.id)}>
             <X /> Close

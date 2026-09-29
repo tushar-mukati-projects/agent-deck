@@ -1,5 +1,14 @@
+export type AgentId = string;
+
+export interface CustomAgent {
+  id: string;
+  name: string;
+  command: string;
+}
+
 export interface SessionInfo {
   id: string;
+  agent: AgentId;
   distro: string | null;
   filePath: string;
   projectKey: string;
@@ -72,6 +81,7 @@ export interface AppEnvironment {
   claudeHome: string;
   shell: string;
   claudeFound: boolean;
+  codexFound: boolean;
 }
 
 export type ChangeStatus = "added" | "modified" | "deleted" | "unchanged";
@@ -238,7 +248,7 @@ export interface FsChange {
   paths: string[];
 }
 
-export type TerminalKind = "claude" | "shell";
+export type TerminalKind = "agent" | "shell";
 
 export type TerminalStatus = "starting" | "running" | "exited" | "error";
 
@@ -271,9 +281,11 @@ export interface Workspace {
   cwd: string;
   title: string;
   filePath: string | null;
+  agent: AgentId;
+  pendingSince: number | null;
   mode: WorkspaceMode;
-  claudeTerminalId: string | null;
-  claudeArgs: string[];
+  agentTerminalId: string | null;
+  agentArgs: string[];
   shells: ShellTab[];
   activeShellId: string | null;
   shellPanelOpen: boolean;

@@ -9,6 +9,7 @@ import { FileIcon } from "@/lib/file-icons";
 import { api } from "@/lib/tauri/commands";
 import { basename, cn, dirname, errorMessage, isWithin, relativePath } from "@/lib/utils";
 import { DECK_PATH_MIME } from "@/lib/terminal/input";
+import { agentName, CLAUDE } from "@/lib/agents/registry";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useActiveWorkspace, useWorkspaceStore } from "@/stores/workspace-store";
 import type { ChangedFile, GitChange, Workspace } from "@/types";
@@ -177,7 +178,7 @@ export const ChangesPanel = () => {
         className="h-full"
         icon={<GitCompare />}
         title="No session open"
-        description="Open a session to see which files Claude changed."
+        description="Open a session to see which files its agent changed."
       />
     );
   }
@@ -229,7 +230,7 @@ export const ChangesPanel = () => {
               {error && <p className="px-2 py-1 text-[11px] text-danger">{error}</p>}
               {visibleFiles.length === 0 && !error && (
                 <p className="px-2 py-1 text-[11.5px] text-faint">
-                  Claude hasn't changed any files in this session.
+                  {agentName(workspace.agent)} hasn't changed any files in this session.
                 </p>
               )}
               {visibleFiles.map((file) => (
@@ -238,7 +239,13 @@ export const ChangesPanel = () => {
                   workspace={workspace}
                   path={file.path}
                   badge={statusBadge[file.status] ?? statusBadge.modified}
-                  onOpen={() => openDiff(file.path, "session", file.backup)}
+                  onOpen={() =>
+                    openDiff(
+                      file.path,
+                      file.backup || session?.agent === CLAUDE ? "session" : "git",
+                      file.backup,
+                    )
+                  }
                 >
                   <span className="shrink-0 font-mono text-[10.5px]">
                     {file.additions > 0 && <span className="text-add">+{file.additions}</span>}

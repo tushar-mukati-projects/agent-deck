@@ -113,5 +113,9 @@ pub fn watch_claude_home(app: AppHandle) -> Option<notify::RecommendedWatcher> {
         let _ = std::fs::create_dir_all(&dir);
         let _ = watcher.watch(&dir, RecursiveMode::Recursive);
     }
+    let codex = crate::codex::sessions_dir();
+    if codex.is_dir() {
+        let _ = watcher.watch(&codex, RecursiveMode::Recursive);
+    }
     Some(watcher)
 }

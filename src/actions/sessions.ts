@@ -1,6 +1,6 @@
 import { toast } from "sonner";
 
-import { isPersisted, type LaunchOptions } from "@/lib/claude/launch";
+import { isPersisted, type LaunchOptions } from "@/lib/agents/launch";
 import { externalLive } from "@/lib/sessions";
 import { api } from "@/lib/tauri/commands";
 import { pickFolder } from "@/lib/tauri/system";
@@ -10,7 +10,7 @@ import { useSettingsStore } from "@/stores/settings-store";
 import { isTerminalAlive, useTerminalStore } from "@/stores/terminal-store";
 import { useUiStore } from "@/stores/ui-store";
 import { findWorkspace, findWorkspaceBySession, useWorkspaceStore } from "@/stores/workspace-store";
-import type { SessionInfo } from "@/types";
+import type { AgentId, SessionInfo } from "@/types";
 
 const promptLabel = (count: number) => `${count} ${count === 1 ? "prompt" : "prompts"}`;
 
@@ -61,20 +61,25 @@ export const openSessionByClick = (session: SessionInfo) =>
     ? void resumeSession(session)
     : previewSession(session);
 
-export const startSessionInPickedFolder = async (defaultPath?: string) => {
+export const startNewSession = (cwd: string, agent?: AgentId) =>
+  useWorkspaceStore
+    .getState()
+    .newSession(cwd, { agent: agent ?? useSettingsStore.getState().defaultAgent });
+
+export const startSessionInPickedFolder = async (defaultPath?: string, agent?: AgentId) => {
   const folder = await pickFolder(defaultPath);
-  if (folder) useWorkspaceStore.getState().newSession(folder);
+  if (folder) startNewSession(folder, agent);
 };
 
-export const startAgentSession = (cwd: string, agent: string) =>
-  useWorkspaceStore.getState().newSession(cwd, { agent });
+export const startAgentSession = (cwd: string, subagent: string) =>
+  useWorkspaceStore.getState().newSession(cwd, { subagent });
 
 export const renameSession = (session: SessionInfo) =>
   useUiStore.getState().setRenameTarget(session);
 
 export const deleteSessionWithConfirm = async (session: SessionInfo) => {
   const workspace = findWorkspaceBySession(session.id);
-  if (workspace && isTerminalAlive(workspace.claudeTerminalId)) {
+  if (workspace && isTerminalAlive(workspace.agentTerminalId)) {
     toast.error("This session is running here. Close its tab first.");
     return;
   }
