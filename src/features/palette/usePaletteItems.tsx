@@ -30,6 +30,7 @@ import {
   resumeWorkspace,
   startSessionInPickedFolder,
 } from "@/actions/sessions";
+import { openTypedPath } from "@/actions/files";
 import { closeIdleWorkspaces, closeOtherWorkspaces, closeWorkspace } from "@/actions/workspaces";
 import { runShortcut } from "@/hooks/useGlobalShortcuts";
 import { FileIcon } from "@/lib/file-icons";
@@ -38,6 +39,7 @@ import { shortcutLabel, type ShortcutAction } from "@/lib/shortcuts";
 import { api } from "@/lib/tauri/commands";
 import { copyText, revealInExplorer } from "@/lib/tauri/system";
 import { THEMES } from "@/lib/themes";
+import { parseTypedPath } from "@/lib/typed-path";
 import { basename, joinPath, shortenHome, timeAgo } from "@/lib/utils";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -309,8 +311,24 @@ export const usePaletteItems = (mode: PaletteMode, rawQuery: string) => {
         ];
       });
 
+    const typedPath = workspace ? parseTypedPath(rawQuery, workspace.cwd, home) : null;
+    const pathItems: PaletteItem[] =
+      typedPath && workspace && !commandMode && mode !== "chats"
+        ? [
+            {
+              id: `path:${typedPath}`,
+              group: "Go to path",
+              title: basename(typedPath) || typedPath,
+              subtitle: typedPath,
+              icon: <FileIcon path={typedPath} />,
+              score: Number.MAX_SAFE_INTEGER,
+              run: () => void openTypedPath(workspace, typedPath),
+            },
+          ]
+        : [];
+
     if (commandMode) return sortTop(commandItems(), 100);
-    if (mode === "files") return sortTop(fileItems(), 80);
+    if (mode === "files") return [...pathItems, ...sortTop(fileItems(), 80)];
     if (mode === "chats") return chatItems();
 
     const tabItems = workspaces.flatMap((w) => {
@@ -353,6 +371,7 @@ export const usePaletteItems = (mode: PaletteMode, rawQuery: string) => {
     });
 
     return [
+      ...pathItems,
       ...sortTop(tabItems, 8),
       ...sortTop(sessionItems, query ? 30 : 12),
       ...(query ? sortTop(fileItems(), 15) : []),
@@ -362,6 +381,7 @@ export const usePaletteItems = (mode: PaletteMode, rawQuery: string) => {
     commandMode,
     mode,
     query,
+    rawQuery,
     commands,
     workspace,
     files,

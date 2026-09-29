@@ -26,7 +26,7 @@ export const Dialog = ({
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="animate-fade-in fixed inset-0 z-40 bg-black/55 backdrop-blur-[2px]" />
+        <DialogPrimitive.Overlay className="animate-fade-in fixed inset-0 z-40 bg-scrim backdrop-blur-[2px]" />
         <DialogPrimitive.Content
           onOpenAutoFocus={() => {
             previousFocus.current =
@@ -41,7 +41,7 @@ export const Dialog = ({
             }
           }}
           className={cn(
-            "animate-pop-in fixed top-[13%] left-1/2 z-50 w-[min(560px,calc(100vw-48px))] -translate-x-1/2 rounded-xl border border-border-strong bg-panel shadow-2xl shadow-black/60 outline-none",
+            "animate-pop-in fixed top-[13%] left-1/2 z-50 w-[min(560px,calc(100vw-48px))] -translate-x-1/2 rounded-xl border border-border-strong bg-panel shadow-2xl shadow-shadow outline-none",
             className,
           )}
         >

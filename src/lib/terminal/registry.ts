@@ -151,7 +151,7 @@ const createEntry = (spec: TerminalSpec): Entry => {
     cursorWidth: 2,
     scrollback: 10_000,
     smoothScrollDuration: 90,
-    minimumContrastRatio: 1,
+    minimumContrastRatio: findTheme(themeId).terminalContrast,
     drawBoldTextInBrightColors: false,
     theme: findTheme(themeId).terminal,
   });
@@ -366,8 +366,11 @@ export const disposeTerminal = async (id: string) => {
 
 useSettingsStore.subscribe((state, previous) => {
   if (state.themeId !== previous.themeId) {
-    const theme = findTheme(state.themeId).terminal;
-    for (const entry of entries.values()) entry.term.options.theme = theme;
+    const theme = findTheme(state.themeId);
+    for (const entry of entries.values()) {
+      entry.term.options.theme = theme.terminal;
+      entry.term.options.minimumContrastRatio = theme.terminalContrast;
+    }
   }
   if (state.fontSize !== previous.fontSize) {
     for (const [id, entry] of entries) {

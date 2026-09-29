@@ -129,7 +129,7 @@ export const CommandPalette = () => {
   return (
     <DialogPrimitive.Root open={!!mode} onOpenChange={(open) => !open && closePalette()}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="animate-fade-in fixed inset-0 z-40 bg-black/40" />
+        <DialogPrimitive.Overlay className="animate-fade-in fixed inset-0 z-40 bg-scrim" />
         <DialogPrimitive.Content
           onOpenAutoFocus={() => {
             previousFocus.current =
@@ -143,7 +143,7 @@ export const CommandPalette = () => {
               target.focus({ preventScroll: true });
             }
           }}
-          className="animate-pop-in fixed top-[11%] left-1/2 z-50 w-[min(680px,calc(100vw-48px))] -translate-x-1/2 overflow-hidden rounded-xl border border-border-strong bg-panel shadow-2xl shadow-black/60 outline-none"
+          className="animate-pop-in fixed top-[11%] left-1/2 z-50 w-[min(680px,calc(100vw-48px))] -translate-x-1/2 overflow-hidden rounded-xl border border-border-strong bg-panel shadow-2xl shadow-shadow outline-none"
         >
           <DialogPrimitive.Title className="sr-only">Command palette</DialogPrimitive.Title>
           <DialogPrimitive.Description className="sr-only">

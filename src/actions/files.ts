@@ -3,7 +3,9 @@ import { toast } from "sonner";
 import type { PathLinkTarget } from "@/lib/terminal/links";
 import { pasteIntoTerminal } from "@/lib/terminal/registry";
 import { api } from "@/lib/tauri/commands";
-import { basename, normalizePath, relativePath } from "@/lib/utils";
+import { revealInExplorer } from "@/lib/tauri/system";
+import { basename, isWithin, normalizePath, relativePath } from "@/lib/utils";
+import { useExplorerStore } from "@/stores/explorer-store";
 import { useUiStore } from "@/stores/ui-store";
 import { useViewerStore } from "@/stores/viewer-store";
 import { findWorkspace, useWorkspaceStore } from "@/stores/workspace-store";
@@ -50,6 +52,26 @@ export const closeFilesWithConfirm = async (workspaceId: string, tabs: string[])
 
 export const closeFileWithConfirm = (workspaceId: string, tab: string) =>
   closeFilesWithConfirm(workspaceId, [tab]);
+
+export const openTypedPath = async (workspace: Workspace, path: string) => {
+  const explorer = useExplorerStore.getState();
+  if (await api.pathIsDir(path).catch(() => false)) {
+    if (!isWithin(path, workspace.cwd)) {
+      void revealInExplorer(path);
+      return;
+    }
+    await explorer.reveal(path, workspace.cwd);
+    explorer.expand(path);
+    useUiStore.getState().showContext("explorer");
+    return;
+  }
+  const content = await api.readFile(path).catch(() => null);
+  if (!content) {
+    toast.error(`Can't find ${path}`);
+    return;
+  }
+  useWorkspaceStore.getState().openFile(workspace.id, path);
+};
 
 export const openPathFromTerminal = async (workspaceId: string, target: PathLinkTarget) => {
   if (!findWorkspace(workspaceId)) return;

@@ -372,7 +372,7 @@ export const SessionPreview = ({ workspace }: { workspace: Workspace }) => {
         {!atBottom && !deferredQuery && (
           <Button
             size="sm"
-            className="absolute right-5 bottom-4 shadow-lg shadow-black/30"
+            className="absolute right-5 bottom-4 shadow-lg shadow-shadow"
             onClick={jumpToLatest}
           >
             <ArrowDown /> Latest

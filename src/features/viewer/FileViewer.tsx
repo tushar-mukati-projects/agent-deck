@@ -45,7 +45,7 @@ const MediaFile = ({ path, kind }: { path: string; kind: "image" | "pdf" | "vide
         <img
           src={src}
           alt={basename(path)}
-          className="max-h-full max-w-full rounded shadow-2xl shadow-black/50"
+          className="max-h-full max-w-full rounded shadow-2xl shadow-shadow"
         />
       )}
       {kind === "video" && <video src={src} controls className="max-h-full max-w-full rounded" />}

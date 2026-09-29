@@ -20,7 +20,7 @@ export const Tooltip = ({ content, shortcut, side = "bottom", children }: Toolti
       <TooltipPrimitive.Content
         side={side}
         sideOffset={6}
-        className="animate-fade-in z-50 flex max-w-[420px] items-center gap-2 rounded-md border border-border-strong bg-overlay px-2 py-1 text-xs text-fg shadow-xl shadow-black/40"
+        className="animate-fade-in z-50 flex max-w-[420px] items-center gap-2 rounded-md border border-border-strong bg-overlay px-2 py-1 text-xs text-fg shadow-xl shadow-shadow"
       >
         {content}
         {shortcut && <span className="font-mono text-[10.5px] text-faint">{shortcut}</span>}

@@ -155,9 +155,13 @@ export const FileTree = ({ workspace }: { workspace: Workspace }) => {
     const element = containerRef.current;
     if (!element || selectedIndex < 0) return;
     const top = selectedIndex * ROW_HEIGHT;
-    if (top < element.scrollTop) element.scrollTop = top;
-    else if (top + ROW_HEIGHT > element.scrollTop + element.clientHeight)
-      element.scrollTop = top + ROW_HEIGHT - element.clientHeight;
+    const viewTop = element.scrollTop;
+    const viewBottom = viewTop + element.clientHeight;
+    if (top >= viewTop && top + ROW_HEIGHT <= viewBottom) return;
+    const adjacent = top >= viewTop - ROW_HEIGHT && top + ROW_HEIGHT <= viewBottom + ROW_HEIGHT;
+    if (!adjacent) element.scrollTop = top - element.clientHeight / 2 + ROW_HEIGHT / 2;
+    else if (top < viewTop) element.scrollTop = top;
+    else element.scrollTop = top + ROW_HEIGHT - element.clientHeight;
   }, [selectedIndex]);
 
   const activate = (row: Row) => {

@@ -29,6 +29,8 @@
   --color-badge: #7bb5b8;
   --color-code-bg: #0e1013;
   --color-terminal-bg: #0c0d10;
+  --color-shadow: rgb(0 0 0 / 0.55);
+  --color-scrim: rgb(0 0 0 / 0.5);
 
   --font-sans: "Inter Variable", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono Variable", ui-monospace, "Cascadia Code", Consolas, monospace;

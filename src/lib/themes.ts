@@ -1,5 +1,7 @@
 import type { ITheme } from "@xterm/xterm";
 
+import { contrast, ensureContrast } from "@/lib/contrast";
+
 export type ThemeKind = "dark" | "light";
 
 type Ansi = [
@@ -65,43 +67,110 @@ export interface Theme {
   kind: ThemeKind;
   vars: Record<string, string>;
   terminal: ITheme;
+  terminalContrast: number;
   swatch: [string, string, string, string];
 }
 
+const FLOORS = {
+  light: {
+    fg: 7.5,
+    muted: 5.2,
+    faint: 3.9,
+    border: 1.32,
+    borderStrong: 1.7,
+    hover: 1.06,
+    active: 1.14,
+    color: 3.6,
+    syntax: 4.5,
+    comment: 3.8,
+    accent: 3.2,
+    onAccent: 4.5,
+  },
+  dark: {
+    fg: 7,
+    muted: 4.8,
+    faint: 3.3,
+    border: 1.2,
+    borderStrong: 1.5,
+    hover: 1.04,
+    active: 1.1,
+    color: 3.2,
+    syntax: 3.6,
+    comment: 3.3,
+    accent: 3,
+    onAccent: 4.5,
+  },
+};
+
 const defineTheme = (input: ThemeInput): Theme => {
-  const [, red, green, yellow, blue, magenta, cyan] = input.ansi;
-  const syntax: Syntax = {
+  const floor = FLOORS[input.kind];
+  const codeBg = input.codeBg ?? input.bg;
+  const onBg = (color: string, ratio: number) => ensureContrast(color, input.bg, ratio);
+  const onPanel = (color: string, ratio: number) => ensureContrast(color, input.panel, ratio);
+  const readable = (color: string) => onBg(color, floor.color);
+
+  const [, rawRed, rawGreen, rawYellow, rawBlue, rawMagenta, rawCyan] = input.ansi;
+  const [red, green, yellow, blue, magenta, cyan] = [
+    rawRed,
+    rawGreen,
+    rawYellow,
+    rawBlue,
+    rawMagenta,
+    rawCyan,
+  ].map(readable);
+  const fg = onPanel(onBg(input.fg, floor.fg), floor.fg);
+  const muted = onPanel(input.muted, floor.muted);
+  const faint = onPanel(input.faint, floor.faint);
+  const onAccent = input.onAccent;
+  const fillFor = (color: string) => {
+    const visible = onBg(color, floor.accent);
+    return contrast(onAccent, visible) >= floor.onAccent
+      ? visible
+      : ensureContrast(visible, onAccent, floor.onAccent);
+  };
+  const accent = fillFor(input.accent);
+  const accentStrong = fillFor(input.accentStrong ?? input.accent);
+
+  const syntaxInput: Syntax = {
     comment: input.faint,
-    keyword: magenta,
-    string: green,
-    number: yellow,
-    function: blue,
-    type: yellow,
-    property: cyan,
-    tag: red,
+    keyword: rawMagenta,
+    string: rawGreen,
+    number: rawYellow,
+    function: rawBlue,
+    type: rawYellow,
+    property: rawCyan,
+    tag: rawRed,
     variable: input.fg,
     operator: input.muted,
-    heading: blue,
-    link: blue,
+    heading: rawBlue,
+    link: rawBlue,
     ...input.syntax,
   };
-  const codeBg = input.codeBg ?? input.bg;
+  const syntax = Object.fromEntries(
+    Object.entries(syntaxInput).map(([key, color]) => [
+      key,
+      ensureContrast(color, codeBg, key === "comment" ? floor.comment : floor.syntax),
+    ]),
+  ) as unknown as Syntax;
+
+  const shadow = input.kind === "dark" ? "rgb(0 0 0 / 0.55)" : "rgb(15 23 42 / 0.16)";
+  const scrim = input.kind === "dark" ? "rgb(0 0 0 / 0.5)" : "rgb(15 23 42 / 0.22)";
   const vars: Record<string, string> = {
     "--color-bg": input.bg,
     "--color-panel": input.panel,
     "--color-elevated": input.elevated,
     "--color-overlay": input.elevated,
-    "--color-hover": input.hover,
-    "--color-active": input.active,
-    "--color-border": input.border,
-    "--color-border-strong": input.borderStrong,
-    "--color-fg": input.fg,
-    "--color-muted": input.muted,
-    "--color-faint": input.faint,
-    "--color-accent": input.accent,
-    "--color-accent-strong": input.accentStrong ?? input.accent,
-    "--color-accent-soft": `color-mix(in srgb, ${input.accent} 14%, transparent)`,
-    "--color-on-accent": input.onAccent,
+    "--color-hover": onPanel(input.hover, floor.hover),
+    "--color-active": onPanel(input.active, floor.active),
+    "--color-border": onBg(input.border, floor.border),
+    "--color-border-strong": onBg(input.borderStrong, floor.borderStrong),
+    "--color-fg": fg,
+    "--color-muted": muted,
+    "--color-faint": faint,
+    "--color-accent": accent,
+    "--color-accent-strong": accentStrong,
+    "--color-accent-soft": `color-mix(in srgb, ${accent} ${input.kind === "dark" ? 14 : 16}%, transparent)`,
+    "--color-on-accent": onAccent,
     "--color-success": green,
     "--color-warning": yellow,
     "--color-danger": red,
@@ -113,14 +182,16 @@ const defineTheme = (input: ThemeInput): Theme => {
     "--color-badge": cyan,
     "--color-code-bg": codeBg,
     "--color-terminal-bg": input.bg,
-    "--color-selection": `color-mix(in srgb, ${input.accent} 28%, transparent)`,
+    "--color-selection": `color-mix(in srgb, ${accent} ${input.kind === "dark" ? 28 : 22}%, transparent)`,
+    "--color-shadow": shadow,
+    "--color-scrim": scrim,
     "--icon-red": red,
     "--icon-green": green,
     "--icon-yellow": yellow,
     "--icon-blue": blue,
     "--icon-purple": magenta,
     "--icon-cyan": cyan,
-    "--icon-orange": input.accent,
+    "--icon-orange": accent,
   };
   for (const [key, value] of Object.entries(syntax)) vars[`--syntax-${key}`] = value;
 
@@ -144,10 +215,10 @@ const defineTheme = (input: ThemeInput): Theme => {
   ] = input.ansi;
   const terminal: ITheme = {
     background: input.bg,
-    foreground: input.terminalFg ?? input.fg,
-    cursor: input.accent,
+    foreground: input.terminalFg ?? fg,
+    cursor: accent,
     cursorAccent: input.bg,
-    selectionBackground: `${input.accent}44`,
+    selectionBackground: `${accent}${input.kind === "dark" ? "44" : "38"}`,
     selectionInactiveBackground: input.kind === "dark" ? "#ffffff14" : "#0000000f",
     scrollbarSliderBackground: `${input.borderStrong}99`,
     scrollbarSliderHoverBackground: input.borderStrong,
@@ -175,7 +246,8 @@ const defineTheme = (input: ThemeInput): Theme => {
     kind: input.kind,
     vars,
     terminal,
-    swatch: [input.bg, input.panel, input.accent, input.fg],
+    terminalContrast: input.kind === "light" ? 4.5 : 1,
+    swatch: [input.bg, input.panel, accent, fg],
   };
 };
 

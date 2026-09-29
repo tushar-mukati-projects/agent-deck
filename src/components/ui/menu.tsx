@@ -4,7 +4,7 @@ import * as DropdownPrimitive from "@radix-ui/react-dropdown-menu";
 import { cn } from "@/lib/utils";
 
 const contentClass =
-  "animate-pop-in z-50 min-w-[210px] overflow-hidden rounded-lg border border-border-strong bg-overlay p-1 text-[12.5px] text-fg shadow-2xl shadow-black/50";
+  "animate-pop-in z-50 min-w-[210px] overflow-hidden rounded-lg border border-border-strong bg-overlay p-1 text-[12.5px] text-fg shadow-2xl shadow-shadow";
 
 const itemClass =
   "relative flex h-7 cursor-default items-center gap-2 rounded-md px-2 outline-none select-none data-[disabled]:opacity-40 data-[highlighted]:bg-accent-soft [&_svg]:size-3.5 [&_svg]:text-muted";

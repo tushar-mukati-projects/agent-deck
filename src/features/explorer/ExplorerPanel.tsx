@@ -14,7 +14,8 @@ import { IconButton } from "@/components/ui/icon-button";
 import { FileTree } from "@/features/explorer/FileTree";
 import { shortcutLabel } from "@/lib/shortcuts";
 import { revealInExplorer } from "@/lib/tauri/system";
-import { basename, normalizePath } from "@/lib/utils";
+import { decodeMcpTab, tabTargetPath } from "@/lib/diff-tabs";
+import { basename, isWithin, normalizePath } from "@/lib/utils";
 import { useExplorerStore } from "@/stores/explorer-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useUiStore } from "@/stores/ui-store";
@@ -35,6 +36,16 @@ export const ExplorerPanel = () => {
     const { children, load } = useExplorerStore.getState();
     if (!children[normalizePath(root)]) void load(root);
   }, [root]);
+
+  const revealTarget =
+    workspace?.activeFile && decodeMcpTab(workspace.activeFile) === null
+      ? tabTargetPath(workspace.activeFile)
+      : null;
+
+  useEffect(() => {
+    if (root && revealTarget && isWithin(revealTarget, root))
+      void useExplorerStore.getState().reveal(revealTarget, root);
+  }, [root, revealTarget]);
 
   if (!workspace || !root) {
     return (
