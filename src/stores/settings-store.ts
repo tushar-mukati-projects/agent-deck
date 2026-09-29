@@ -11,6 +11,7 @@ export const DEFAULT_FONT_SIZE = 12;
 interface SettingsState {
   claudeArgs: string;
   codexArgs: string;
+  matchAgentTheme: boolean;
   defaultAgent: AgentId;
   agentFilter: AgentId | "all";
   customAgents: CustomAgent[];
@@ -47,6 +48,7 @@ export const useSettingsStore = create<SettingsState>()(
     (set, get) => ({
       claudeArgs: "",
       codexArgs: "",
+      matchAgentTheme: true,
       defaultAgent: "claude",
       agentFilter: "all",
       customAgents: [],

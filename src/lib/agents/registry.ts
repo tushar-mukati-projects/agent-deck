@@ -1,4 +1,5 @@
 import { parseArgs } from "@/lib/args";
+import { findTheme } from "@/lib/themes";
 import { useSettingsStore } from "@/stores/settings-store";
 import type { AgentId, CustomAgent } from "@/types";
 
@@ -23,6 +24,14 @@ export const CODEX: AgentId = "codex";
 
 const extra = (key: "claudeArgs" | "codexArgs") => parseArgs(useSettingsStore.getState()[key]);
 
+const claudeThemeArgs = () => {
+  const { matchAgentTheme, claudeArgs, themeId } = useSettingsStore.getState();
+  if (!matchAgentTheme || /(^|\s)--settings(\s|=|$)/.test(claudeArgs)) return [];
+  return ["--settings", JSON.stringify({ theme: findTheme(themeId).kind })];
+};
+
+const claudeExtra = () => [...claudeThemeArgs(), ...extra("claudeArgs")];
+
 const claude: AgentDefinition = {
   id: CLAUDE,
   name: "Claude",
@@ -34,16 +43,16 @@ const claude: AgentDefinition = {
     "--session-id",
     sessionId,
     ...(subagent ? ["--agent", subagent] : []),
-    ...extra("claudeArgs"),
+    ...claudeExtra(),
   ],
-  resumeArgs: (sessionId) => ["--resume", sessionId, ...extra("claudeArgs")],
+  resumeArgs: (sessionId) => ["--resume", sessionId, ...claudeExtra()],
   forkArgs: (sessionId, newSessionId) => [
     "--resume",
     sessionId,
     "--fork-session",
     "--session-id",
     newSessionId,
-    ...extra("claudeArgs"),
+    ...claudeExtra(),
   ],
 };
 

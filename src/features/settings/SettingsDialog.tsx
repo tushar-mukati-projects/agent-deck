@@ -80,6 +80,19 @@ export const SettingsDialog = () => {
         >
           <DefaultAgentPicker />
         </Field>
+        <Field
+          label="Claude's colors"
+          hint="Start Claude with its light or dark theme to match Deck, so prompts and diffs look right. Running sessions update when resumed."
+        >
+          <Segmented<"on" | "off">
+            value={settings.matchAgentTheme ? "on" : "off"}
+            onChange={(value) => settings.set({ matchAgentTheme: value === "on" })}
+            options={[
+              { value: "on", label: "Match Deck theme" },
+              { value: "off", label: "Use Claude's own setting" },
+            ]}
+          />
+        </Field>
         <Field label="Extra Claude flags" hint="Added to every Claude session you start or resume.">
           <input
             className={inputClass}

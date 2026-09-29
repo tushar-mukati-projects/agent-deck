@@ -65,6 +65,7 @@ export const Welcome = () => {
                 <button
                   key={session.id}
                   type="button"
+                  data-opens-preview
                   onClick={() => previewSession(session)}
                   onDoubleClick={() => void resumeSession(session)}
                   className="group flex flex-col gap-1.5 rounded-lg border border-border bg-panel p-3 text-left transition-colors hover:border-border-strong hover:bg-elevated"

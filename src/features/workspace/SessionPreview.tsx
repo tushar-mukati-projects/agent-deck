@@ -169,7 +169,8 @@ export const SessionPreview = ({ workspace }: { workspace: Workspace }) => {
   const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    resumeRef.current?.focus({ preventScroll: true });
+    const chosen = (document.activeElement as HTMLElement | null)?.closest?.("[data-opens-preview]");
+    if (chosen) resumeRef.current?.focus({ preventScroll: true });
   }, [workspace.id]);
 
   const matches = useMemo(() => {

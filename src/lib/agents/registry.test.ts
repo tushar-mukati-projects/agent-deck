@@ -7,7 +7,9 @@ const id = "019a0000-0000-7000-8000-000000000001";
 
 describe("agent registry", () => {
   beforeEach(() =>
-    useSettingsStore.getState().set({ claudeArgs: "", codexArgs: "", customAgents: [] }),
+    useSettingsStore
+      .getState()
+      .set({ claudeArgs: "", codexArgs: "", customAgents: [], matchAgentTheme: false }),
   );
 
   it("builds Claude commands with its own session ids", () => {
@@ -50,6 +52,25 @@ describe("agent registry", () => {
     expect(custom.map((a) => a.id)).toEqual(["custom:g1"]);
     expect(custom[0].command).toEqual(["gemini", "--yolo"]);
     expect(custom[0].history).toBe(false);
+  });
+
+  it("tells Claude to use the Deck theme's light or dark colors", () => {
+    useSettingsStore.getState().set({ matchAgentTheme: true, themeId: "snow" });
+    expect(findAgent("claude").resumeArgs(id)).toEqual([
+      "--resume",
+      id,
+      "--settings",
+      '{"theme":"light"}',
+    ]);
+    useSettingsStore.getState().set({ themeId: "deck" });
+    expect(findAgent("claude").resumeArgs(id)).toEqual([
+      "--resume",
+      id,
+      "--settings",
+      '{"theme":"dark"}',
+    ]);
+    useSettingsStore.getState().set({ claudeArgs: "--settings my.json" });
+    expect(findAgent("claude").resumeArgs(id)).toEqual(["--resume", id, "--settings", "my.json"]);
   });
 
   it("falls back to Claude for unknown agents", () => {

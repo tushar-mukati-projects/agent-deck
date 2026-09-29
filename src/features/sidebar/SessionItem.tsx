@@ -84,6 +84,7 @@ export const SessionItem = memo(
           <button
             type="button"
             data-session-row
+            data-opens-preview
             onClick={() => openSessionByClick(session)}
             onDoubleClick={() => void resumeSession(session)}
             style={{ contentVisibility: "auto", containIntrinsicSize: "auto 52px" }}
