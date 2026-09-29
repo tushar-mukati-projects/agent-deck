@@ -19,7 +19,7 @@ use serde_json::value::RawValue;
 
 use crate::{
     codex,
-    util::{canonical, is_session_id, lenient, lenient_bool, mtime_ms},
+    util::{canonical, is_session_id, lenient, lenient_bool, lenient_u64, mtime_ms},
 };
 
 const PROMPT_PREVIEW_CHARS: usize = 280;
@@ -96,6 +96,8 @@ pub struct LiveSession {
     pub status: Option<String>,
     pub kind: Option<String>,
     pub name: Option<String>,
+    #[serde(default, deserialize_with = "lenient_u64")]
+    pub started_at: Option<u64>,
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq)]
@@ -299,7 +301,7 @@ fn decode_project_key(key: &str) -> String {
     }
 }
 
-fn ends_line(file: &mut fs::File, offset: u64) -> io::Result<bool> {
+pub(crate) fn ends_line(file: &mut fs::File, offset: u64) -> io::Result<bool> {
     if offset == 0 {
         return Ok(true);
     }
@@ -309,7 +311,7 @@ fn ends_line(file: &mut fs::File, offset: u64) -> io::Result<bool> {
     Ok(last[0] == b'\n')
 }
 
-fn complete_lines(file: fs::File, start: u64, mut on_line: impl FnMut(&str, u64)) -> io::Result<()> {
+pub(crate) fn complete_lines(file: fs::File, start: u64, mut on_line: impl FnMut(&str, u64)) -> io::Result<()> {
     let mut reader = BufReader::with_capacity(256 * 1024, file);
     reader.seek(SeekFrom::Start(start))?;
     let mut offset = start;
@@ -593,6 +595,8 @@ struct LiveFile {
     kind: Option<String>,
     #[serde(default, deserialize_with = "lenient")]
     name: Option<String>,
+    #[serde(default, deserialize_with = "lenient_u64")]
+    started_at: Option<u64>,
 }
 
 pub fn live_sessions() -> Vec<LiveSession> {
@@ -612,6 +616,7 @@ pub fn live_sessions() -> Vec<LiveSession> {
                 status: live.status,
                 kind: live.kind,
                 name: live.name,
+                started_at: live.started_at,
             })
         })
         .collect()

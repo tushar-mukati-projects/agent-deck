@@ -1,20 +1,40 @@
-import { ChevronDown, Plus, RotateCw, SquareTerminal, Trash2 } from "lucide-react";
+import { Bot, ChevronDown, Eraser, Plus, RotateCw, SquareTerminal, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { StatusDot } from "@/components/ui/feedback";
+import { StatusDot, type DotTone } from "@/components/ui/feedback";
 import { IconButton } from "@/components/ui/icon-button";
 import { Alert } from "@/components/ui/panel";
 import { Tab, TabStrip } from "@/components/ui/tabs";
 import { TerminalView } from "@/features/terminal/TerminalView";
+import { AgentShellView } from "@/features/workspace/AgentShellView";
+import { useAgentShells, useAgentStart } from "@/hooks/useAgentShells";
 import { terminalTone, useTerminal } from "@/hooks/useWorkspaceStatus";
+import { taskLabel, taskState, type TaskState } from "@/lib/agent-tasks";
+import { agentName } from "@/lib/agents/registry";
 import { shortcutLabel } from "@/lib/shortcuts";
 import { clearTerminal } from "@/lib/terminal/registry";
 import { basename, cn } from "@/lib/utils";
 import { parseWslPath, shellQuote } from "@/lib/wsl";
+import { useAgentTasksStore } from "@/stores/agent-tasks-store";
 import { useTerminalStore } from "@/stores/terminal-store";
 import { useUiStore } from "@/stores/ui-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
-import type { ShellTab, Workspace } from "@/types";
+import type { AgentTask, ShellTab, Workspace } from "@/types";
+
+const TASK_TONE: Record<TaskState, DotTone> = {
+  running: "running",
+  completed: "exited",
+  failed: "error",
+  killed: "exited",
+  stopped: "exited",
+  ended: "exited",
+};
+
+const tabClass = (active: boolean) =>
+  cn(
+    "h-full cursor-default rounded-md pr-0.5 pl-2 text-[11.5px]",
+    active ? "bg-active text-fg" : "text-muted hover:bg-hover hover:text-fg",
+  );
 
 const shellName = (shell: ShellTab, index: number) =>
   `${basename(shell.program).replace(/\.exe$/i, "")} ${index + 1}`;
@@ -24,11 +44,11 @@ const shellPath = (path: string) => {
   return wsl ? `${shellQuote(wsl.linuxPath)} ` : `"${path}" `;
 };
 
-const closeShellWithConfirm = async (workspaceId: string, shell: ShellTab, name: string) => {
+const killShellWithConfirm = async (workspaceId: string, shell: ShellTab, name: string) => {
   if (useTerminalStore.getState().terminals[shell.id]?.busy) {
     const confirmed = await useUiStore.getState().askConfirm({
       title: `Kill ${name}?`,
-      description: "Something is still running in this shell. Closing it stops that process.",
+      description: "Something is still running in this shell. Killing it stops that process.",
       confirmLabel: "Kill shell",
       destructive: true,
     });
@@ -37,29 +57,32 @@ const closeShellWithConfirm = async (workspaceId: string, shell: ShellTab, name:
   useWorkspaceStore.getState().closeShell(workspaceId, shell.id);
 };
 
+const selectShell = (workspaceId: string, shellId: string) => {
+  useAgentTasksStore.getState().select(workspaceId, null);
+  useWorkspaceStore.getState().setActiveShell(workspaceId, shellId);
+};
+
 const ShellTabButton = ({
   workspace,
   shell,
   index,
+  active,
 }: {
   workspace: Workspace;
   shell: ShellTab;
   index: number;
+  active: boolean;
 }) => {
   const tone = terminalTone(useTerminal(shell.id));
-  const active = workspace.activeShellId === shell.id;
   const name = shellName(shell, index);
   return (
     <Tab
       selected={active}
-      onSelect={() => useWorkspaceStore.getState().setActiveShell(workspace.id, shell.id)}
-      onClose={() => void closeShellWithConfirm(workspace.id, shell, name)}
+      onSelect={() => selectShell(workspace.id, shell.id)}
+      onClose={() => void killShellWithConfirm(workspace.id, shell, name)}
       closeLabel={`Kill ${name}`}
       title={shell.cwd}
-      className={cn(
-        "h-full cursor-default rounded-md pr-0.5 pl-2 text-[11.5px]",
-        active ? "bg-active text-fg" : "text-muted hover:bg-hover hover:text-fg",
-      )}
+      className={tabClass(active)}
     >
       {tone && <StatusDot tone={tone === "attention" ? "running" : tone} className="size-1.5" />}
       <span className="max-w-[160px] truncate">{name}</span>
@@ -70,11 +93,43 @@ const ShellTabButton = ({
   );
 };
 
+const AgentShellTab = ({
+  workspace,
+  task,
+  state,
+  active,
+}: {
+  workspace: Workspace;
+  task: AgentTask;
+  state: TaskState;
+  active: boolean;
+}) => (
+  <Tab
+    selected={active}
+    onSelect={() => useAgentTasksStore.getState().select(workspace.id, task.id)}
+    title={`Started by ${agentName(workspace.agent)}: ${task.command}`}
+    className={cn(tabClass(active), "pr-2")}
+  >
+    <StatusDot tone={TASK_TONE[state]} className="size-1.5" />
+    <Bot className="size-3 shrink-0 text-info" />
+    <span className="max-w-[200px] truncate">{taskLabel(task)}</span>
+    <span className="shrink-0 rounded border border-info/35 bg-info/10 px-1 text-[9px] leading-[13px] font-semibold tracking-wide text-info uppercase">
+      agent
+    </span>
+  </Tab>
+);
+
 export const ShellPanel = ({ workspace }: { workspace: Workspace }) => {
   const { openShell, setShellPanel, restartShell } = useWorkspaceStore.getState();
-  const activeId = workspace.activeShellId ?? workspace.shells[0]?.id ?? null;
-  const active = useTerminal(activeId);
-  const activeShell = workspace.shells.find((s) => s.id === activeId);
+  const agentShells = useAgentShells(workspace);
+  const agentStarted = useAgentStart(workspace);
+  const selectedTaskId = useAgentTasksStore((s) => s.selected[workspace.id] ?? null);
+  const selectedTask = agentShells.find((t) => t.id === selectedTaskId) ?? null;
+  const showTask = selectedTask ?? (workspace.shells.length === 0 ? agentShells[0] : null) ?? null;
+  const activeShell = showTask
+    ? undefined
+    : (workspace.shells.find((s) => s.id === workspace.activeShellId) ?? workspace.shells[0]);
+  const active = useTerminal(activeShell?.id);
 
   return (
     <div className="flex h-full min-h-0 flex-col border-t border-border bg-bg">
@@ -82,7 +137,25 @@ export const ShellPanel = ({ workspace }: { workspace: Workspace }) => {
         <SquareTerminal className="mr-1 size-3.5 shrink-0 text-faint" />
         <TabStrip label="Shells" className="h-full min-w-0 flex-1 items-center gap-0.5">
           {workspace.shells.map((shell, index) => (
-            <ShellTabButton key={shell.id} workspace={workspace} shell={shell} index={index} />
+            <ShellTabButton
+              key={shell.id}
+              workspace={workspace}
+              shell={shell}
+              index={index}
+              active={shell.id === activeShell?.id}
+            />
+          ))}
+          {agentShells.length > 0 && workspace.shells.length > 0 && (
+            <span className="mx-1 h-4 w-px shrink-0 bg-border" />
+          )}
+          {agentShells.map((task) => (
+            <AgentShellTab
+              key={task.id}
+              workspace={workspace}
+              task={task}
+              state={taskState(task, agentStarted)}
+              active={task.id === showTask?.id}
+            />
           ))}
         </TabStrip>
         <IconButton
@@ -92,10 +165,25 @@ export const ShellPanel = ({ workspace }: { workspace: Workspace }) => {
         >
           <Plus />
         </IconButton>
-        {activeId && (
-          <IconButton label="Clear" onClick={() => clearTerminal(activeId)}>
-            <Trash2 />
-          </IconButton>
+        {activeShell && (
+          <>
+            <IconButton label="Clear output" onClick={() => clearTerminal(activeShell.id)}>
+              <Eraser />
+            </IconButton>
+            <IconButton
+              label="Kill shell"
+              className="hover:bg-danger/15 hover:text-danger"
+              onClick={() =>
+                void killShellWithConfirm(
+                  workspace.id,
+                  activeShell,
+                  shellName(activeShell, workspace.shells.indexOf(activeShell)),
+                )
+              }
+            >
+              <Trash2 />
+            </IconButton>
+          </>
         )}
         <IconButton
           label="Hide panel"
@@ -106,6 +194,14 @@ export const ShellPanel = ({ workspace }: { workspace: Workspace }) => {
         </IconButton>
       </div>
       <div className="relative min-h-0 flex-1">
+        {showTask && (
+          <AgentShellView
+            key={showTask.id}
+            workspaceId={workspace.id}
+            task={showTask}
+            state={taskState(showTask, agentStarted)}
+          />
+        )}
         {activeShell && (
           <TerminalView key={activeShell.id} terminalId={activeShell.id} dropText={shellPath} />
         )}
@@ -117,7 +213,7 @@ export const ShellPanel = ({ workspace }: { workspace: Workspace }) => {
             </Button>
           </div>
         )}
-        {active?.status === "error" && (
+        {active?.status === "error" && activeShell && (
           <Alert tone="danger" className="absolute inset-x-3 top-3 font-mono">
             {active.error}
           </Alert>

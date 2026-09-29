@@ -1,12 +1,14 @@
 import { Channel, invoke } from "@tauri-apps/api/core";
 
 import type {
+  AgentTask,
   AppEnvironment,
   ChangedFile,
   GitChange,
   DirEntry,
   FileContent,
   FileEncoding,
+  FileTail,
   LiveSession,
   ClaudeOverview,
   McpDescription,
@@ -42,6 +44,8 @@ export const api = {
     invoke<TranscriptPage>("session_transcript", { filePath, distro, fromOffset }),
   deleteSession: (filePath: string, distro: string | null) =>
     invoke<void>("delete_session", { filePath, distro }),
+  sessionTasks: (filePath: string, distro: string | null) =>
+    invoke<AgentTask[]>("session_tasks", { filePath, distro }),
   sessionChanges: (filePath: string, distro: string | null) =>
     invoke<ChangedFile[]>("session_changes", { filePath, distro }),
   sessionBackup: (filePath: string, backup: string, distro: string | null) =>
@@ -87,6 +91,7 @@ export const api = {
       expectedModifiedMs: options.expectedModifiedMs ?? null,
     }),
   statPath: (path: string) => invoke<PathStat | null>("stat_path", { path }),
+  readTail: (path: string, maxBytes: number) => invoke<FileTail>("read_tail", { path, maxBytes }),
   listFiles: (root: string) => invoke<string[]>("list_files", { root }),
   openInEditor: (path: string) => invoke<void>("open_in_editor", { path }),
   openPath: (path: string) => invoke<void>("open_path", { path }),

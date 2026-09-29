@@ -36,6 +36,15 @@ EDIT_TOOLS = ("Write", "Edit", "MultiEdit", "NotebookEdit")
 MAX_DIFF_BYTES = 2 * 1024 * 1024
 EXACT_DIFF_LINES = 4000
 NOISY_DIRS = (".git", "node_modules", "target", ".next", "__pycache__", ".venv")
+TASK_LINE_LIMIT = 256 * 1024
+TASK_MARKERS = (
+    b'"run_in_background":true',
+    b'"backgroundTaskId"',
+    b"running in background with ID",
+    b"<task-notification>",
+    b'"name":"TaskStop"',
+    b'"name":"KillShell"',
+)
 
 
 def homes(variable, name, marker):
@@ -372,6 +381,8 @@ def live_sessions():
                 continue
             entry = {k: data.get(k) if isinstance(data.get(k), str) else None for k in ("cwd", "status", "kind", "name")}
             entry.update({"pid": pid, "sessionId": session_id})
+            if isinstance(data.get("startedAt"), int):
+                entry["startedAt"] = data["startedAt"]
             result.append(entry)
     return result
 
@@ -402,6 +413,20 @@ def transcript(path, offset):
     session = resolve_session(path)
     reducer = (lambda line: codex_record(line, True)) if session["codex"] else claude_full_record
     records, start, end, _ = scan(session["path"], offset, reducer)
+    return {"lines": records, "start": start, "end": end}
+
+
+def task_record(line):
+    if len(line) > TASK_LINE_LIMIT or not any(marker in line for marker in TASK_MARKERS):
+        return None
+    return loads(line)
+
+
+def tasks(path, offset):
+    session = resolve_session(path)
+    if session["codex"]:
+        return {"lines": [], "start": 0, "end": 0}
+    records, start, end, _ = scan(session["path"], offset, task_record)
     return {"lines": records, "start": start, "end": end}
 
 
@@ -726,6 +751,7 @@ def main():
     handlers = {
         "index": lambda: index(read_stdin_json()),
         "transcript": lambda: transcript(args[0], int(args[1]) if len(args) > 1 else 0),
+        "tasks": lambda: tasks(args[0], int(args[1]) if len(args) > 1 else 0),
         "delete": lambda: delete(args[0]),
         "files": lambda: list_files(args[0]),
         "changes": lambda: changes(args[0]),

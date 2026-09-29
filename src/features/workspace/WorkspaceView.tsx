@@ -5,6 +5,7 @@ import { AgentPane } from "@/features/workspace/AgentPane";
 import { SessionPreview } from "@/features/workspace/SessionPreview";
 import { ShellPanel } from "@/features/workspace/ShellPanel";
 import { FileViewer } from "@/features/viewer/FileViewer";
+import { useAgentShells, useAgentShellSync } from "@/hooks/useAgentShells";
 import { releaseWatch, retainWatch } from "@/lib/file-events";
 import { api } from "@/lib/tauri/commands";
 import { cn } from "@/lib/utils";
@@ -33,7 +34,10 @@ const useWatchedRoot = (root: string) =>
 
 const WorkspaceLayout = ({ workspace }: { workspace: Workspace }) => {
   const hasFiles = workspace.openFiles.length > 0;
-  const shellOpen = workspace.shellPanelOpen && workspace.shells.length > 0;
+  const agentShells = useAgentShells(workspace);
+  const shellOpen =
+    workspace.shellPanelOpen && (workspace.shells.length > 0 || agentShells.length > 0);
+  useAgentShellSync(workspace);
   const columns = useSavedLayout("deck-columns", hasFiles ? ["main", "viewer"] : ["main"]);
   const rows = useSavedLayout("deck-rows", shellOpen ? ["primary", "shell"] : ["primary"]);
   useWatchedRoot(workspace.cwd);
@@ -41,7 +45,7 @@ const WorkspaceLayout = ({ workspace }: { workspace: Workspace }) => {
   return (
     <Group
       orientation="horizontal"
-      className="h-full"
+      className="animate-fade-in h-full"
       defaultLayout={columns.defaultLayout}
       onLayoutChanged={columns.onLayoutChanged}
     >

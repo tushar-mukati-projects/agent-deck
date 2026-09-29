@@ -59,10 +59,10 @@ describe("agent registry", () => {
   it("tells Claude to use the Deck theme's light or dark colors when Deck launches it", () => {
     const claude = findAgent("claude");
     useSettingsStore.getState().set({ matchAgentTheme: true, themeId: "snow" });
-    expect(claude.extraArgs({ deckTheme: true })).toEqual(["--settings", '{"theme":"light"}']);
+    expect(claude.extraArgs({ deckTheme: true })).toEqual(["--settings", '{"theme":"light-ansi"}']);
     expect(claude.extraArgs()).toEqual([]);
     useSettingsStore.getState().set({ themeId: "deck" });
-    expect(claude.extraArgs({ deckTheme: true })).toEqual(["--settings", '{"theme":"dark"}']);
+    expect(claude.extraArgs({ deckTheme: true })).toEqual(["--settings", '{"theme":"dark-ansi"}']);
     useSettingsStore.getState().set({ claudeArgs: "--settings my.json" });
     expect(claude.extraArgs({ deckTheme: true })).toEqual(["--settings", "my.json"]);
   });

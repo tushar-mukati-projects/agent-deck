@@ -83,6 +83,13 @@ pub fn lenient<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Opti
     })
 }
 
+pub fn lenient_u64<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Option<u64>, D::Error> {
+    Ok(match serde::Deserialize::deserialize(deserializer)? {
+        serde_json::Value::Number(number) => number.as_u64(),
+        _ => None,
+    })
+}
+
 pub fn lenient_bool<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<bool, D::Error> {
     Ok(matches!(serde::Deserialize::deserialize(deserializer)?, serde_json::Value::Bool(true)))
 }

@@ -89,7 +89,7 @@ const isCurrent = (entry: Entry, generation: number) =>
   entries.get(entry.spec.id) === entry && entry.generation === generation;
 
 const send = (entry: Entry, data: string) => {
-  noteInput(entry);
+  noteInput(entry, data);
   api.ptyWrite(entry.spec.id, data).catch(() => undefined);
 };
 
@@ -236,9 +236,16 @@ export const startTerminal = (spec: TerminalSpec, options?: { focus?: boolean })
 
 export const hasTerminal = (id: string) => entries.has(id);
 
+export const terminalInput = (id: string) => {
+  const activity = entries.get(id)?.activity;
+  return activity ? { typedAt: activity.typedAt, hasDraft: activity.draft > 0 } : null;
+};
+
+let fitsHeldUntil = 0;
+
 export const fitTerminal = (id: string) => {
   const entry = entries.get(id);
-  if (!entry?.opened || !entry.element.isConnected) return;
+  if (!entry?.opened || !entry.element.isConnected || performance.now() < fitsHeldUntil) return;
   if (entry.element.clientWidth < 20 || entry.element.clientHeight < 20) return;
   const proposed = entry.fit.proposeDimensions();
   if (!proposed || Number.isNaN(proposed.cols) || Number.isNaN(proposed.rows)) return;
@@ -247,6 +254,13 @@ export const fitTerminal = (id: string) => {
   entry.fit.fit();
   if (runningPtys.has(id))
     void api.ptyResize(id, entry.term.cols, entry.term.rows).catch(() => undefined);
+};
+
+export const holdTerminalFits = (ms: number) => {
+  fitsHeldUntil = performance.now() + ms;
+  window.setTimeout(() => {
+    for (const id of entries.keys()) fitTerminal(id);
+  }, ms + 20);
 };
 
 export const mountTerminal = (id: string, host: HTMLElement) => {

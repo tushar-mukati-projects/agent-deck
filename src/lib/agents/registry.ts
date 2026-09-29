@@ -28,7 +28,7 @@ const settings = () => useSettingsStore.getState();
 const claudeThemeArgs = () => {
   const { matchAgentTheme, claudeArgs, themeId } = settings();
   if (!matchAgentTheme || /(^|\s)--settings(\s|=|$)/.test(claudeArgs)) return [];
-  return ["--settings", JSON.stringify({ theme: findTheme(themeId).kind })];
+  return ["--settings", JSON.stringify({ theme: `${findTheme(themeId).kind}-ansi` })];
 };
 
 const claude: AgentDefinition = {

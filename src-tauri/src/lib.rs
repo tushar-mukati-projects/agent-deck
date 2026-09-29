@@ -11,6 +11,7 @@ mod pool;
 mod process;
 mod pty;
 mod sessions;
+mod tasks;
 mod util;
 mod watcher;
 mod wsl;
@@ -90,6 +91,8 @@ pub fn run() {
             commands::read_file,
             commands::write_file,
             commands::stat_path,
+            commands::read_tail,
+            commands::session_tasks,
             commands::list_files,
             commands::open_in_editor,
             commands::open_path,

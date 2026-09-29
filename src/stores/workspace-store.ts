@@ -36,7 +36,7 @@ interface WorkspaceState {
   launch: (workspaceId: string, options?: LaunchOptions) => string | null;
   fork: (source: Workspace) => string | null;
   newSession: (cwd: string, options?: NewSessionOptions) => string | null;
-  restartAgent: (workspaceId: string) => void;
+  restartAgent: (workspaceId: string, focus?: boolean) => void;
   close: (workspaceId: string) => Promise<void>;
   activate: (workspaceId: string) => void;
   cycle: (direction: 1 | -1) => void;
@@ -45,7 +45,7 @@ interface WorkspaceState {
   closeShell: (workspaceId: string, shellId: string) => void;
   restartShell: (workspaceId: string, shellId: string) => void;
   setActiveShell: (workspaceId: string, shellId: string) => void;
-  setShellPanel: (workspaceId: string, open: boolean) => void;
+  setShellPanel: (workspaceId: string, open: boolean, spawn?: boolean) => void;
   openFile: (workspaceId: string, path: string) => void;
   closeFile: (workspaceId: string, path: string) => void;
   setActiveFile: (workspaceId: string, path: string) => void;
@@ -196,13 +196,13 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           return add(withAgent(base, planLaunch(base, { subagent })));
         },
 
-        restartAgent: (workspaceId) => {
+        restartAgent: (workspaceId, focus = true) => {
           const workspace = find(workspaceId);
           const terminalId = workspace?.agentTerminalId;
           if (!workspace || !terminalId || !agentAvailable(workspace.agent)) return;
           const fields = launchFields(planLaunch(workspace));
           patch(workspaceId, () => fields);
-          requestFocus(terminalId);
+          if (focus) requestFocus(terminalId);
           void restartTerminal(
             terminalId,
             agentSpec({ ...workspace, ...fields, agentTerminalId: terminalId }),
@@ -305,10 +305,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           patch(workspaceId, () => ({ activeShellId: shellId }));
         },
 
-        setShellPanel: (workspaceId, open) => {
+        setShellPanel: (workspaceId, open, spawn = true) => {
           const workspace = find(workspaceId);
           if (!workspace) return;
-          if (open && workspace.shells.length === 0) {
+          if (open && spawn && workspace.shells.length === 0) {
             get().openShell(workspaceId);
             return;
           }

@@ -14,9 +14,11 @@ import { StatusBar } from "@/features/statusbar/StatusBar";
 import { TitleBar } from "@/features/titlebar/TitleBar";
 import { Welcome } from "@/features/welcome/Welcome";
 import { ResizeHandle, WorkspaceView } from "@/features/workspace/WorkspaceView";
+import { useAgentThemeSync } from "@/hooks/useAgentThemeSync";
 import { useAppEvents } from "@/hooks/useAppEvents";
 import { useAttentionAlerts } from "@/hooks/useAttentionAlerts";
 import { useGlobalShortcuts } from "@/hooks/useGlobalShortcuts";
+import { holdTerminalFits } from "@/lib/terminal/registry";
 import { findTheme } from "@/lib/themes";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useUiStore, type SidePanel } from "@/stores/ui-store";
@@ -24,6 +26,19 @@ import { useWorkspaceStore } from "@/stores/workspace-store";
 
 const FLAG = { sessions: "sessionsOpen", context: "contextOpen" } as const;
 const WIDTH = { sessions: "sessionsWidth", context: "contextWidth" } as const;
+const PANEL_ANIMATION_MS = 180;
+
+let panelTimer: number | undefined;
+const animatePanels = () => {
+  const root = document.documentElement;
+  root.classList.add("panels-animating");
+  holdTerminalFits(PANEL_ANIMATION_MS);
+  window.clearTimeout(panelTimer);
+  panelTimer = window.setTimeout(
+    () => root.classList.remove("panels-animating"),
+    PANEL_ANIMATION_MS + 20,
+  );
+};
 
 let draggingSeparator = false;
 window.addEventListener(
@@ -44,8 +59,10 @@ const useSidePanel = (panel: SidePanel, available = true) => {
     const frame = requestAnimationFrame(() => {
       const handle = panelRef.current;
       if (!handle) return;
-      if (open && handle.isCollapsed()) handle.resize(useUiStore.getState()[WIDTH[panel]]);
-      if (!open && !handle.isCollapsed()) handle.collapse();
+      if (open === !handle.isCollapsed()) return;
+      animatePanels();
+      if (open) handle.resize(useUiStore.getState()[WIDTH[panel]]);
+      else handle.collapse();
     });
     return () => cancelAnimationFrame(frame);
   }, [open, panel, panelRef]);
@@ -71,6 +88,7 @@ export const App = () => {
   useAppEvents();
   useGlobalShortcuts();
   useAttentionAlerts();
+  useAgentThemeSync();
 
   return (
     <TooltipProvider>

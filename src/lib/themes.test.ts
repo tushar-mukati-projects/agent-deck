@@ -39,4 +39,24 @@ describe("theme contrast", () => {
     expect(row.comment).toBeGreaterThanOrEqual(3.2);
     expect(row.borderStrong).toBeGreaterThanOrEqual(1.25);
   });
+
+  it.each(THEMES.filter((t) => t.kind === "light"))(
+    "$id keeps ANSI white light so Claude's light prompt bars stay light",
+    (theme) => {
+      const { background, black, white, brightWhite } = theme.terminal;
+      expect(contrast(white!, background!)).toBeLessThan(1.3);
+      expect(contrast(brightWhite!, background!)).toBeLessThan(1.15);
+      expect(contrast(black!, white!)).toBeGreaterThanOrEqual(theme.terminalContrast);
+    },
+  );
+
+  it.each(THEMES.filter((t) => t.kind === "dark"))(
+    "$id keeps ANSI bright black subtle so Claude's dark prompt bars stay subtle",
+    (theme) => {
+      const { background, brightBlack, brightWhite } = theme.terminal;
+      expect(contrast(brightBlack!, background!)).toBeLessThan(1.8);
+      expect(contrast(brightWhite!, brightBlack!)).toBeGreaterThanOrEqual(4.5);
+      expect(theme.terminalContrast).toBeGreaterThanOrEqual(3);
+    },
+  );
 });

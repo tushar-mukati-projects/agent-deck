@@ -35,6 +35,7 @@ export interface LiveSession {
   status: string | null;
   kind: string | null;
   name: string | null;
+  startedAt: number | null;
 }
 
 export interface TranscriptItem {
@@ -69,6 +70,26 @@ export type FileContent =
 
 export type WriteOutcome =
   { kind: "saved"; modifiedMs: number } | { kind: "conflict"; modifiedMs: number };
+
+export type AgentTaskStatus = "running" | "completed" | "failed" | "killed" | "stopped";
+
+export interface AgentTask {
+  id: string;
+  tool: string;
+  command: string;
+  description: string | null;
+  outputPath: string | null;
+  startedAt: string | null;
+  endedAt: string | null;
+  status: AgentTaskStatus;
+  summary: string | null;
+}
+
+export interface FileTail {
+  text: string;
+  size: number;
+  truncated: boolean;
+}
 
 export interface PathStat {
   kind: "file" | "dir";

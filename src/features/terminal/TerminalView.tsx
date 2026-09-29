@@ -133,7 +133,7 @@ export const TerminalView = ({ terminalId, dropText, dropLabel }: TerminalViewPr
       <div
         ref={hostRef}
         style={{ backgroundColor: "var(--color-terminal-bg)" }}
-        className="h-full w-full overflow-hidden"
+        className="isolate h-full w-full overflow-hidden"
         onMouseDown={() => requestAnimationFrame(() => focusTerminal(terminalId))}
         onDragOver={(e) => {
           if (!acceptsDrop(e)) return;

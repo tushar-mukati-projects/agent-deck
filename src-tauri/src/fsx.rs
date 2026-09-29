@@ -1,6 +1,6 @@
 use std::{
     fs,
-    io::{self, Read, Write},
+    io::{self, Read, Seek, Write},
     path::{Path, PathBuf},
 };
 
@@ -227,6 +227,31 @@ pub fn write_file(
     let data = encode(contents, encoding, encoding == Encoding::Utf8 && starts_with_utf8_bom(&target))?;
     save_bytes(&target, &data).with_context(|| format!("Couldn't save {path}"))?;
     Ok(WriteOutcome::Saved { modified_ms: path_mtime_ms(&target) })
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileTail {
+    pub text: String,
+    pub size: u64,
+    pub truncated: bool,
+}
+
+pub fn read_tail(path: &str, max_bytes: u64) -> anyhow::Result<FileTail> {
+    let target = guarded(Path::new(path))?;
+    let mut file = fs::File::open(&target).with_context(|| format!("Cannot open {path}"))?;
+    let size = file.metadata()?.len();
+    let start = size.saturating_sub(max_bytes);
+    file.seek(io::SeekFrom::Start(start))?;
+    let mut bytes = Vec::new();
+    file.read_to_end(&mut bytes)?;
+    let mut text = String::from_utf8_lossy(&bytes).into_owned();
+    if start > 0 {
+        if let Some(newline) = text.find('\n') {
+            text.drain(..=newline);
+        }
+    }
+    Ok(FileTail { text, size, truncated: start > 0 })
 }
 
 pub fn stat_path(path: &str) -> anyhow::Result<Option<PathStat>> {

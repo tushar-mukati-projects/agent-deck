@@ -1,9 +1,11 @@
 import { toast } from "sonner";
 
+import { processStart, shownTasks } from "@/lib/agent-tasks";
 import { samePath } from "@/lib/utils";
+import { useAgentTasksStore } from "@/stores/agent-tasks-store";
 import { useExplorerStore } from "@/stores/explorer-store";
 import { useSessionsStore } from "@/stores/sessions-store";
-import { aliveTerminals, useTerminalStore } from "@/stores/terminal-store";
+import { aliveTerminals, isTerminalAlive, useTerminalStore } from "@/stores/terminal-store";
 import { useUiStore } from "@/stores/ui-store";
 import { dirtyPaths, useViewerStore } from "@/stores/viewer-store";
 import { getActiveWorkspace, useWorkspaceStore } from "@/stores/workspace-store";
@@ -118,8 +120,19 @@ export const focusNextAttention = () => {
   else toast("No sessions are waiting for you");
 };
 
+const agentShellsNow = (workspace: Workspace) => {
+  const { live } = useSessionsStore.getState();
+  const alive =
+    (workspace.mode === "live" && isTerminalAlive(workspace.agentTerminalId)) ||
+    live.some((l) => l.sessionId === workspace.sessionId);
+  const tasks = useAgentTasksStore.getState().bySession[workspace.sessionId] ?? [];
+  return shownTasks(tasks, alive ? processStart(live, workspace.sessionId) : null, Date.now());
+};
+
 export const toggleShellPanel = () => {
   const workspace = getActiveWorkspace();
-  if (workspace)
-    useWorkspaceStore.getState().setShellPanel(workspace.id, !workspace.shellPanelOpen);
+  if (!workspace) return;
+  const open = !workspace.shellPanelOpen;
+  const spawn = agentShellsNow(workspace).length === 0;
+  useWorkspaceStore.getState().setShellPanel(workspace.id, open, spawn);
 };

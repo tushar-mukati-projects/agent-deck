@@ -1,7 +1,8 @@
-import { Check } from "lucide-react";
+import { useState } from "react";
+import { Check, Moon, Sun } from "lucide-react";
 
-import { SectionLabel } from "@/components/ui/panel";
-import { THEMES, type Theme } from "@/lib/themes";
+import { Segmented } from "@/components/ui/panel";
+import { findTheme, THEMES, type Theme } from "@/lib/themes";
 import { cn } from "@/lib/utils";
 import { useSettingsStore } from "@/stores/settings-store";
 
@@ -68,30 +69,39 @@ const ThemeCard = ({
   );
 };
 
+type Kind = Theme["kind"];
+
 export const ThemePicker = () => {
   const themeId = useSettingsStore((s) => s.themeId);
-  const set = useSettingsStore((s) => s.set);
-  const groups: { label: string; themes: Theme[] }[] = [
-    { label: "Dark", themes: THEMES.filter((t) => t.kind === "dark") },
-    { label: "Light", themes: THEMES.filter((t) => t.kind === "light") },
-  ];
+  const current = findTheme(themeId);
+  const [kind, setKind] = useState<Kind>(current.kind);
+  const themes = THEMES.filter((t) => t.kind === kind);
   return (
-    <div className="flex flex-col gap-3">
-      {groups.map((group) => (
-        <div key={group.label}>
-          <SectionLabel className="mb-1.5">{group.label}</SectionLabel>
-          <div className="grid grid-cols-4 gap-2">
-            {group.themes.map((theme) => (
-              <ThemeCard
-                key={theme.id}
-                theme={theme}
-                selected={theme.id === themeId}
-                onSelect={() => set({ themeId: theme.id })}
-              />
-            ))}
-          </div>
+    <div className="flex flex-col gap-2.5">
+      <div className="flex items-center justify-between gap-2">
+        <Segmented<Kind>
+          size="sm"
+          value={kind}
+          onChange={setKind}
+          options={[
+            { value: "dark", label: "Dark", icon: <Moon /> },
+            { value: "light", label: "Light", icon: <Sun /> },
+          ]}
+        />
+        <span className="text-[11px] text-faint">Current: {current.name}</span>
+      </div>
+      <div className="max-h-[252px] overflow-y-auto pr-1">
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+          {themes.map((theme) => (
+            <ThemeCard
+              key={theme.id}
+              theme={theme}
+              selected={theme.id === themeId}
+              onSelect={() => useSettingsStore.getState().set({ themeId: theme.id })}
+            />
+          ))}
         </div>
-      ))}
+      </div>
     </div>
   );
 };

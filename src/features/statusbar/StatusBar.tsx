@@ -10,7 +10,8 @@ import { shortenHome } from "@/lib/utils";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useTerminalStore } from "@/stores/terminal-store";
 import { useActiveWorkspace } from "@/stores/workspace-store";
-import type { TerminalState } from "@/types";
+import { useAgentShells } from "@/hooks/useAgentShells";
+import type { TerminalState, Workspace } from "@/types";
 
 const Item = ({
   children,
@@ -41,6 +42,20 @@ const agentCounts = (terminals: Record<string, TerminalState>) => {
     agents.filter((t) => t.busy).length,
     agents.filter((t) => t.attention).length,
   ];
+};
+
+const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
+
+const ShellItem = ({ workspace }: { workspace: Workspace }) => {
+  const agentRunning = useAgentShells(workspace).filter((t) => t.status === "running").length;
+  const own = workspace.shells.length;
+  const parts = [own > 0 && plural(own, "shell"), agentRunning > 0 && `${agentRunning} by agent`];
+  return (
+    <Item title={`Toggle shell panel (${shortcutLabel("toggleShell")})`} onClick={toggleShellPanel}>
+      <SquareTerminal />
+      {parts.filter(Boolean).join(" · ") || "Shell"}
+    </Item>
+  );
 };
 
 export const StatusBar = () => {
@@ -78,15 +93,7 @@ export const StatusBar = () => {
               <Hash />
               <span className="font-mono">{workspace.sessionId.slice(0, 8)}</span>
             </Item>
-            <Item
-              title={`Toggle shell panel (${shortcutLabel("toggleShell")})`}
-              onClick={toggleShellPanel}
-            >
-              <SquareTerminal />
-              {workspace.shells.length > 0
-                ? `${workspace.shells.length} shell${workspace.shells.length > 1 ? "s" : ""}`
-                : "Shell"}
-            </Item>
+            <ShellItem workspace={workspace} />
           </>
         )}
       </div>

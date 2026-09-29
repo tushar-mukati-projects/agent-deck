@@ -18,6 +18,7 @@ use crate::{
     changes::ChangedFile,
     git::GitChange,
     sessions::{self, Accumulator, LiveSession, Needle, SearchHit, SessionInfo, TranscriptPage},
+    tasks,
     util::{hidden, run_with_timeout},
 };
 
@@ -440,6 +441,25 @@ pub fn live_sessions() -> Vec<LiveSession> {
         .filter(|d| d.live_at.is_some_and(|at| at.elapsed() < LIVE_TTL))
         .flat_map(|d| d.live.clone())
         .collect()
+}
+
+pub fn session_tasks(distro: &str, path: &str) -> anyhow::Result<Vec<tasks::AgentTask>> {
+    let key = format!("{distro}\n{path}");
+    let mut log = tasks::take(&key);
+    let reply: Lines = run_agent(distro, &["tasks", path, &log.offset.to_string()], None)?;
+    if reply.start == 0 && log.offset != 0 {
+        log = tasks::TaskLog::default();
+    }
+    for line in &reply.lines {
+        log.feed(line.get());
+    }
+    log.offset = reply.end;
+    let found = log.tasks();
+    tasks::put(&key, log);
+    Ok(found
+        .into_iter()
+        .map(|task| tasks::AgentTask { output_path: task.output_path.as_deref().map(|p| host_of(distro, p)), ..task })
+        .collect())
 }
 
 pub fn transcript(distro: &str, path: &str, from_offset: u64) -> anyhow::Result<TranscriptPage> {

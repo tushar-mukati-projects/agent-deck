@@ -7,6 +7,7 @@ use crate::{
     pg::{self, PgManager},
     pty::{self, PtyEvent, PtyInfo, PtyManager, SpawnRequest},
     sessions::{self, LiveSession, Needle, SearchHit, SessionInfo, TranscriptPage},
+    tasks,
     watcher::Watchers,
     wsl,
 };
@@ -250,6 +251,20 @@ pub async fn write_file(
     expected_modified_ms: Option<u64>,
 ) -> CmdResult<fsx::WriteOutcome> {
     blocking(move || fsx::write_file(&path, &contents, encoding, expected_modified_ms)).await
+}
+
+#[tauri::command]
+pub async fn read_tail(path: String, max_bytes: u64) -> CmdResult<fsx::FileTail> {
+    blocking(move || fsx::read_tail(&path, max_bytes)).await
+}
+
+#[tauri::command]
+pub async fn session_tasks(file_path: String, distro: Option<String>) -> CmdResult<Vec<tasks::AgentTask>> {
+    blocking(move || match distro {
+        Some(distro) => wsl::session_tasks(&distro, &file_path),
+        None => tasks::local(&file_path),
+    })
+    .await
 }
 
 #[tauri::command]

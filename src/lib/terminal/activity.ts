@@ -7,6 +7,11 @@ const IDLE_AFTER_MS = 1600;
 const ECHO_WINDOW_MS = 400;
 const RESIZE_WINDOW_MS = 600;
 const MIN_BUSY_FOR_ALERT_MS = 3000;
+const TERMINAL_REPORT = /^\x1b\[(?:[IO]|<[\d;]+[Mm]|M[\s\S]{3})$/;
+const CONTROL = /[\x00-\x1f\x7f]/;
+const PASTE_START = "\x1b[200~";
+const CLEARS_DRAFT = new Set(["\r", "\x03", "\x15"]);
+const ERASES = new Set(["\x7f", "\b"]);
 const INPUT_PROMPT_PATTERN =
   /Do you want to|Would you like to|\(y\/n\)|\[y\/N\]|❯ 1\. Yes|Yes, proceed|Enter to confirm|Esc to cancel|Allow this/i;
 
@@ -24,6 +29,8 @@ export interface Activity {
   busySince: number;
   quietUntil: number;
   idleTimer: number | undefined;
+  typedAt: number;
+  draft: number;
 }
 
 interface ActivityOwner {
@@ -45,6 +52,8 @@ export const createActivity = (): Activity => ({
   busySince: 0,
   quietUntil: 0,
   idleTimer: undefined,
+  typedAt: 0,
+  draft: 0,
 });
 
 const update = (id: string, patch: { busy?: boolean; attention?: boolean }) =>
@@ -59,8 +68,19 @@ const screenTail = (term: Terminal, lines: number) => {
   return rows.join("\n");
 };
 
-export const noteInput = (owner: ActivityOwner) => {
-  owner.activity.quietUntil = performance.now() + ECHO_WINDOW_MS;
+const nextDraft = (draft: number, data: string) => {
+  if (CLEARS_DRAFT.has(data)) return 0;
+  if (ERASES.has(data)) return Math.max(0, draft - 1);
+  if (data.startsWith(PASTE_START)) return draft + 1;
+  return CONTROL.test(data) ? draft : draft + [...data].length;
+};
+
+export const noteInput = (owner: ActivityOwner, data: string) => {
+  const { activity } = owner;
+  activity.quietUntil = performance.now() + ECHO_WINDOW_MS;
+  if (TERMINAL_REPORT.test(data)) return;
+  activity.typedAt = Date.now();
+  activity.draft = nextDraft(activity.draft, data);
 };
 
 export const noteResize = (owner: ActivityOwner) => {
@@ -101,5 +121,6 @@ export const noteOutput = (owner: ActivityOwner) => {
 export const resetActivity = (owner: Pick<ActivityOwner, "spec" | "activity">) => {
   window.clearTimeout(owner.activity.idleTimer);
   owner.activity.busy = false;
+  owner.activity.draft = 0;
   update(owner.spec.id, { busy: false, attention: false });
 };
