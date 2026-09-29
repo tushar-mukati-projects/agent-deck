@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Search } from "lucide-react";
 
+import { Dialog } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/feedback";
 import { Kbd } from "@/components/ui/kbd";
 import { usePaletteItems, type PaletteItem } from "@/features/palette/usePaletteItems";
@@ -15,19 +15,31 @@ const placeholders: Record<PaletteMode, string> = {
   chats: "Search inside every conversation…",
 };
 
-const PaletteList = ({ mode, onClose }: { mode: PaletteMode; onClose: () => void }) => {
+const PAGE_STEP = 8;
+
+const PaletteList = ({
+  mode,
+  onClose,
+  inputRef,
+}: {
+  mode: PaletteMode;
+  onClose: () => void;
+  inputRef: React.RefObject<HTMLInputElement | null>;
+}) => {
   const [query, setQuery] = useState(mode === "commands" ? ">" : "");
   const [selected, setSelected] = useState(0);
+  const [enterQueued, setEnterQueued] = useState(false);
   const { items, loading, emptyHint } = usePaletteItems(mode, query);
   const listRef = useRef<HTMLDivElement>(null);
+  const current = Math.min(selected, items.length - 1);
 
   useEffect(() => setSelected(0), [query]);
 
   useEffect(() => {
     listRef.current
-      ?.querySelector(`[data-index="${selected}"]`)
+      ?.querySelector(`[data-index="${current}"]`)
       ?.scrollIntoView({ block: "nearest" });
-  }, [selected]);
+  }, [current]);
 
   const run = (item: PaletteItem | undefined) => {
     if (!item) return;
@@ -35,13 +47,24 @@ const PaletteList = ({ mode, onClose }: { mode: PaletteMode; onClose: () => void
     requestAnimationFrame(item.run);
   };
 
+  useEffect(() => {
+    if (!enterQueued || loading) return;
+    setEnterQueued(false);
+    run(items[0]);
+  });
+
+  const move = (delta: number) =>
+    setSelected((i) => Math.max(0, Math.min(items.length - 1, Math.max(0, i) + delta)));
+
   const handleKeyDown = (event: React.KeyboardEvent) => {
-    if (event.key === "ArrowDown") setSelected((i) => Math.min(items.length - 1, i + 1));
-    else if (event.key === "ArrowUp") setSelected((i) => Math.max(0, i - 1));
-    else if (event.key === "PageDown") setSelected((i) => Math.min(items.length - 1, i + 8));
-    else if (event.key === "PageUp") setSelected((i) => Math.max(0, i - 8));
-    else if (event.key === "Enter") run(items[selected]);
-    else return;
+    if (event.key === "ArrowDown") move(1);
+    else if (event.key === "ArrowUp") move(-1);
+    else if (event.key === "PageDown") move(PAGE_STEP);
+    else if (event.key === "PageUp") move(-PAGE_STEP);
+    else if (event.key === "Enter") {
+      if (items[current]) run(items[current]);
+      else if (loading) setEnterQueued(true);
+    } else return;
     event.preventDefault();
   };
 
@@ -50,7 +73,12 @@ const PaletteList = ({ mode, onClose }: { mode: PaletteMode; onClose: () => void
       <div className="flex h-12 items-center gap-3 border-b border-border px-4">
         <Search className="size-4 shrink-0 text-faint" />
         <input
-          autoFocus
+          ref={inputRef}
+          role="combobox"
+          aria-expanded
+          aria-controls="palette-results"
+          aria-activedescendant={current >= 0 ? `palette-item-${current}` : undefined}
+          aria-label="Search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -59,49 +87,57 @@ const PaletteList = ({ mode, onClose }: { mode: PaletteMode; onClose: () => void
         />
         {loading && <Spinner className="size-3.5" />}
       </div>
-      <div ref={listRef} className="max-h-[min(460px,60vh)] overflow-y-auto p-1.5">
+      <div
+        ref={listRef}
+        id="palette-results"
+        role="listbox"
+        aria-label="Results"
+        className="max-h-[min(460px,60vh)] overflow-y-auto p-1.5"
+      >
         {items.length === 0 ? (
           <p className="px-3 py-8 text-center text-xs text-faint">{emptyHint}</p>
         ) : (
           items.map((item, index) => (
-            <div key={item.id}>
+            <div key={item.id} role="presentation">
               {(index === 0 || items[index - 1].group !== item.group) && (
-                <div className="px-2.5 pt-2 pb-1 text-[10.5px] font-semibold tracking-wider text-faint uppercase">
+                <div
+                  role="presentation"
+                  className="truncate px-2.5 pt-2 pb-1 text-[10.5px] font-semibold tracking-wider text-faint uppercase"
+                >
                   {item.group}
                 </div>
               )}
-              <button
-                type="button"
+              <div
+                role="option"
+                id={`palette-item-${index}`}
+                aria-selected={index === current}
                 data-index={index}
-                onMouseMove={() => setSelected(index)}
+                onMouseMove={() => index !== current && setSelected(index)}
                 onClick={() => run(item)}
                 className={cn(
-                  "flex h-9 w-full items-center gap-2.5 rounded-md px-2.5 text-left [&_svg]:size-3.5 [&_svg]:shrink-0 [&_svg]:text-muted",
-                  index === selected ? "bg-accent-soft" : "",
+                  "flex h-9 w-full cursor-default items-center gap-2.5 rounded-md px-2.5 text-left [&_svg]:size-3.5 [&_svg]:shrink-0 [&_svg]:text-muted",
+                  index === current && "bg-accent-soft",
                 )}
               >
                 {item.icon}
                 <span
                   className={cn(
-                    "truncate text-[13px] text-fg",
-                    mode === "chats" ? "min-w-0 flex-1" : "shrink-0",
+                    "min-w-0 truncate text-[13px] text-fg",
+                    mode === "chats" ? "flex-1" : "max-w-[65%] shrink-0",
                   )}
                 >
                   {item.title}
                 </span>
-                {item.subtitle && (
-                  <span
-                    className={cn(
-                      "truncate text-[11.5px] text-faint",
-                      mode === "chats" ? "max-w-[40%] shrink-0" : "min-w-0 flex-1",
-                    )}
-                  >
-                    {item.subtitle}
-                  </span>
-                )}
-                {!item.subtitle && <span className="flex-1" />}
-                {item.hint && <Kbd keys={item.hint} />}
-              </button>
+                <span
+                  className={cn(
+                    "min-w-0 truncate text-[11.5px] text-faint",
+                    mode === "chats" ? "max-w-[40%] shrink-0" : "flex-1",
+                  )}
+                >
+                  {item.subtitle}
+                </span>
+                {item.hint && <Kbd keys={item.hint} className="shrink-0" />}
+              </div>
             </div>
           ))
         )}
@@ -124,34 +160,19 @@ const PaletteList = ({ mode, onClose }: { mode: PaletteMode; onClose: () => void
 export const CommandPalette = () => {
   const mode = useUiStore((s) => s.paletteMode);
   const closePalette = useUiStore((s) => s.closePalette);
-  const previousFocus = useRef<HTMLElement | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   return (
-    <DialogPrimitive.Root open={!!mode} onOpenChange={(open) => !open && closePalette()}>
-      <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="animate-fade-in fixed inset-0 z-40 bg-scrim" />
-        <DialogPrimitive.Content
-          onOpenAutoFocus={() => {
-            previousFocus.current =
-              document.activeElement instanceof HTMLElement ? document.activeElement : null;
-          }}
-          onCloseAutoFocus={(event) => {
-            const target = previousFocus.current;
-            previousFocus.current = null;
-            if (target?.isConnected) {
-              event.preventDefault();
-              target.focus({ preventScroll: true });
-            }
-          }}
-          className="animate-pop-in fixed top-[11%] left-1/2 z-50 w-[min(680px,calc(100vw-48px))] -translate-x-1/2 overflow-hidden rounded-xl border border-border-strong bg-panel shadow-2xl shadow-shadow outline-none"
-        >
-          <DialogPrimitive.Title className="sr-only">Command palette</DialogPrimitive.Title>
-          <DialogPrimitive.Description className="sr-only">
-            Search sessions, files and actions
-          </DialogPrimitive.Description>
-          {mode && <PaletteList key={mode} mode={mode} onClose={closePalette} />}
-        </DialogPrimitive.Content>
-      </DialogPrimitive.Portal>
-    </DialogPrimitive.Root>
+    <Dialog
+      open={!!mode}
+      onOpenChange={(open) => !open && closePalette()}
+      title="Command palette"
+      description="Search sessions, files and actions"
+      hideHeader
+      initialFocusRef={inputRef}
+      className="top-[11%] w-[min(680px,calc(100vw-48px))] overflow-hidden"
+    >
+      {mode && <PaletteList key={mode} mode={mode} onClose={closePalette} inputRef={inputRef} />}
+    </Dialog>
   );
 };

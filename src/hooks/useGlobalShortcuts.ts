@@ -60,18 +60,20 @@ const handlers: Record<ShortcutAction, () => void> = {
 
 export const runShortcut = (action: ShortcutAction) => handlers[action]();
 
-const modalOpen = () => {
-  const { confirm, renameTarget, settingsOpen, shortcutsOpen } = ui();
-  return !!confirm || !!renameTarget || settingsOpen || shortcutsOpen;
+const PALETTE_ACTIONS = new Set<ShortcutAction>(["palette", "quickOpen", "searchChats"]);
+
+const blockedByModal = (action: ShortcutAction | null) => {
+  const { confirm, renameTarget, settingsOpen, shortcutsOpen, paletteMode } = ui();
+  if (confirm || renameTarget || settingsOpen || shortcutsOpen) return true;
+  return !!paletteMode && !(action && PALETTE_ACTIONS.has(action));
 };
 
 export const useGlobalShortcuts = () => {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (modalOpen()) return;
       const tab = matchTabNumber(event);
       const action = tab ? null : matchShortcut(event);
-      if (!tab && !action) return;
+      if ((!tab && !action) || blockedByModal(action)) return;
       event.preventDefault();
       event.stopPropagation();
       if (tab) activateWorkspaceAt(tab === 9 ? -1 : tab - 1);

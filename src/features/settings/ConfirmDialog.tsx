@@ -1,3 +1,5 @@
+import { useRef } from "react";
+
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { useUiStore } from "@/stores/ui-store";
@@ -5,6 +7,8 @@ import { useUiStore } from "@/stores/ui-store";
 export const ConfirmDialog = () => {
   const confirm = useUiStore((s) => s.confirm);
   const resolveConfirm = useUiStore((s) => s.resolveConfirm);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const confirmRef = useRef<HTMLButtonElement>(null);
 
   return (
     <Dialog
@@ -12,18 +16,15 @@ export const ConfirmDialog = () => {
       onOpenChange={(open) => !open && resolveConfirm(false)}
       title={confirm?.title ?? ""}
       description={confirm?.description}
+      initialFocusRef={confirm?.destructive ? cancelRef : confirmRef}
       className="w-[min(440px,calc(100vw-48px))]"
     >
       <div className="flex justify-end gap-2 px-5 pt-5 pb-4">
-        <Button
-          autoFocus={!!confirm?.destructive}
-          variant="ghost"
-          onClick={() => resolveConfirm(false)}
-        >
+        <Button ref={cancelRef} variant="ghost" onClick={() => resolveConfirm(false)}>
           Cancel
         </Button>
         <Button
-          autoFocus={!confirm?.destructive}
+          ref={confirmRef}
           variant={confirm?.destructive ? "danger" : "primary"}
           onClick={() => resolveConfirm(true)}
         >

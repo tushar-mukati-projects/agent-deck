@@ -2,10 +2,13 @@ mod changes;
 mod claude_config;
 mod codex;
 mod commands;
+mod file_protocol;
 mod fsx;
 mod git;
 mod mcp;
 mod pg;
+mod pool;
+mod process;
 mod pty;
 mod sessions;
 mod util;
@@ -17,9 +20,12 @@ use tauri::{Manager, RunEvent};
 use mcp::McpManager;
 use pg::PgManager;
 use pty::PtyManager;
-use watcher::Watchers;
+use watcher::{HomeWatcher, Watchers};
 
-struct ClaudeHomeWatcher(#[allow(dead_code)] Option<notify::RecommendedWatcher>);
+struct ClaudeHomeWatcher(#[allow(dead_code)] std::sync::Arc<HomeWatcher>);
+
+const IDLE_SWEEP: std::time::Duration = std::time::Duration::from_secs(60);
+const IDLE_LIMIT: std::time::Duration = std::time::Duration::from_secs(15 * 60);
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -34,19 +40,27 @@ pub fn run() {
                 )
                 .build(),
         )
+        .register_asynchronous_uri_scheme_protocol(file_protocol::SCHEME, |_ctx, request, responder| {
+            tauri::async_runtime::spawn_blocking(move || responder.respond(file_protocol::respond(&request)));
+        })
         .manage(PtyManager::default())
         .manage(Watchers::default())
         .manage(McpManager::default())
         .manage(PgManager::default())
         .setup(|app| {
             app.manage(ClaudeHomeWatcher(watcher::watch_claude_home(app.handle().clone())));
+            let handle = app.handle().clone();
+            std::thread::spawn(move || loop {
+                std::thread::sleep(IDLE_SWEEP);
+                handle.state::<McpManager>().shutdown_idle(IDLE_LIMIT);
+                handle.state::<PgManager>().shutdown_idle(IDLE_LIMIT);
+            });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             commands::environment,
             commands::list_sessions,
             commands::list_wsl_sessions,
-            commands::wsl_distros,
             commands::wsl_start,
             commands::live_sessions,
             commands::session_transcript,
@@ -65,6 +79,7 @@ pub fn run() {
             commands::mcp_disconnect,
             commands::pg_info,
             commands::pg_query,
+            commands::pg_cancel,
             commands::pty_spawn,
             commands::pty_attach,
             commands::pty_write,
@@ -74,9 +89,11 @@ pub fn run() {
             commands::list_dir,
             commands::read_file,
             commands::write_file,
+            commands::stat_path,
             commands::list_files,
-            commands::path_is_dir,
             commands::open_in_editor,
+            commands::open_path,
+            commands::reveal_path,
             commands::watch_dir,
             commands::unwatch_dir,
             commands::set_attention_badge,
@@ -88,6 +105,8 @@ pub fn run() {
         if let RunEvent::Exit = event {
             handle.state::<PtyManager>().kill_all();
             handle.state::<McpManager>().shutdown_all();
+            handle.state::<PgManager>().shutdown_all();
+            handle.state::<Watchers>().clear();
         }
     });
 }

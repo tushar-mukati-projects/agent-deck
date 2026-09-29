@@ -35,7 +35,7 @@ const tone = (
   oscillator.stop(start + duration + 0.05);
 };
 
-export type ChimeKind = "done" | "input";
+type ChimeKind = "done" | "input";
 
 export const playChime = async (kind: ChimeKind) => {
   try {

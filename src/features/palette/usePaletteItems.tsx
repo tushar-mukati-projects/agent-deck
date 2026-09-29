@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import {
   AppWindow,
   Bell,
@@ -33,13 +33,15 @@ import {
 } from "@/actions/sessions";
 import { openTypedPath } from "@/actions/files";
 import { closeIdleWorkspaces, closeOtherWorkspaces, closeWorkspace } from "@/actions/workspaces";
+import { useAsync } from "@/hooks/useAsync";
 import { runShortcut } from "@/hooks/useGlobalShortcuts";
 import { FileIcon } from "@/lib/file-icons";
 import { fuzzyPathScore, fuzzyScore } from "@/lib/fuzzy";
 import { shortcutLabel, type ShortcutAction } from "@/lib/shortcuts";
 import { api } from "@/lib/tauri/commands";
 import { copyText, revealInExplorer } from "@/lib/tauri/system";
-import { agentName, listAgents } from "@/lib/agents/registry";
+import { resumeCommandLine } from "@/lib/agents/launch";
+import { agentName, findAgent, listAgents } from "@/lib/agents/registry";
 import { THEMES } from "@/lib/themes";
 import { parseTypedPath } from "@/lib/typed-path";
 import { basename, joinPath, shortenHome, timeAgo } from "@/lib/utils";
@@ -65,26 +67,18 @@ const FILE_CACHE_MS = 20_000;
 const CHAT_SEARCH_DELAY_MS = 250;
 const fileCache = new Map<string, { at: number; files: string[] }>();
 
-const useFileList = (root: string | null, enabled: boolean) => {
-  const [files, setFiles] = useState<string[] | null>(null);
-  useEffect(() => {
-    if (!root || !enabled) return;
-    const cached = fileCache.get(root);
-    if (cached) setFiles(cached.files);
-    if (cached && Date.now() - cached.at < FILE_CACHE_MS) return;
-    let cancelled = false;
-    api
-      .listFiles(root)
-      .then((list) => {
-        fileCache.set(root, { at: Date.now(), files: list });
-        if (!cancelled) setFiles(list);
-      })
-      .catch(() => !cancelled && setFiles([]));
-    return () => {
-      cancelled = true;
-    };
-  }, [root, enabled]);
+const listFiles = async (root: string) => {
+  const cached = fileCache.get(root);
+  if (cached && Date.now() - cached.at < FILE_CACHE_MS) return cached.files;
+  const files = await api.listFiles(root).catch(() => cached?.files ?? []);
+  fileCache.set(root, { at: Date.now(), files });
   return files;
+};
+
+const useFileList = (root: string | null, enabled: boolean) => {
+  const active = enabled ? root : null;
+  const { data } = useAsync(active ? () => listFiles(active) : null, [active]);
+  return data ?? (active ? (fileCache.get(active)?.files ?? null) : null);
 };
 
 const useChatSearch = (query: string, enabled: boolean) => {
@@ -181,6 +175,8 @@ const buildCommands = (workspace: Workspace | null): CommandDef[] => {
     })),
   ];
   if (!workspace) return commands;
+  const session = useSessionsStore.getState().byId[workspace.sessionId];
+  const agent = findAgent(workspace.agent);
   return [
     ...(workspace.mode === "preview"
       ? [
@@ -192,12 +188,16 @@ const buildCommands = (workspace: Workspace | null): CommandDef[] => {
           },
         ]
       : []),
-    {
-      id: "fork",
-      title: "Fork this session",
-      icon: <GitFork />,
-      run: () => void resumeWorkspace(workspace.id, { fork: true }),
-    },
+    ...(session && agent.canFork
+      ? [
+          {
+            id: "fork",
+            title: "Fork this session",
+            icon: <GitFork />,
+            run: () => void resumeWorkspace(workspace.id, { fork: true }),
+          },
+        ]
+      : []),
     shortcut("newShell", "New shell", <SquareTerminal />),
     shortcut("toggleShell", "Toggle shell panel", <SquareTerminal />),
     {
@@ -212,12 +212,16 @@ const buildCommands = (workspace: Workspace | null): CommandDef[] => {
       icon: <Copy />,
       run: () => void copyText(workspace.sessionId),
     },
-    {
-      id: "copy-resume",
-      title: "Copy resume command",
-      icon: <Copy />,
-      run: () => void copyText(`claude --resume ${workspace.sessionId}`),
-    },
+    ...(session && agent.history
+      ? [
+          {
+            id: "copy-resume",
+            title: "Copy resume command",
+            icon: <Copy />,
+            run: () => void copyText(resumeCommandLine(session)),
+          },
+        ]
+      : []),
     {
       id: "close",
       title: "Close this tab",
@@ -237,23 +241,41 @@ const buildCommands = (workspace: Workspace | null): CommandDef[] => {
 const sortTop = (list: PaletteItem[], limit = MAX_PER_GROUP) =>
   list.sort((a, b) => b.score - a.score).slice(0, limit);
 
-export const usePaletteItems = (mode: PaletteMode, rawQuery: string) => {
+const topFiles = (files: string[], query: string, limit: number) => {
+  if (!query) return files.slice(0, limit).map((rel) => ({ rel, score: 0 }));
+  const top: { rel: string; score: number }[] = [];
+  for (const rel of files) {
+    const score = fuzzyPathScore(query, rel);
+    if (score === null) continue;
+    if (top.length < limit) top.push({ rel, score });
+    else if (score > top[top.length - 1].score) top[top.length - 1] = { rel, score };
+    else continue;
+    top.sort((a, b) => b.score - a.score);
+  }
+  return top;
+};
+
+const groupBySession = (hits: SearchHit[]) => {
+  const order = [...new Set(hits.map((hit) => hit.sessionId))];
+  return order.flatMap((id) => hits.filter((hit) => hit.sessionId === id));
+};
+
+export const usePaletteItems = (mode: PaletteMode, liveQuery: string) => {
+  const rawQuery = useDeferredValue(liveQuery);
   const sessions = useSessionsStore((s) => s.sessions);
   const byId = useSessionsStore((s) => s.byId);
   const home = useSessionsStore((s) => s.environment?.home ?? "");
   const workspaces = useWorkspaceStore((s) => s.workspaces);
   const workspace = useActiveWorkspace();
-  const commandMode = mode === "commands" || rawQuery.startsWith(">");
-  const query = rawQuery.replace(/^>/, "").trim().toLowerCase();
+  const commandMode = mode === "commands" || (mode === "all" && rawQuery.startsWith(">"));
+  const query = (commandMode ? rawQuery.replace(/^>/, "") : rawQuery).trim().toLowerCase();
   const files = useFileList(
     workspace?.cwd ?? null,
     mode === "files" || (mode === "all" && query.length > 0),
   );
   const chats = useChatSearch(query, mode === "chats");
 
-  const workspaceId = workspace?.id;
-  const workspaceMode = workspace?.mode;
-  const commands = useMemo(() => buildCommands(workspace), [workspaceId, workspaceMode]);
+  const commands = useMemo(() => buildCommands(workspace), [workspace]);
 
   const items = useMemo(() => {
     const commandItems = (): PaletteItem[] =>
@@ -274,29 +296,22 @@ export const usePaletteItems = (mode: PaletteMode, rawQuery: string) => {
             ];
       });
 
-    const fileItems = (): PaletteItem[] => {
+    const fileItems = (limit: number): PaletteItem[] => {
       if (!workspace || !files) return [];
-      const scored: PaletteItem[] = [];
-      for (const rel of files) {
-        const score = query ? fuzzyPathScore(query, rel) : 0;
-        if (score === null) continue;
-        scored.push({
-          id: `file:${rel}`,
-          group: "Files",
-          title: basename(rel),
-          subtitle: rel,
-          icon: <FileIcon path={rel} />,
-          score,
-          run: () =>
-            useWorkspaceStore.getState().openFile(workspace.id, joinPath(workspace.cwd, rel)),
-        });
-        if (!query && scored.length >= 60) break;
-      }
-      return scored;
+      return topFiles(files, query, limit).map(({ rel, score }) => ({
+        id: `file:${rel}`,
+        group: "Files",
+        title: basename(rel),
+        subtitle: rel,
+        icon: <FileIcon path={rel} />,
+        score,
+        run: () =>
+          useWorkspaceStore.getState().openFile(workspace.id, joinPath(workspace.cwd, rel)),
+      }));
     };
 
     const chatItems = (): PaletteItem[] =>
-      (chats.hits ?? []).flatMap((hit, index) => {
+      groupBySession(chats.hits ?? []).flatMap((hit, index) => {
         const session = byId[hit.sessionId];
         if (!session) return [];
         return [
@@ -329,7 +344,7 @@ export const usePaletteItems = (mode: PaletteMode, rawQuery: string) => {
         : [];
 
     if (commandMode) return sortTop(commandItems(), 100);
-    if (mode === "files") return [...pathItems, ...sortTop(fileItems(), 80)];
+    if (mode === "files") return [...pathItems, ...fileItems(80)];
     if (mode === "chats") return chatItems();
 
     const tabItems = workspaces.flatMap((w) => {
@@ -375,7 +390,7 @@ export const usePaletteItems = (mode: PaletteMode, rawQuery: string) => {
       ...pathItems,
       ...sortTop(tabItems, 8),
       ...sortTop(sessionItems, query ? 30 : 12),
-      ...(query ? sortTop(fileItems(), 15) : []),
+      ...(query ? fileItems(15) : []),
       ...sortTop(commandItems(), query ? 8 : 6),
     ];
   }, [

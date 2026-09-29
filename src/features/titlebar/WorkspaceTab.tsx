@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { memo, useEffect, useRef } from "react";
 import {
   ArrowRightToLine,
   Copy,
@@ -26,79 +26,23 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/menu";
-import { Tooltip } from "@/components/ui/tooltip";
+import { Tab } from "@/components/ui/tabs";
 import { useWorkspaceTone } from "@/hooks/useWorkspaceStatus";
+import { findAgent } from "@/lib/agents/registry";
 import { copyText, revealInExplorer } from "@/lib/tauri/system";
 import { basename, cn } from "@/lib/utils";
 import { useSessionsStore } from "@/stores/sessions-store";
-import { useWorkspaceStore } from "@/stores/workspace-store";
+import { useWorkspace, useWorkspaceStore } from "@/stores/workspace-store";
 import type { Workspace } from "@/types";
 
 const TAB_DRAG_TYPE = "application/x-claude-deck-tab";
 
-export const WorkspaceTab = ({ workspace }: { workspace: Workspace }) => {
-  const isActive = useWorkspaceStore((s) => s.activeId === workspace.id);
-  const activate = useWorkspaceStore((s) => s.activate);
-  const reorder = useWorkspaceStore((s) => s.reorder);
-  const tone = useWorkspaceTone(workspace);
+const TabMenu = ({ workspace, children }: { workspace: Workspace; children: React.ReactNode }) => {
   const session = useSessionsStore((s) => s.byId[workspace.sessionId]);
-
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (isActive) ref.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
-  }, [isActive]);
-
-  const handleDrop = (event: React.DragEvent) => {
-    const fromId = event.dataTransfer.getData(TAB_DRAG_TYPE);
-    if (fromId) reorder(fromId, workspace.id);
-  };
-
+  const canFork = findAgent(workspace.agent).canFork && !!session;
   return (
     <ContextMenu>
-      <ContextMenuTrigger asChild>
-        <div
-          ref={ref}
-          role="tab"
-          aria-selected={isActive}
-          draggable
-          onDragStart={(e) => e.dataTransfer.setData(TAB_DRAG_TYPE, workspace.id)}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={handleDrop}
-          onMouseDown={(e) => e.button === 1 && e.preventDefault()}
-          onAuxClick={(e) => e.button === 1 && void closeWorkspace(workspace.id)}
-          onClick={() => activate(workspace.id)}
-          className={cn(
-            "group relative flex h-full max-w-[220px] min-w-[120px] shrink-0 cursor-default items-center gap-2 border-r border-border pr-1.5 pl-3 text-[12.5px] transition-colors duration-75",
-            isActive ? "bg-bg text-fg" : "text-muted hover:bg-hover/60 hover:text-fg",
-          )}
-        >
-          {isActive && <span className="absolute inset-x-0 top-0 h-[2px] bg-accent" />}
-          {isActive && <span className="absolute inset-x-0 -bottom-px h-px bg-bg" />}
-          {tone ? (
-            <StatusDot tone={tone} />
-          ) : (
-            <span className="size-[7px] shrink-0 rounded-full border border-faint/60" />
-          )}
-          <Tooltip content={`${workspace.title} — ${workspace.cwd}`}>
-            <span className="min-w-0 flex-1 truncate">{workspace.title}</span>
-          </Tooltip>
-          <button
-            type="button"
-            aria-label="Close tab"
-            onClick={(e) => {
-              e.stopPropagation();
-              void closeWorkspace(workspace.id);
-            }}
-            className={cn(
-              "flex size-5 shrink-0 items-center justify-center rounded text-faint hover:bg-active hover:text-fg",
-              isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100",
-            )}
-          >
-            <X className="size-3" />
-          </button>
-        </div>
-      </ContextMenuTrigger>
+      <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
       <ContextMenuContent>
         <ContextMenuItem
           icon={<SquareTerminal />}
@@ -119,12 +63,14 @@ export const WorkspaceTab = ({ workspace }: { workspace: Workspace }) => {
         >
           Rename…
         </ContextMenuItem>
-        <ContextMenuItem
-          icon={<GitFork />}
-          onSelect={() => void resumeWorkspace(workspace.id, { fork: true })}
-        >
-          Fork into new session
-        </ContextMenuItem>
+        {canFork && (
+          <ContextMenuItem
+            icon={<GitFork />}
+            onSelect={() => void resumeWorkspace(workspace.id, { fork: true })}
+          >
+            Fork into new session
+          </ContextMenuItem>
+        )}
         <ContextMenuItem icon={<Copy />} onSelect={() => void copyText(workspace.sessionId)}>
           Copy session ID
         </ContextMenuItem>
@@ -159,3 +105,55 @@ export const WorkspaceTab = ({ workspace }: { workspace: Workspace }) => {
     </ContextMenu>
   );
 };
+
+const TabBody = ({ workspace, isActive }: { workspace: Workspace; isActive: boolean }) => {
+  const tone = useWorkspaceTone(workspace);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isActive) ref.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [isActive]);
+
+  return (
+    <TabMenu workspace={workspace}>
+      <Tab
+        ref={ref}
+        selected={isActive}
+        onSelect={() => useWorkspaceStore.getState().activate(workspace.id)}
+        onClose={() => void closeWorkspace(workspace.id)}
+        closeLabel={`Close ${workspace.title}`}
+        title={`${workspace.title} — ${workspace.cwd}`}
+        draggable
+        onDragStart={(e) => e.dataTransfer.setData(TAB_DRAG_TYPE, workspace.id)}
+        onDragOver={(e) => {
+          if (e.dataTransfer.types.includes(TAB_DRAG_TYPE)) e.preventDefault();
+        }}
+        onDrop={(e) => {
+          const fromId = e.dataTransfer.getData(TAB_DRAG_TYPE);
+          if (fromId) useWorkspaceStore.getState().reorder(fromId, workspace.id);
+        }}
+        className={cn(
+          "h-full max-w-[220px] min-w-[120px] cursor-default border-r border-border pr-1.5 pl-3 text-[12.5px] transition-colors duration-75",
+          isActive ? "bg-bg text-fg" : "text-muted hover:bg-hover/60 hover:text-fg",
+        )}
+        tabClassName="gap-2"
+      >
+        {isActive && <span className="absolute inset-x-0 top-0 h-[2px] bg-accent" />}
+        {isActive && <span className="absolute inset-x-0 -bottom-px h-px bg-bg" />}
+        {tone ? (
+          <StatusDot tone={tone} />
+        ) : (
+          <span className="size-[7px] shrink-0 rounded-full border border-faint/60" />
+        )}
+        <span className="min-w-0 flex-1 truncate">{workspace.title}</span>
+      </Tab>
+    </TabMenu>
+  );
+};
+
+export const WorkspaceTab = memo(({ workspaceId }: { workspaceId: string }) => {
+  const workspace = useWorkspace(workspaceId);
+  const isActive = useWorkspaceStore((s) => s.activeId === workspaceId);
+  return workspace ? <TabBody workspace={workspace} isActive={isActive} /> : null;
+});
+WorkspaceTab.displayName = "WorkspaceTab";

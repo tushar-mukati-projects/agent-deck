@@ -1,15 +1,18 @@
+import { toast } from "sonner";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+import { adoptSessions } from "@/lib/adopt";
 import {
   agentSpec,
   defaultShellProgram,
+  isPersisted,
   planLaunch,
   shellSpec,
   type LaunchOptions,
   type LaunchPlan,
 } from "@/lib/agents/launch";
-import { agentName, CLAUDE } from "@/lib/agents/registry";
+import { agentName, CLAUDE, findAgent, getAgent } from "@/lib/agents/registry";
 import {
   disposeTerminal,
   hasTerminal,
@@ -17,17 +20,13 @@ import {
   requestFocus,
   restartTerminal,
   startTerminal,
+  type TerminalSpec,
 } from "@/lib/terminal/registry";
 import { newId, samePath } from "@/lib/utils";
 import { parseWslPath } from "@/lib/wsl";
 import { blankWorkspace, workspaceFromSession } from "@/stores/workspace-factory";
+import { migrateSaved, restoreSaved } from "@/stores/workspace-persist";
 import type { AgentId, SessionInfo, ShellTab, Workspace } from "@/types";
-
-export interface ShellOptions {
-  cwd?: string;
-  label?: string;
-  command?: string;
-}
 
 interface WorkspaceState {
   workspaces: Workspace[];
@@ -35,14 +34,16 @@ interface WorkspaceState {
   recentlyClosed: string[];
   openSession: (session: SessionInfo) => string;
   launch: (workspaceId: string, options?: LaunchOptions) => string | null;
-  newSession: (cwd: string, options?: NewSessionOptions) => string;
+  fork: (source: Workspace) => string | null;
+  newSession: (cwd: string, options?: NewSessionOptions) => string | null;
   restartAgent: (workspaceId: string) => void;
   close: (workspaceId: string) => Promise<void>;
   activate: (workspaceId: string) => void;
   cycle: (direction: 1 | -1) => void;
   reorder: (fromId: string, toId: string) => void;
-  openShell: (workspaceId: string, options?: ShellOptions) => void;
+  openShell: (workspaceId: string, cwd?: string) => void;
   closeShell: (workspaceId: string, shellId: string) => void;
+  restartShell: (workspaceId: string, shellId: string) => void;
   setActiveShell: (workspaceId: string, shellId: string) => void;
   setShellPanel: (workspaceId: string, open: boolean) => void;
   openFile: (workspaceId: string, path: string) => void;
@@ -52,56 +53,67 @@ interface WorkspaceState {
   restore: () => void;
 }
 
-export interface NewSessionOptions extends LaunchOptions {
+interface NewSessionOptions {
   agent?: AgentId;
+  subagent?: string;
 }
 
 const RECENTLY_CLOSED_LIMIT = 20;
-const ADOPT_WINDOW_MS = 20_000;
+
+const launchFields = (plan: LaunchPlan) => ({
+  agentArgs: plan.args,
+  pendingSince: plan.pending ? Date.now() : null,
+});
 
 const withAgent = (workspace: Workspace, plan: LaunchPlan) => {
   const next = {
     ...workspace,
+    ...launchFields(plan),
     mode: "live" as const,
     agentTerminalId: newId(),
-    agentArgs: plan.args,
-    pendingSince: plan.pending ? Date.now() : null,
   };
   startTerminal(agentSpec(next), { focus: true });
   return next;
 };
 
-const startedMs = (session: SessionInfo) =>
-  Date.parse(session.startedAt ?? "") || session.modifiedMs;
-
-const adopt = (workspaces: Workspace[], byId: Record<string, SessionInfo>) => {
-  const taken = new Set(workspaces.map((w) => w.sessionId));
-  let changed = false;
-  const next = workspaces.map((w) => {
-    if (!w.pendingSince || byId[w.sessionId]) return w;
-    const since = w.pendingSince;
-    const match = Object.values(byId)
-      .filter(
-        (s) =>
-          !taken.has(s.id) &&
-          s.agent === w.agent &&
-          samePath(s.cwd, w.cwd) &&
-          startedMs(s) >= since - ADOPT_WINDOW_MS,
-      )
-      .sort((a, b) => startedMs(a) - startedMs(b))[0];
-    if (!match) return w;
-    taken.add(match.id);
-    changed = true;
-    return {
-      ...w,
-      sessionId: match.id,
-      filePath: match.filePath,
-      title: match.title ?? w.title,
-      pendingSince: null,
-    };
-  });
-  return changed ? next : workspaces;
+const focusAgent = (workspace: Workspace) => {
+  if (workspace.mode === "live" && workspace.agentTerminalId)
+    requestFocus(workspace.agentTerminalId);
 };
+
+const agentAvailable = (agent: AgentId) => {
+  if (getAgent(agent)) return true;
+  toast.error("This session's agent was removed in Settings. Add it again to start it.");
+  return false;
+};
+
+const newSessionTitle = (agent: AgentId, subagent?: string) => {
+  if (subagent) return `New ${subagent} session`;
+  return agent === CLAUDE ? "New session" : `New ${agentName(agent)} session`;
+};
+
+const restoredWorkspace = (workspace: Workspace) => {
+  const shells = workspace.shells.filter((shell) => isPtyRunning(shell.id));
+  const agentAlive = !!workspace.agentTerminalId && isPtyRunning(workspace.agentTerminalId);
+  return {
+    ...workspace,
+    mode: agentAlive ? ("live" as const) : ("preview" as const),
+    agentTerminalId: agentAlive ? workspace.agentTerminalId : null,
+    pendingSince: agentAlive ? workspace.pendingSince : null,
+    shells,
+    activeShellId: shells.some((shell) => shell.id === workspace.activeShellId)
+      ? workspace.activeShellId
+      : (shells[0]?.id ?? null),
+    shellPanelOpen: workspace.shellPanelOpen && shells.length > 0,
+  };
+};
+
+const terminalSpecs = (workspace: Workspace): TerminalSpec[] => [
+  ...(workspace.agentTerminalId
+    ? [agentSpec({ ...workspace, agentTerminalId: workspace.agentTerminalId })]
+    : []),
+  ...workspace.shells.map((shell) => shellSpec(workspace.id, shell)),
+];
 
 export const useWorkspaceStore = create<WorkspaceState>()(
   persist(
@@ -134,24 +146,13 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
         launch: (workspaceId, options = {}) => {
           const workspace = find(workspaceId);
-          if (!workspace) return null;
+          if (!workspace || !agentAvailable(workspace.agent)) return null;
           if (workspace.mode === "live" && !options.fork) {
-            set({ activeId: workspaceId });
+            get().activate(workspaceId);
             return workspaceId;
           }
-          const plan = planLaunch(workspace, options);
-          if (options.fork) {
-            const base = blankWorkspace({
-              id: newId(),
-              sessionId: plan.sessionId,
-              cwd: workspace.cwd,
-              title: `${workspace.title} (fork)`,
-              filePath: null,
-              agent: workspace.agent,
-            });
-            return add(withAgent(base, plan));
-          }
-          const next = withAgent(workspace, plan);
+          if (options.fork) return get().fork(workspace);
+          const next = withAgent(workspace, planLaunch(workspace, options));
           set((s) => ({
             workspaces: s.workspaces.map((w) => (w.id === workspaceId ? next : w)),
             activeId: workspaceId,
@@ -159,39 +160,53 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           return workspaceId;
         },
 
-        newSession: (cwd, { agent = CLAUDE, ...options } = {}) => {
+        fork: (source) => {
+          if (!agentAvailable(source.agent)) return null;
+          if (!findAgent(source.agent).canFork) {
+            toast.error(`${agentName(source.agent)} sessions can't be forked.`);
+            return null;
+          }
+          if (!isPersisted(source)) {
+            toast.error("Nothing to fork yet — send a prompt in this session first.");
+            return null;
+          }
+          const plan = planLaunch(source, { fork: true });
+          const base = blankWorkspace({
+            id: newId(),
+            sessionId: plan.sessionId,
+            cwd: source.cwd,
+            title: `${source.title} (fork)`,
+            filePath: null,
+            agent: source.agent,
+          });
+          return add(withAgent(base, plan));
+        },
+
+        newSession: (cwd, { agent = CLAUDE, subagent } = {}) => {
+          if (!agentAvailable(agent)) return null;
           const sessionId = newId();
-          const title = options.subagent
-            ? `New ${options.subagent} session`
-            : agent === CLAUDE
-              ? "New session"
-              : `New ${agentName(agent)} session`;
           const base = blankWorkspace({
             id: sessionId,
             sessionId,
             cwd,
-            title,
+            title: newSessionTitle(agent, subagent),
             filePath: null,
             agent,
           });
-          return add(withAgent(base, planLaunch(base, options)));
+          return add(withAgent(base, planLaunch(base, { subagent })));
         },
 
         restartAgent: (workspaceId) => {
           const workspace = find(workspaceId);
-          if (!workspace?.agentTerminalId) return;
-          const plan = planLaunch(workspace);
-          const next = {
-            ...workspace,
-            agentTerminalId: workspace.agentTerminalId,
-            agentArgs: plan.args,
-            pendingSince: plan.pending ? Date.now() : null,
-          };
-          patch(workspaceId, () => ({
-            agentArgs: next.agentArgs,
-            pendingSince: next.pendingSince,
-          }));
-          void restartTerminal(next.agentTerminalId, agentSpec(next));
+          const terminalId = workspace?.agentTerminalId;
+          if (!workspace || !terminalId || !agentAvailable(workspace.agent)) return;
+          const fields = launchFields(planLaunch(workspace));
+          patch(workspaceId, () => fields);
+          requestFocus(terminalId);
+          void restartTerminal(
+            terminalId,
+            agentSpec({ ...workspace, ...fields, agentTerminalId: terminalId }),
+          );
         },
 
         close: async (workspaceId) => {
@@ -200,15 +215,17 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           const workspace = workspaces[index];
           if (!workspace) return;
           const remaining = workspaces.filter((w) => w.id !== workspaceId);
-          const neighbor = remaining[Math.min(index, remaining.length - 1)]?.id ?? null;
+          const neighbor = remaining[Math.min(index, remaining.length - 1)] ?? null;
+          const closingActive = activeId === workspaceId;
           set((s) => ({
             workspaces: remaining,
-            activeId: activeId === workspaceId ? neighbor : activeId,
+            activeId: closingActive ? (neighbor?.id ?? null) : activeId,
             recentlyClosed: [
               workspace.sessionId,
               ...s.recentlyClosed.filter((id) => id !== workspace.sessionId),
             ].slice(0, RECENTLY_CLOSED_LIMIT),
           }));
+          if (closingActive && neighbor) focusAgent(neighbor);
           const terminalIds = [workspace.agentTerminalId, ...workspace.shells.map((s) => s.id)];
           await Promise.all(terminalIds.filter((id): id is string => !!id).map(disposeTerminal));
         },
@@ -216,17 +233,20 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         activate: (workspaceId) => {
           set({ activeId: workspaceId });
           const workspace = find(workspaceId);
-          if (workspace?.mode === "live" && workspace.agentTerminalId)
-            requestFocus(workspace.agentTerminalId);
+          if (workspace) focusAgent(workspace);
         },
 
         cycle: (direction) => {
           const { workspaces, activeId } = get();
-          if (workspaces.length < 2) return;
+          if (!workspaces.length) return;
           const index = workspaces.findIndex((w) => w.id === activeId);
-          get().activate(
-            workspaces[(index + direction + workspaces.length) % workspaces.length].id,
-          );
+          const next =
+            index < 0
+              ? direction > 0
+                ? 0
+                : workspaces.length - 1
+              : (index + direction + workspaces.length) % workspaces.length;
+          if (next !== index) get().activate(workspaces[next].id);
         },
 
         reorder: (fromId, toId) =>
@@ -240,16 +260,14 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             return { workspaces: list };
           }),
 
-        openShell: (workspaceId, options = {}) => {
+        openShell: (workspaceId, cwd) => {
           const workspace = find(workspaceId);
           if (!workspace) return;
-          const cwd = options.cwd ?? workspace.cwd;
+          const root = cwd ?? workspace.cwd;
           const shell: ShellTab = {
             id: newId(),
-            cwd,
-            program: parseWslPath(cwd) ? "wsl.exe" : defaultShellProgram(),
-            label: options.label,
-            command: options.command,
+            cwd: root,
+            program: parseWslPath(root) ? "wsl.exe" : defaultShellProgram(),
           };
           startTerminal(shellSpec(workspaceId, shell), { focus: true });
           patch(workspaceId, (w) => ({
@@ -260,16 +278,26 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         },
 
         closeShell: (workspaceId, shellId) => {
+          const workspace = find(workspaceId);
+          if (!workspace) return;
           void disposeTerminal(shellId);
-          patch(workspaceId, (w) => {
-            const shells = w.shells.filter((s) => s.id !== shellId);
-            return {
-              shells,
-              activeShellId:
-                w.activeShellId === shellId ? (shells.at(-1)?.id ?? null) : w.activeShellId,
-              shellPanelOpen: shells.length > 0 && w.shellPanelOpen,
-            };
-          });
+          const index = workspace.shells.findIndex((s) => s.id === shellId);
+          const shells = workspace.shells.filter((s) => s.id !== shellId);
+          const activeShellId =
+            workspace.activeShellId === shellId
+              ? (shells[Math.min(index, shells.length - 1)]?.id ?? null)
+              : workspace.activeShellId;
+          const shellPanelOpen = shells.length > 0 && workspace.shellPanelOpen;
+          patch(workspaceId, () => ({ shells, activeShellId, shellPanelOpen }));
+          const focusId = shellPanelOpen ? activeShellId : workspace.agentTerminalId;
+          if (focusId) requestFocus(focusId);
+        },
+
+        restartShell: (workspaceId, shellId) => {
+          const shell = find(workspaceId)?.shells.find((s) => s.id === shellId);
+          if (!shell) return;
+          requestFocus(shellId);
+          void restartTerminal(shellId, shellSpec(workspaceId, shell));
         },
 
         setActiveShell: (workspaceId, shellId) => {
@@ -314,7 +342,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
         syncSessions: (byId) =>
           set((s) => {
-            const adopted = adopt(s.workspaces, byId);
+            const adopted = adoptSessions(s.workspaces, byId);
             let changed = adopted !== s.workspaces;
             const workspaces = adopted.map((w) => {
               const session = byId[w.sessionId];
@@ -327,61 +355,20 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             return changed ? { workspaces } : s;
           }),
 
-        restore: () =>
-          set((s) => ({
-            workspaces: s.workspaces.map((workspace) => {
-              const shells = workspace.shells.filter((shell) => isPtyRunning(shell.id));
-              shells.forEach(
-                (shell) =>
-                  hasTerminal(shell.id) ||
-                  startTerminal(shellSpec(workspace.id, { ...shell, command: undefined })),
-              );
-              const agentId = workspace.agentTerminalId;
-              const agentAlive = !!agentId && isPtyRunning(agentId);
-              if (agentAlive && !hasTerminal(agentId))
-                startTerminal(agentSpec({ ...workspace, agentTerminalId: agentId }));
-              return {
-                ...workspace,
-                mode: agentAlive ? "live" : "preview",
-                agentTerminalId: agentAlive ? agentId : null,
-                shells,
-                activeShellId: shells.some((shell) => shell.id === workspace.activeShellId)
-                  ? workspace.activeShellId
-                  : (shells[0]?.id ?? null),
-                shellPanelOpen: workspace.shellPanelOpen && shells.length > 0,
-              };
-            }),
-          })),
+        restore: () => {
+          const workspaces = get().workspaces.map(restoredWorkspace);
+          set({ workspaces });
+          for (const spec of workspaces.flatMap(terminalSpecs))
+            if (!hasTerminal(spec.id)) startTerminal(spec);
+        },
       };
     },
     {
       name: "claude-deck-workspaces",
-      version: 2,
+      version: 3,
       partialize: (s) => ({ workspaces: s.workspaces, activeId: s.activeId }),
-      migrate: (persisted) => persisted as Pick<WorkspaceState, "workspaces" | "activeId">,
-      merge: (persisted, current) => {
-        const saved = (persisted ?? {}) as Partial<Pick<WorkspaceState, "workspaces" | "activeId">>;
-        const workspaces = (saved.workspaces ?? []).map((raw) => {
-          const legacy = raw as Workspace & {
-            claudeTerminalId?: string | null;
-            claudeArgs?: string[];
-          };
-          const { claudeTerminalId, claudeArgs, ...w } = legacy;
-          const workspace = {
-            ...blankWorkspace(w),
-            ...w,
-            agentTerminalId: w.agentTerminalId ?? claudeTerminalId ?? null,
-            agentArgs: w.agentArgs ?? claudeArgs ?? [],
-          };
-          const openFiles = workspace.openFiles.filter((f) => !f.startsWith("media::"));
-          const activeFile =
-            workspace.activeFile && openFiles.includes(workspace.activeFile)
-              ? workspace.activeFile
-              : (openFiles[0] ?? null);
-          return { ...workspace, openFiles, activeFile };
-        });
-        return { ...current, workspaces, activeId: saved.activeId ?? null };
-      },
+      migrate: migrateSaved,
+      merge: (persisted, current) => ({ ...current, ...restoreSaved(persisted) }),
     },
   ),
 );
@@ -396,6 +383,9 @@ export const findWorkspace = (id: string) =>
 
 export const findWorkspaceBySession = (sessionId: string) =>
   useWorkspaceStore.getState().workspaces.find((w) => w.sessionId === sessionId) ?? null;
+
+export const useWorkspace = (id: string | null) =>
+  useWorkspaceStore((s) => (id ? (s.workspaces.find((w) => w.id === id) ?? null) : null));
 
 export const useActiveWorkspace = () =>
   useWorkspaceStore((s) => s.workspaces.find((w) => w.id === s.activeId) ?? null);

@@ -1,66 +1,164 @@
+import { useId } from "react";
+
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Segmented } from "@/components/ui/panel";
 import { CustomAgentsEditor, DefaultAgentPicker } from "@/features/settings/AgentSettings";
 import { ThemePicker } from "@/features/settings/ThemePicker";
 import { playChime } from "@/lib/chime";
-import { cn } from "@/lib/utils";
 import { useSessionsStore } from "@/stores/sessions-store";
-import { useSettingsStore, type ClickBehavior } from "@/stores/settings-store";
+import { useSettingsStore, type ClickBehavior, type SettingsData } from "@/stores/settings-store";
 import { useUiStore } from "@/stores/ui-store";
+
+type TextKey = "claudeArgs" | "codexArgs" | "shellProgram";
+type ToggleKey = "matchAgentTheme" | "notifications" | "sound" | "includeWsl";
+
+const setSetting = (patch: Partial<SettingsData>) => useSettingsStore.getState().set(patch);
 
 const Field = ({
   label,
   hint,
+  htmlFor,
   children,
 }: {
   label: string;
   hint?: string;
+  htmlFor?: string;
   children: React.ReactNode;
 }) => (
   <div className="grid grid-cols-[170px_1fr] items-start gap-4 py-3">
     <div>
-      <p className="text-[12.5px] font-medium text-fg">{label}</p>
+      <label htmlFor={htmlFor} className="block text-[12.5px] font-medium text-fg">
+        {label}
+      </label>
       {hint && <p className="mt-0.5 text-[11px] leading-snug text-faint">{hint}</p>}
     </div>
     <div>{children}</div>
   </div>
 );
 
-const inputClass =
-  "h-8 w-full rounded-md border border-border-strong bg-bg px-2.5 font-mono text-xs text-fg outline-none placeholder:text-faint focus:border-accent/70";
-
-const Segmented = <T extends string>({
-  value,
-  options,
-  onChange,
+const TextField = ({
+  field,
+  label,
+  hint,
+  placeholder,
 }: {
-  value: T;
-  options: { value: T; label: string }[];
-  onChange: (value: T) => void;
-}) => (
-  <div className="inline-flex rounded-md border border-border-strong bg-bg p-0.5">
-    {options.map((option) => (
-      <button
-        key={option.value}
-        type="button"
-        onClick={() => onChange(option.value)}
-        className={cn(
-          "h-7 rounded px-3 text-xs",
-          value === option.value ? "bg-active text-fg" : "text-faint hover:text-fg",
-        )}
-      >
-        {option.label}
-      </button>
-    ))}
-  </div>
-);
+  field: TextKey;
+  label: string;
+  hint?: string;
+  placeholder: string;
+}) => {
+  const id = useId();
+  const value = useSettingsStore((s) => s[field]);
+  return (
+    <Field label={label} hint={hint} htmlFor={id}>
+      <Input
+        id={id}
+        className="font-mono text-xs"
+        value={value}
+        placeholder={placeholder}
+        spellCheck={false}
+        onChange={(e) => setSetting({ [field]: e.target.value })}
+      />
+    </Field>
+  );
+};
+
+const Toggle = ({ field, on, off }: { field: ToggleKey; on: string; off: string }) => {
+  const value = useSettingsStore((s) => s[field]);
+  return (
+    <Segmented<"on" | "off">
+      value={value ? "on" : "off"}
+      onChange={(next) => setSetting({ [field]: next === "on" })}
+      options={[
+        { value: "on", label: on },
+        { value: "off", label: off },
+      ]}
+    />
+  );
+};
+
+const ClickBehaviorField = () => {
+  const clickBehavior = useSettingsStore((s) => s.clickBehavior);
+  return (
+    <Field
+      label="Clicking a session"
+      hint="Double-click, or Enter on the selected session, resumes."
+    >
+      <Segmented<ClickBehavior>
+        value={clickBehavior}
+        onChange={(next) => setSetting({ clickBehavior: next })}
+        options={[
+          { value: "preview", label: "Preview conversation" },
+          { value: "resume", label: "Resume immediately" },
+        ]}
+      />
+    </Field>
+  );
+};
+
+const FontSizeField = () => {
+  const id = useId();
+  const fontSize = useSettingsStore((s) => s.fontSize);
+  return (
+    <Field label="Terminal font size" htmlFor={id}>
+      <div className="flex items-center gap-3">
+        <input
+          id={id}
+          type="range"
+          min={9}
+          max={22}
+          value={fontSize}
+          onChange={(e) => setSetting({ fontSize: Number(e.target.value) })}
+          className="w-48 accent-[var(--color-accent)]"
+        />
+        <span className="font-mono text-xs text-muted tabular-nums">{fontSize}px</span>
+      </div>
+    </Field>
+  );
+};
+
+const WslField = () => {
+  const distros = useSessionsStore((s) => s.distros);
+  return (
+    <Field
+      label="WSL sessions"
+      hint={
+        distros.length
+          ? `Found: ${distros.map((d) => `${d.name}${d.running ? "" : " (stopped)"}`).join(", ")}`
+          : "No WSL distributions found."
+      }
+    >
+      <Toggle field="includeWsl" on="Include running distros" off="Windows only" />
+    </Field>
+  );
+};
+
+const EnvironmentFields = () => {
+  const shell = useSessionsStore((s) => s.environment?.shell);
+  const claudeHome = useSessionsStore((s) => s.environment?.claudeHome);
+  return (
+    <>
+      <TextField
+        field="shellProgram"
+        label="Shell"
+        hint={`Default: ${shell ?? "auto"}`}
+        placeholder="pwsh.exe, powershell.exe, cmd.exe, bash.exe…"
+      />
+      <FontSizeField />
+      <WslField />
+      <Field label="Claude data folder">
+        <p className="pt-1.5 font-mono text-xs break-all text-muted select-text">{claudeHome}</p>
+      </Field>
+    </>
+  );
+};
 
 export const SettingsDialog = () => {
   const open = useUiStore((s) => s.settingsOpen);
   const setOpen = useUiStore((s) => s.setSettingsOpen);
-  const settings = useSettingsStore();
-  const environment = useSessionsStore((s) => s.environment);
-  const distros = useSessionsStore((s) => s.distros);
+  const agentId = useId();
 
   return (
     <Dialog
@@ -76,130 +174,49 @@ export const SettingsDialog = () => {
         </Field>
         <Field
           label="Default agent"
+          htmlFor={agentId}
           hint="Used by New session (Ctrl Shift N), folder + buttons and Choose folder."
         >
-          <DefaultAgentPicker />
+          <DefaultAgentPicker id={agentId} />
         </Field>
         <Field
           label="Claude's colors"
           hint="Start Claude with its light or dark theme to match Deck, so prompts and diffs look right. Running sessions update when resumed."
         >
-          <Segmented<"on" | "off">
-            value={settings.matchAgentTheme ? "on" : "off"}
-            onChange={(value) => settings.set({ matchAgentTheme: value === "on" })}
-            options={[
-              { value: "on", label: "Match Deck theme" },
-              { value: "off", label: "Use Claude's own setting" },
-            ]}
-          />
+          <Toggle field="matchAgentTheme" on="Match Deck theme" off="Use Claude's own setting" />
         </Field>
-        <Field label="Extra Claude flags" hint="Added to every Claude session you start or resume.">
-          <input
-            className={inputClass}
-            value={settings.claudeArgs}
-            placeholder="e.g. --permission-mode acceptEdits --model opus"
-            onChange={(e) => settings.set({ claudeArgs: e.target.value })}
-            spellCheck={false}
-          />
-        </Field>
-        <Field
+        <TextField
+          field="claudeArgs"
+          label="Extra Claude flags"
+          hint="Added to every Claude session you start or resume. Quote values with spaces."
+          placeholder="e.g. --permission-mode acceptEdits --model opus"
+        />
+        <TextField
+          field="codexArgs"
           label="Extra Codex flags"
           hint="Added to every Codex session you start, resume or fork."
-        >
-          <input
-            className={inputClass}
-            value={settings.codexArgs}
-            placeholder="e.g. --model gpt-5 --sandbox workspace-write"
-            onChange={(e) => settings.set({ codexArgs: e.target.value })}
-            spellCheck={false}
-          />
-        </Field>
+          placeholder="e.g. --model gpt-5 --sandbox workspace-write"
+        />
         <Field
           label="Other agents"
           hint="Any CLI agent (Gemini, Aider, OpenCode…) can start new sessions from Deck. Resume and history are available for Claude and Codex."
         >
           <CustomAgentsEditor />
         </Field>
-        <Field label="Clicking a session" hint="Double-click always resumes.">
-          <Segmented<ClickBehavior>
-            value={settings.clickBehavior}
-            onChange={(clickBehavior) => settings.set({ clickBehavior })}
-            options={[
-              { value: "preview", label: "Preview conversation" },
-              { value: "resume", label: "Resume immediately" },
-            ]}
-          />
-        </Field>
+        <ClickBehaviorField />
         <Field
           label="When an agent finishes"
           hint="Sound plays every time; notifications only for sessions you're not looking at."
         >
           <div className="flex items-center gap-2">
-            <Segmented<"on" | "off">
-              value={settings.notifications ? "on" : "off"}
-              onChange={(value) => settings.set({ notifications: value === "on" })}
-              options={[
-                { value: "on", label: "Notify" },
-                { value: "off", label: "Off" },
-              ]}
-            />
-            <Segmented<"on" | "off">
-              value={settings.sound ? "on" : "off"}
-              onChange={(value) => settings.set({ sound: value === "on" })}
-              options={[
-                { value: "on", label: "Sound" },
-                { value: "off", label: "Silent" },
-              ]}
-            />
+            <Toggle field="notifications" on="Notify" off="Off" />
+            <Toggle field="sound" on="Sound" off="Silent" />
             <Button size="sm" variant="ghost" onClick={() => void playChime("done")}>
               Test
             </Button>
           </div>
         </Field>
-        <Field label="Shell" hint={`Default: ${environment?.shell ?? "auto"}`}>
-          <input
-            className={inputClass}
-            value={settings.shellProgram}
-            placeholder="pwsh.exe, powershell.exe, cmd.exe, bash.exe…"
-            onChange={(e) => settings.set({ shellProgram: e.target.value })}
-            spellCheck={false}
-          />
-        </Field>
-        <Field label="Terminal font size">
-          <div className="flex items-center gap-3">
-            <input
-              type="range"
-              min={9}
-              max={22}
-              value={settings.fontSize}
-              onChange={(e) => settings.set({ fontSize: Number(e.target.value) })}
-              className="w-48 accent-[var(--color-accent)]"
-            />
-            <span className="font-mono text-xs text-muted tabular-nums">{settings.fontSize}px</span>
-          </div>
-        </Field>
-        <Field
-          label="WSL sessions"
-          hint={
-            distros.length
-              ? `Found: ${distros.map((d) => `${d.name}${d.running ? "" : " (stopped)"}`).join(", ")}`
-              : "No WSL distributions found."
-          }
-        >
-          <Segmented<"on" | "off">
-            value={settings.includeWsl ? "on" : "off"}
-            onChange={(value) => settings.set({ includeWsl: value === "on" })}
-            options={[
-              { value: "on", label: "Include running distros" },
-              { value: "off", label: "Windows only" },
-            ]}
-          />
-        </Field>
-        <Field label="Claude data folder">
-          <p className="pt-1.5 font-mono text-xs break-all text-muted select-text">
-            {environment?.claudeHome}
-          </p>
-        </Field>
+        <EnvironmentFields />
       </div>
       <div className="flex justify-end px-5 pt-2 pb-4">
         <Button variant="primary" onClick={() => setOpen(false)}>

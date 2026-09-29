@@ -1,6 +1,6 @@
 import type { ILink, Terminal } from "@xterm/xterm";
 
-import { joinPath } from "@/lib/utils";
+import { joinPath, samePath } from "@/lib/utils";
 import { parseWslPath } from "@/lib/wsl";
 
 const EXTENSIONS =
@@ -12,23 +12,25 @@ const PATH_PATTERN = new RegExp(
 );
 
 export interface PathLinkTarget {
-  path: string;
+  raw: string;
   line: number | null;
 }
 
-const toHostPath = (raw: string, root: string) => {
-  const wsl = parseWslPath(root);
-  if (/^[A-Za-z]:[\\/]/.test(raw)) return raw;
+export const candidatePaths = (raw: string, bases: string[]) => {
+  if (/^[A-Za-z]:[\\/]/.test(raw)) return [raw];
+  const wsl = bases.map(parseWslPath).find(Boolean);
   if (raw.startsWith("/") && wsl)
-    return `\\\\wsl.localhost\\${wsl.distro}${raw.replace(/\//g, "\\")}`;
-  return joinPath(root, raw.replace(/^\.[\\/]/, ""));
+    return [`\\\\wsl.localhost\\${wsl.distro}${raw.replace(/\//g, "\\")}`];
+  const relative = raw.replace(/^\.[\\/]/, "");
+  const paths: string[] = [];
+  for (const base of bases) {
+    const path = joinPath(base, relative);
+    if (!paths.some((p) => samePath(p, path))) paths.push(path);
+  }
+  return paths;
 };
 
-export const registerPathLinks = (
-  term: Terminal,
-  getRoot: () => string,
-  onOpen: (target: PathLinkTarget) => void,
-) =>
+export const registerPathLinks = (term: Terminal, onOpen: (target: PathLinkTarget) => void) =>
   term.registerLinkProvider({
     provideLinks: (lineNumber, callback) => {
       const text = term.buffer.active.getLine(lineNumber - 1)?.translateToString(true) ?? "";
@@ -44,8 +46,7 @@ export const registerPathLinks = (
             end: { x: start + whole.length, y: lineNumber },
           },
           decorations: { underline: true, pointerCursor: true },
-          activate: () =>
-            onOpen({ path: toHostPath(raw, getRoot()), line: line ? Number(line) : null }),
+          activate: () => onOpen({ raw, line: line ? Number(line) : null }),
         });
       }
       callback(links.length ? links : undefined);

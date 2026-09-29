@@ -20,7 +20,7 @@ import { useGlobalShortcuts } from "@/hooks/useGlobalShortcuts";
 import { findTheme } from "@/lib/themes";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useUiStore, type SidePanel } from "@/stores/ui-store";
-import { useActiveWorkspace } from "@/stores/workspace-store";
+import { useWorkspaceStore } from "@/stores/workspace-store";
 
 const FLAG = { sessions: "sessionsOpen", context: "contextOpen" } as const;
 const WIDTH = { sessions: "sessionsWidth", context: "contextWidth" } as const;
@@ -62,10 +62,12 @@ const useSidePanel = (panel: SidePanel, available = true) => {
 };
 
 export const App = () => {
-  const workspace = useActiveWorkspace();
+  const activeId = useWorkspaceStore((s) =>
+    s.workspaces.some((w) => w.id === s.activeId) ? s.activeId : null,
+  );
   const themeKind = useSettingsStore((s) => findTheme(s.themeId).kind);
   const sessions = useSidePanel("sessions");
-  const context = useSidePanel("context", !!workspace);
+  const context = useSidePanel("context", !!activeId);
   useAppEvents();
   useGlobalShortcuts();
   useAttentionAlerts();
@@ -91,8 +93,8 @@ export const App = () => {
           </Panel>
           <ResizeHandle orientation="horizontal" />
           <Panel id="content" minSize={420}>
-            <ErrorBoundary key={workspace?.id ?? "welcome"}>
-              {workspace ? <WorkspaceView key={workspace.id} workspace={workspace} /> : <Welcome />}
+            <ErrorBoundary key={activeId ?? "welcome"}>
+              {activeId ? <WorkspaceView key={activeId} workspaceId={activeId} /> : <Welcome />}
             </ErrorBoundary>
           </Panel>
           <ResizeHandle orientation="horizontal" />
@@ -106,7 +108,7 @@ export const App = () => {
             groupResizeBehavior="preserve-pixel-size"
             onResize={context.onResize}
           >
-            <ErrorBoundary>{workspace && <ContextPanel />}</ErrorBoundary>
+            <ErrorBoundary key={activeId ?? "none"}>{activeId && <ContextPanel />}</ErrorBoundary>
           </Panel>
         </Group>
         <StatusBar />

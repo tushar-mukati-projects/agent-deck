@@ -84,6 +84,8 @@ export const SearchInput = ({
   className,
   inputRef,
   onKeyDown,
+  placeholder,
+  "aria-label": ariaLabel,
   ...props
 }: SearchInputProps) => (
   <div
@@ -105,6 +107,8 @@ export const SearchInput = ({
         onKeyDown?.(e);
       }}
       className="h-full min-w-0 flex-1 bg-transparent text-xs text-fg outline-none placeholder:text-faint"
+      placeholder={placeholder}
+      aria-label={ariaLabel ?? placeholder}
       {...props}
     />
     {value && (

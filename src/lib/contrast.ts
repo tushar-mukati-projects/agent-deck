@@ -3,7 +3,7 @@ const channel = (value: number) => {
   return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
 };
 
-export const parseHex = (hex: string): [number, number, number] => {
+const parseHex = (hex: string): [number, number, number] => {
   const clean = hex.replace("#", "");
   const full = clean.length === 3 ? [...clean].map((c) => c + c).join("") : clean.slice(0, 6);
   return [0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16)) as [number, number, number];
@@ -18,7 +18,7 @@ const toHex = (rgb: number[]) =>
     )
     .join("")}`;
 
-export const luminance = (hex: string) => {
+const luminance = (hex: string) => {
   const [r, g, b] = parseHex(hex).map(channel);
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 };

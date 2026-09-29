@@ -21,6 +21,7 @@ export const FolderFilter = () => {
   const includeSubfolders = useSettingsStore((s) => s.includeSubfolders);
   const setSettings = useSettingsStore((s) => s.set);
   const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -32,9 +33,33 @@ export const FolderFilter = () => {
     if (folder) setSettings({ folderFilter: folder });
   };
 
+  const onFilterKey = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      event.currentTarget
+        .closest("[role=menu]")
+        ?.querySelector<HTMLElement>("[role=menuitem]:not([data-disabled])")
+        ?.focus();
+      return;
+    }
+    if (event.key === "Enter" && query.trim() && visible[0]) {
+      event.preventDefault();
+      setSettings({ folderFilter: visible[0].cwd });
+      setOpen(false);
+      return;
+    }
+    if (event.key !== "Escape") event.stopPropagation();
+  };
+
   return (
     <div className="flex items-center gap-1 px-2 pb-2">
-      <DropdownMenu onOpenChange={(open) => !open && setQuery("")}>
+      <DropdownMenu
+        open={open}
+        onOpenChange={(next) => {
+          setOpen(next);
+          if (!next) setQuery("");
+        }}
+      >
         <DropdownMenuTrigger asChild>
           <button
             type="button"
@@ -55,20 +80,20 @@ export const FolderFilter = () => {
           <div className="border-b border-border p-1.5">
             <input
               autoFocus
+              aria-label="Filter folders"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => e.stopPropagation()}
+              onKeyDown={onFilterKey}
               placeholder="Filter folders…"
               className="h-7 w-full rounded-md bg-bg px-2 text-xs text-fg outline-none placeholder:text-faint"
             />
           </div>
           <div className="max-h-[360px] overflow-y-auto p-1">
             <DropdownMenuItem
-              icon={<Layers />}
-              shortcut={folderFilter ? undefined : "✓"}
+              icon={folderFilter ? <Layers /> : <Check className="!text-accent" />}
               onSelect={() => setSettings({ folderFilter: null })}
             >
-              All folders
+              <span className={cn(!folderFilter && "text-accent")}>All folders</span>
             </DropdownMenuItem>
             {visible.map((folder) => {
               const selected = !!folderFilter && samePath(folderFilter, folder.cwd);

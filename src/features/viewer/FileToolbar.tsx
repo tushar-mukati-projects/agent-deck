@@ -44,7 +44,7 @@ interface FileToolbarProps {
 }
 
 const Breadcrumbs = ({ path, root }: { path: string; root: string }) => {
-  const segments = relativePath(path, root).split(/[\\/]/);
+  const segments = relativePath(path, root).split(/[\\/]/).filter(Boolean);
   return (
     <>
       {segments.map((segment, index) => (
@@ -94,7 +94,7 @@ export const FileToolbar = ({
         </div>
       )}
       {dirty && (
-        <Button size="sm" variant="primary" className="mr-1 h-6" onClick={onSave}>
+        <Button size="xs" variant="primary" className="mr-1" onClick={onSave}>
           <Save /> Save
         </Button>
       )}

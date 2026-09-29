@@ -6,9 +6,11 @@ import type {
   GitChange,
   DirEntry,
   FileContent,
+  FileEncoding,
   LiveSession,
   ClaudeOverview,
   McpDescription,
+  PathStat,
   PgInfo,
   PgOutput,
   SearchHit,
@@ -16,10 +18,15 @@ import type {
   PtyInfo,
   SessionInfo,
   SpawnRequest,
-  TranscriptItem,
-  WslDistro,
+  TranscriptPage,
+  WriteOutcome,
   WslIndex,
 } from "@/types";
+
+export interface WriteOptions {
+  encoding?: FileEncoding;
+  expectedModifiedMs?: number | null;
+}
 
 const createChannel = (onEvent: (event: PtyEvent) => void) => {
   const channel = new Channel<PtyEvent>();
@@ -31,8 +38,8 @@ export const api = {
   environment: () => invoke<AppEnvironment>("environment"),
   listSessions: () => invoke<SessionInfo[]>("list_sessions"),
   liveSessions: () => invoke<LiveSession[]>("live_sessions"),
-  sessionTranscript: (filePath: string, distro: string | null) =>
-    invoke<TranscriptItem[]>("session_transcript", { filePath, distro }),
+  sessionTranscript: (filePath: string, distro: string | null, fromOffset = 0) =>
+    invoke<TranscriptPage>("session_transcript", { filePath, distro, fromOffset }),
   deleteSession: (filePath: string, distro: string | null) =>
     invoke<void>("delete_session", { filePath, distro }),
   sessionChanges: (filePath: string, distro: string | null) =>
@@ -55,9 +62,9 @@ export const api = {
   mcpDisconnect: (cwd: string, id: string) => invoke<void>("mcp_disconnect", { cwd, id }),
   pgInfo: (cwd: string, id: string) => invoke<PgInfo>("pg_info", { cwd, id }),
   pgQuery: (cwd: string, id: string, sql: string) => invoke<PgOutput>("pg_query", { cwd, id, sql }),
+  pgCancel: (cwd: string, id: string) => invoke<void>("pg_cancel", { cwd, id }),
   setAttentionBadge: (active: boolean) => invoke<void>("set_attention_badge", { active }),
   listWslSessions: () => invoke<WslIndex>("list_wsl_sessions"),
-  wslDistros: () => invoke<WslDistro[]>("wsl_distros"),
   wslStart: (distro: string) => invoke<void>("wsl_start", { distro }),
 
   ptySpawn: (request: SpawnRequest, onEvent: (event: PtyEvent) => void) =>
@@ -72,10 +79,18 @@ export const api = {
 
   listDir: (path: string) => invoke<DirEntry[]>("list_dir", { path }),
   readFile: (path: string) => invoke<FileContent>("read_file", { path }),
-  writeFile: (path: string, contents: string) => invoke<void>("write_file", { path, contents }),
+  writeFile: (path: string, contents: string, options: WriteOptions = {}) =>
+    invoke<WriteOutcome>("write_file", {
+      path,
+      contents,
+      encoding: options.encoding ?? null,
+      expectedModifiedMs: options.expectedModifiedMs ?? null,
+    }),
+  statPath: (path: string) => invoke<PathStat | null>("stat_path", { path }),
   listFiles: (root: string) => invoke<string[]>("list_files", { root }),
-  pathIsDir: (path: string) => invoke<boolean>("path_is_dir", { path }),
   openInEditor: (path: string) => invoke<void>("open_in_editor", { path }),
+  openPath: (path: string) => invoke<void>("open_path", { path }),
+  revealPath: (path: string) => invoke<void>("reveal_path", { path }),
   watchDir: (root: string) => invoke<void>("watch_dir", { root }),
   unwatchDir: (root: string) => invoke<void>("unwatch_dir", { root }),
 };

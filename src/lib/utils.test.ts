@@ -9,9 +9,9 @@ describe("normalizePath", () => {
     expect(normalizePath("C:\\Users\\Me\\Repo\\")).toBe("c:\\users\\me\\repo");
   });
 
-  it("keeps WSL paths case-sensitive and unifies the wsl$ prefix", () => {
+  it("keeps Linux paths case-sensitive and unifies the WSL prefix and distro", () => {
     expect(normalizePath("\\\\wsl$\\Debian\\home\\me\\README.md")).toBe(
-      "\\\\wsl.localhost\\Debian\\home\\me\\README.md",
+      "\\\\wsl.localhost\\debian\\home\\me\\README.md",
     );
     expect(
       samePath(
@@ -19,6 +19,7 @@ describe("normalizePath", () => {
         "\\\\wsl.localhost\\Debian\\a\\readme.md",
       ),
     ).toBe(false);
+    expect(samePath("\\\\WSL.LOCALHOST\\debian\\a", "\\\\wsl$\\Debian\\a\\")).toBe(true);
   });
 });
 
@@ -35,6 +36,14 @@ describe("path helpers", () => {
   it("makes paths relative to a root", () => {
     expect(relativePath("C:\\a\\b\\c.ts", "C:\\a")).toBe("b\\c.ts");
     expect(relativePath("C:\\a", "C:\\a")).toBe("C:\\a");
+    expect(relativePath("C:/A/b/c.ts", "c:\\a\\")).toBe("b\\c.ts");
+    expect(relativePath("D:\\x.ts", "D:\\")).toBe("x.ts");
+    expect(
+      relativePath(
+        "\\\\wsl.localhost\\Ubuntu\\home\\me\\proj\\src\\a.ts",
+        "\\\\wsl$\\Ubuntu\\home\\me\\proj",
+      ),
+    ).toBe("src\\a.ts");
   });
 });
 
@@ -61,5 +70,27 @@ describe("parseArgs", () => {
       "--x=a b",
       "c d",
     ]);
+  });
+
+  it("understands single quotes and keeps quotes inside them", () => {
+    expect(parseArgs("--append-system-prompt 'be terse'")).toEqual([
+      "--append-system-prompt",
+      "be terse",
+    ]);
+    expect(parseArgs(`--settings '{"theme":"dark"}'`)).toEqual(["--settings", '{"theme":"dark"}']);
+    expect(parseArgs(`-c 'model="o3"'`)).toEqual(["-c", 'model="o3"']);
+  });
+
+  it("handles escaped quotes, empty values and Windows paths", () => {
+    expect(parseArgs(String.raw`--settings {\"theme\":\"dark\"}`)).toEqual([
+      "--settings",
+      '{"theme":"dark"}',
+    ]);
+    expect(parseArgs(String.raw`"say \"hi\"" ''`)).toEqual(['say "hi"', ""]);
+    expect(parseArgs(String.raw`--add-dir C:\Users\me\repo`)).toEqual([
+      "--add-dir",
+      String.raw`C:\Users\me\repo`,
+    ]);
+    expect(parseArgs("   ")).toEqual([]);
   });
 });

@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 
 import { subscribeFileChanges } from "@/lib/file-events";
 import { api } from "@/lib/tauri/commands";
-import { errorMessage, samePath } from "@/lib/utils";
+import { appWindow } from "@/lib/tauri/system";
+import { errorMessage, normalizePath, samePath } from "@/lib/utils";
 import { isDirty } from "@/stores/viewer-store";
 import type { FileContent } from "@/types";
 
@@ -11,15 +12,32 @@ type State =
   | { status: "ready"; content: FileContent }
   | { status: "error"; error: string };
 
+const CACHE_LIMIT = 40;
+const cache = new Map<string, FileContent>();
+
+const remember = (path: string, content: FileContent) => {
+  const key = normalizePath(path);
+  cache.delete(key);
+  cache.set(key, content);
+  while (cache.size > CACHE_LIMIT) cache.delete(cache.keys().next().value!);
+};
+
+const initialState = (path: string): State => {
+  const cached = cache.get(normalizePath(path));
+  return cached ? { status: "ready", content: cached } : { status: "loading" };
+};
+
 export const useFileContent = (path: string, enabled: boolean) => {
-  const [state, setState] = useState<State>({ status: "loading" });
+  const [state, setState] = useState<State>(() => initialState(path));
   const [staleOnDisk, setStaleOnDisk] = useState(false);
 
   const load = useCallback(
     async (quiet = false) => {
       if (!quiet) setState({ status: "loading" });
       try {
-        setState({ status: "ready", content: await api.readFile(path) });
+        const content = await api.readFile(path);
+        remember(path, content);
+        setState({ status: "ready", content });
         setStaleOnDisk(false);
       } catch (error) {
         setState({ status: "error", error: errorMessage(error) });
@@ -29,17 +47,38 @@ export const useFileContent = (path: string, enabled: boolean) => {
   );
 
   useEffect(() => {
-    if (enabled) void load();
-  }, [enabled, load]);
+    if (enabled) void load(cache.has(normalizePath(path)));
+  }, [enabled, load, path]);
 
   useEffect(() => {
     if (!enabled) return;
-    return subscribeFileChanges((change) => {
-      if (!change.paths.some((p) => samePath(p, path))) return;
+    const onChanged = () => {
       if (isDirty(path)) setStaleOnDisk(true);
       else void load(true);
+    };
+    const unsubscribe = subscribeFileChanges((change) => {
+      if (change.paths.some((p) => samePath(p, path))) onChanged();
     });
+    const unlisten = appWindow.onFocusChanged(({ payload: focused }) => {
+      if (focused && !isDirty(path)) void load(true);
+    });
+    return () => {
+      unsubscribe();
+      void unlisten.then((fn) => fn());
+    };
   }, [enabled, path, load]);
 
   return { state, reload: load, staleOnDisk, dismissStale: () => setStaleOnDisk(false) };
+};
+
+export const useFileVersion = (path: string) => {
+  const [version, setVersion] = useState(0);
+  useEffect(
+    () =>
+      subscribeFileChanges((change) => {
+        if (change.paths.some((p) => samePath(p, path))) setVersion((v) => v + 1);
+      }),
+    [path],
+  );
+  return version;
 };

@@ -10,6 +10,7 @@ interface DialogProps {
   description?: string;
   className?: string;
   hideHeader?: boolean;
+  initialFocusRef?: React.RefObject<HTMLElement | null>;
   children: React.ReactNode;
 }
 
@@ -20,6 +21,7 @@ export const Dialog = ({
   description,
   className,
   hideHeader,
+  initialFocusRef,
   children,
 }: DialogProps) => {
   const previousFocus = useRef<HTMLElement | null>(null);
@@ -28,9 +30,13 @@ export const Dialog = ({
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="animate-fade-in fixed inset-0 z-40 bg-scrim backdrop-blur-[2px]" />
         <DialogPrimitive.Content
-          onOpenAutoFocus={() => {
+          onOpenAutoFocus={(event) => {
             previousFocus.current =
               document.activeElement instanceof HTMLElement ? document.activeElement : null;
+            const initial = initialFocusRef?.current;
+            if (!initial) return;
+            event.preventDefault();
+            initial.focus({ preventScroll: true });
           }}
           onCloseAutoFocus={(event) => {
             const target = previousFocus.current;

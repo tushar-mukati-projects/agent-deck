@@ -1,5 +1,6 @@
 import { AlertTriangle, RotateCw, X } from "lucide-react";
 
+import { mentionText } from "@/actions/files";
 import { closeWorkspace } from "@/actions/workspaces";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/feedback";
@@ -18,7 +19,11 @@ export const AgentPane = ({ workspace }: { workspace: Workspace }) => {
 
   return (
     <div className="relative h-full w-full">
-      <TerminalView terminalId={terminalId} dropRoot={workspace.cwd} />
+      <TerminalView
+        terminalId={terminalId}
+        dropText={(path) => mentionText(path, workspace.cwd)}
+        dropLabel={`Drop to mention in ${agent.name}`}
+      />
 
       {terminal?.status === "starting" && (
         <div className="pointer-events-none absolute top-3 right-4 flex items-center gap-2 rounded-md border border-border bg-panel/90 px-2.5 py-1 text-[11.5px] text-muted">

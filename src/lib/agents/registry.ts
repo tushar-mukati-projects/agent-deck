@@ -17,20 +17,19 @@ export interface AgentDefinition {
   newArgs: (sessionId: string, context: LaunchContext) => string[];
   resumeArgs: (sessionId: string) => string[];
   forkArgs: (sessionId: string, newSessionId: string) => string[];
+  extraArgs: (options?: { deckTheme?: boolean }) => string[];
 }
 
 export const CLAUDE: AgentId = "claude";
 export const CODEX: AgentId = "codex";
 
-const extra = (key: "claudeArgs" | "codexArgs") => parseArgs(useSettingsStore.getState()[key]);
+const settings = () => useSettingsStore.getState();
 
 const claudeThemeArgs = () => {
-  const { matchAgentTheme, claudeArgs, themeId } = useSettingsStore.getState();
+  const { matchAgentTheme, claudeArgs, themeId } = settings();
   if (!matchAgentTheme || /(^|\s)--settings(\s|=|$)/.test(claudeArgs)) return [];
   return ["--settings", JSON.stringify({ theme: findTheme(themeId).kind })];
 };
-
-const claudeExtra = () => [...claudeThemeArgs(), ...extra("claudeArgs")];
 
 const claude: AgentDefinition = {
   id: CLAUDE,
@@ -43,16 +42,18 @@ const claude: AgentDefinition = {
     "--session-id",
     sessionId,
     ...(subagent ? ["--agent", subagent] : []),
-    ...claudeExtra(),
   ],
-  resumeArgs: (sessionId) => ["--resume", sessionId, ...claudeExtra()],
+  resumeArgs: (sessionId) => ["--resume", sessionId],
   forkArgs: (sessionId, newSessionId) => [
     "--resume",
     sessionId,
     "--fork-session",
     "--session-id",
     newSessionId,
-    ...claudeExtra(),
+  ],
+  extraArgs: (options) => [
+    ...(options?.deckTheme ? claudeThemeArgs() : []),
+    ...parseArgs(settings().claudeArgs),
   ],
 };
 
@@ -63,16 +64,15 @@ const codex: AgentDefinition = {
   history: true,
   assignsSessionIds: false,
   canFork: true,
-  newArgs: () => extra("codexArgs"),
-  resumeArgs: (sessionId) => ["resume", sessionId, ...extra("codexArgs")],
-  forkArgs: (sessionId) => ["fork", sessionId, ...extra("codexArgs")],
+  newArgs: () => [],
+  resumeArgs: (sessionId) => ["resume", sessionId],
+  forkArgs: (sessionId) => ["fork", sessionId],
+  extraArgs: () => parseArgs(settings().codexArgs),
 };
 
-export const customAgentId = (agent: CustomAgent) => `custom:${agent.id}`;
-
 const fromCustom = (agent: CustomAgent): AgentDefinition => ({
-  id: customAgentId(agent),
-  name: agent.name.trim() || agent.command.trim().split(/\s+/)[0] || "Agent",
+  id: `custom:${agent.id}`,
+  name: agent.name.trim() || parseArgs(agent.command)[0] || "Agent",
   command: parseArgs(agent.command),
   history: false,
   assignsSessionIds: false,
@@ -80,18 +80,22 @@ const fromCustom = (agent: CustomAgent): AgentDefinition => ({
   newArgs: () => [],
   resumeArgs: () => [],
   forkArgs: () => [],
+  extraArgs: () => [],
 });
 
 export const listAgents = (): AgentDefinition[] => [
   claude,
   codex,
-  ...useSettingsStore
-    .getState()
+  ...settings()
     .customAgents.filter((a) => a.command.trim())
     .map(fromCustom),
 ];
 
-export const findAgent = (id: AgentId | undefined): AgentDefinition =>
-  listAgents().find((a) => a.id === id) ?? claude;
+export const getAgent = (id: AgentId | undefined): AgentDefinition | null =>
+  listAgents().find((a) => a.id === id) ?? null;
+
+export const findAgent = (id: AgentId | undefined): AgentDefinition => getAgent(id) ?? claude;
 
 export const agentName = (id: AgentId | undefined) => findAgent(id).name;
+
+export const SUBAGENT_NAME = /^[\w:.-]+$/;

@@ -9,6 +9,7 @@ import {
   Sparkles,
   SquareTerminal,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import { canMention, mentionInAgent } from "@/actions/files";
 import { startNewSession } from "@/actions/sessions";
@@ -24,11 +25,13 @@ import { fileIcon, folderIcon } from "@/lib/file-icons";
 import { api } from "@/lib/tauri/commands";
 import { copyText, openExternal, revealInExplorer } from "@/lib/tauri/system";
 import { DECK_PATH_MIME } from "@/lib/terminal/input";
-import { cn, normalizePath, relativePath } from "@/lib/utils";
+import { cn, errorMessage, normalizePath, relativePath } from "@/lib/utils";
 import { useExplorerStore } from "@/stores/explorer-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import type { DirEntry, Workspace } from "@/types";
+
+const showError = (error: unknown) => toast.error(errorMessage(error));
 
 const ROW_HEIGHT = 22;
 const OVERSCAN = 12;
@@ -95,7 +98,7 @@ const RowMenu = ({
           <>
             <ContextMenuItem
               icon={<SquareTerminal />}
-              onSelect={() => store().openShell(workspace.id, { cwd: entry.path })}
+              onSelect={() => store().openShell(workspace.id, entry.path)}
             >
               Open shell here
             </ContextMenuItem>
@@ -105,11 +108,17 @@ const RowMenu = ({
           </>
         )}
         <ContextMenuSeparator />
-        <ContextMenuItem icon={<Code2 />} onSelect={() => void api.openInEditor(entry.path)}>
+        <ContextMenuItem
+          icon={<Code2 />}
+          onSelect={() => void api.openInEditor(entry.path).catch(showError)}
+        >
           Open in VS Code
         </ContextMenuItem>
         {!entry.isDir && (
-          <ContextMenuItem icon={<ExternalLink />} onSelect={() => void openExternal(entry.path)}>
+          <ContextMenuItem
+            icon={<ExternalLink />}
+            onSelect={() => void openExternal(entry.path).catch(showError)}
+          >
             Open with default app
           </ContextMenuItem>
         )}
@@ -149,9 +158,12 @@ export const FileTree = ({ workspace }: { workspace: Workspace }) => {
     return () => observer.disconnect();
   }, []);
 
-  const selectedIndex = rows.findIndex(
-    (r) => selected && normalizePath(r.entry.path) === normalizePath(selected),
-  );
+  const selectedIndex = useMemo(() => {
+    if (!selected) return -1;
+    const key = normalizePath(selected);
+    return rows.findIndex((r) => normalizePath(r.entry.path) === key);
+  }, [rows, selected]);
+  const activeKey = activeFile ? normalizePath(activeFile) : null;
 
   useEffect(() => {
     const element = containerRef.current;
@@ -173,6 +185,7 @@ export const FileTree = ({ workspace }: { workspace: Workspace }) => {
   };
 
   const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (event.target !== event.currentTarget) return;
     const current = rows[selectedIndex];
     const move = (index: number) => {
       const target = rows[Math.max(0, Math.min(rows.length - 1, index))];
@@ -222,28 +235,32 @@ export const FileTree = ({ workspace }: { workspace: Workspace }) => {
   return (
     <div
       ref={containerRef}
+      role="tree"
+      aria-label="Files"
+      aria-activedescendant={selectedIndex >= 0 ? `tree-row-${selectedIndex}` : undefined}
       tabIndex={0}
       onKeyDown={handleKeyDown}
       onScroll={(e) => {
         const top = e.currentTarget.scrollTop;
         setViewport((v) => ({ ...v, top }));
       }}
-      className="relative min-h-0 flex-1 overflow-y-auto outline-none"
+      className="relative min-h-0 flex-1 overflow-y-auto outline-none focus-visible:ring-1 focus-visible:ring-accent/60 focus-visible:ring-inset"
     >
       <div style={{ height: rows.length * ROW_HEIGHT }} className="relative">
         {rows.slice(start, end).map((row, offset) => {
           const index = start + offset;
           const { entry } = row;
           const isSelected = index === selectedIndex;
-          const isOpenFile =
-            !!activeFile && normalizePath(activeFile) === normalizePath(entry.path);
+          const isOpenFile = activeKey === normalizePath(entry.path);
           const spec = entry.isDir ? folderIcon(entry.name, row.expanded) : fileIcon(entry.path);
           const Icon = spec.icon;
           const isLoading = entry.isDir && loading[normalizePath(entry.path)];
           return (
             <RowMenu key={entry.path} row={row} workspace={workspace}>
               <div
+                id={`tree-row-${index}`}
                 role="treeitem"
+                aria-level={row.depth + 1}
                 aria-expanded={entry.isDir ? row.expanded : undefined}
                 aria-selected={isSelected}
                 draggable

@@ -1,5 +1,6 @@
 import { Check } from "lucide-react";
 
+import { SectionLabel } from "@/components/ui/panel";
 import { THEMES, type Theme } from "@/lib/themes";
 import { cn } from "@/lib/utils";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -19,6 +20,7 @@ const ThemeCard = ({
       type="button"
       onClick={onSelect}
       title={theme.name}
+      aria-pressed={selected}
       className={cn(
         "group flex flex-col gap-1.5 rounded-lg border p-1.5 text-left transition-colors",
         selected ? "border-accent" : "border-border hover:border-border-strong",
@@ -77,9 +79,7 @@ export const ThemePicker = () => {
     <div className="flex flex-col gap-3">
       {groups.map((group) => (
         <div key={group.label}>
-          <p className="mb-1.5 text-[10.5px] font-semibold tracking-wider text-faint uppercase">
-            {group.label}
-          </p>
+          <SectionLabel className="mb-1.5">{group.label}</SectionLabel>
           <div className="grid grid-cols-4 gap-2">
             {group.themes.map((theme) => (
               <ThemeCard

@@ -1,19 +1,20 @@
 export const singleFlight = (run: () => Promise<void>) => {
   let inflight: Promise<void> | null = null;
-  let queued = false;
+  let queued: Promise<void> | null = null;
   const trigger = (): Promise<void> => {
-    if (inflight) {
-      queued = true;
+    if (!inflight) {
+      inflight = run().finally(() => {
+        inflight = null;
+      });
       return inflight;
     }
-    inflight = run().finally(() => {
-      inflight = null;
-      if (queued) {
-        queued = false;
-        void trigger();
-      }
-    });
-    return inflight;
+    queued ??= inflight
+      .catch(() => undefined)
+      .then(() => {
+        queued = null;
+        return trigger();
+      });
+    return queued;
   };
   return trigger;
 };

@@ -8,11 +8,12 @@ use std::{
 
 use anyhow::{anyhow, Context};
 use parking_lot::Mutex;
-use portable_pty::{native_pty_system, ChildKiller, CommandBuilder, MasterPty, PtySize};
+use portable_pty::{native_pty_system, Child, ChildKiller, CommandBuilder, MasterPty, PtySize};
 use serde::{Deserialize, Serialize};
 use tauri::ipc::Channel;
 
 const REPLAY_LIMIT: usize = 2 * 1024 * 1024;
+const LINE_SEARCH_LIMIT: usize = 64 * 1024;
 const SENDER_BATCH_LIMIT: usize = 512 * 1024;
 
 const ALLOWED_PROGRAMS: &[&str] = &["claude", "codex", "pwsh", "powershell", "cmd", "wsl", "bash", "zsh", "fish", "nu", "sh"];
@@ -68,6 +69,17 @@ struct Output {
     exit_code: Option<u32>,
 }
 
+fn replay_cut(replay: &str) -> usize {
+    let mut cut = replay.len() - REPLAY_LIMIT / 2;
+    while !replay.is_char_boundary(cut) {
+        cut += 1;
+    }
+    match replay[cut..].find('\n') {
+        Some(offset) if offset < LINE_SEARCH_LIMIT => cut + offset + 1,
+        _ => cut,
+    }
+}
+
 impl Output {
     fn emit(&self, event: PtyEvent) {
         if let Some(channel) = &self.channel {
@@ -78,13 +90,16 @@ impl Output {
     fn push(&mut self, data: String) {
         self.replay.push_str(&data);
         if self.replay.len() > REPLAY_LIMIT {
-            let mut cut = self.replay.len() - REPLAY_LIMIT / 2;
-            while !self.replay.is_char_boundary(cut) {
-                cut += 1;
-            }
+            let cut = replay_cut(&self.replay);
             self.replay.drain(..cut);
         }
         self.emit(PtyEvent::Data { data });
+    }
+
+    fn finish(&mut self, code: Option<u32>) {
+        self.exited = true;
+        self.exit_code = code;
+        self.emit(PtyEvent::Exit { code });
     }
 }
 
@@ -102,15 +117,28 @@ impl PtyProcess {
         PtyInfo { id: id.to_string(), pid: self.pid, exit_code: output.exit_code, exited: output.exited }
     }
 
+    fn exited(&self) -> bool {
+        self.output.lock().exited
+    }
+
     fn close(&self) {
         self.input.lock().take();
         self.master.lock().take();
+    }
+
+    fn stop(&self) {
+        self.output.lock().channel = None;
+        if !self.exited() {
+            let _ = self.killer.lock().kill();
+        }
+        self.close();
     }
 }
 
 #[derive(Default)]
 pub struct PtyManager {
     processes: Mutex<HashMap<String, Arc<PtyProcess>>>,
+    spawning: Mutex<HashMap<String, Arc<Mutex<()>>>>,
 }
 
 pub fn drain_utf8(pending: &mut Vec<u8>) -> String {
@@ -178,8 +206,72 @@ pub fn default_shell() -> String {
     }
 }
 
+fn is_agent_name(name: &str) -> bool {
+    !name.is_empty() && name.chars().all(|c| c.is_alphanumeric() || matches!(c, '_' | ':' | '.' | '-'))
+}
+
+fn check_agent_names(args: &[String]) -> anyhow::Result<()> {
+    for pair in args.windows(2).filter(|pair| pair[0] == "--agent") {
+        anyhow::ensure!(is_agent_name(&pair[1]), "\"{}\" isn't a valid agent name", pair[1]);
+    }
+    Ok(())
+}
+
+fn msvc_quote(arg: &str) -> String {
+    if !arg.is_empty() && !arg.contains([' ', '\t', '\n', '\x0b', '"']) {
+        return arg.to_string();
+    }
+    let mut out = String::from('"');
+    let mut backslashes = 0;
+    for c in arg.chars() {
+        match c {
+            '\\' => backslashes += 1,
+            '"' => {
+                out.push_str(&"\\".repeat(backslashes * 2 + 1));
+                out.push('"');
+                backslashes = 0;
+            }
+            _ => {
+                out.push_str(&"\\".repeat(backslashes));
+                out.push(c);
+                backslashes = 0;
+            }
+        }
+    }
+    out.push_str(&"\\".repeat(backslashes * 2));
+    out.push('"');
+    out
+}
+
+fn is_batch_file(program: &Path) -> bool {
+    program.extension().is_some_and(|e| e.eq_ignore_ascii_case("cmd") || e.eq_ignore_ascii_case("bat"))
+}
+
+fn check_batch_arguments(program: &Path, args: &[String]) -> anyhow::Result<()> {
+    let line = std::iter::once(program.to_string_lossy().to_string()).chain(args.iter().cloned()).map(|a| msvc_quote(&a)).collect::<Vec<_>>().join(" ");
+    let mut quoted = false;
+    for c in line.chars() {
+        let unsafe_anywhere = matches!(c, '%' | '!' | '\r' | '\n');
+        let unsafe_outside = matches!(c, '&' | '|' | '<' | '>' | '^' | '(' | ')');
+        anyhow::ensure!(
+            !unsafe_anywhere && (quoted || !unsafe_outside),
+            "{} is a batch file, and one of its arguments contains characters cmd.exe would run as commands",
+            program.display()
+        );
+        if c == '"' {
+            quoted = !quoted;
+        }
+    }
+    Ok(())
+}
+
 fn build_command(req: &SpawnRequest) -> anyhow::Result<CommandBuilder> {
-    let mut cmd = CommandBuilder::new(resolve_program(&req.program)?);
+    check_agent_names(&req.args)?;
+    let program = resolve_program(&req.program)?;
+    if is_batch_file(&program) {
+        check_batch_arguments(&program, &req.args)?;
+    }
+    let mut cmd = CommandBuilder::new(program);
     cmd.args(&req.args);
     cmd.cwd(&req.cwd);
     let inherited = std::env::vars_os()
@@ -209,28 +301,31 @@ fn size(cols: u16, rows: u16) -> PtySize {
 
 impl PtyManager {
     pub fn spawn(&self, req: SpawnRequest, channel: Channel<PtyEvent>) -> anyhow::Result<PtyInfo> {
-        let mut processes = self.processes.lock();
-        if let Some(existing) = processes.get(&req.id).cloned() {
-            if !existing.output.lock().exited {
-                drop(processes);
+        let slot = self.spawning.lock().entry(req.id.clone()).or_default().clone();
+        let _spawning = slot.lock();
+        let existing = self.processes.lock().get(&req.id).cloned();
+        if let Some(existing) = existing {
+            if !existing.exited() {
                 return self.attach(&req.id, channel);
             }
             existing.close();
-            processes.remove(&req.id);
+            self.processes.lock().remove(&req.id);
         }
         anyhow::ensure!(Path::new(&req.cwd).is_dir(), "Folder does not exist: {}", req.cwd);
 
-        let pair = native_pty_system()
-            .openpty(size(req.cols, req.rows))
-            .map_err(|e| anyhow!("Could not open a terminal: {e}"))?;
-        let mut child = pair
-            .slave
-            .spawn_command(build_command(&req)?)
-            .map_err(|e| anyhow!("Could not start {}: {e}", req.program))?;
+        let command = build_command(&req)?;
+        let pair = native_pty_system().openpty(size(req.cols, req.rows)).map_err(|e| anyhow!("Could not open a terminal: {e}"))?;
+        let mut child = pair.slave.spawn_command(command).map_err(|e| anyhow!("Could not start {}: {e}", req.program))?;
         drop(pair.slave);
+        let pipes = pair.master.try_clone_reader().and_then(|reader| pair.master.take_writer().map(|writer| (reader, writer)));
+        let (reader, writer) = match pipes {
+            Ok(pipes) => pipes,
+            Err(error) => {
+                let _ = child.kill();
+                return Err(anyhow!("Could not connect to the terminal: {error}"));
+            }
+        };
 
-        let reader = pair.master.try_clone_reader().map_err(|e| anyhow!("{e}"))?;
-        let writer = pair.master.take_writer().map_err(|e| anyhow!("{e}"))?;
         let output = Arc::new(Mutex::new(Output { channel: Some(channel), ..Output::default() }));
         let process = Arc::new(PtyProcess {
             input: Mutex::new(Some(spawn_writer(writer))),
@@ -239,24 +334,12 @@ impl PtyManager {
             pid: child.process_id(),
             output: output.clone(),
         });
-        processes.insert(req.id.clone(), process.clone());
-        drop(processes);
-
-        let (tx, rx) = mpsc::channel::<String>();
-        spawn_reader(reader, tx);
-        spawn_sender(rx, output.clone());
-
-        let waiter = process.clone();
-        thread::spawn(move || {
-            let code = child.wait().ok().map(|s| s.exit_code());
-            {
-                let mut output = waiter.output.lock();
-                output.exited = true;
-                output.exit_code = code;
-            }
-            waiter.master.lock().take();
-        });
-
+        let (chunks_tx, chunks_rx) = mpsc::channel::<String>();
+        let (exit_tx, exit_rx) = mpsc::channel::<Option<u32>>();
+        spawn_reader(reader, chunks_tx);
+        spawn_sender(chunks_rx, exit_rx, output);
+        spawn_waiter(child, process.clone(), exit_tx);
+        self.processes.lock().insert(req.id.clone(), process.clone());
         Ok(process.info(&req.id))
     }
 
@@ -295,12 +378,11 @@ impl PtyManager {
     }
 
     pub fn kill(&self, id: &str) {
-        let Some(process) = self.processes.lock().remove(id) else { return };
-        process.output.lock().channel = None;
-        if !process.output.lock().exited {
-            let _ = process.killer.lock().kill();
+        let removed = self.processes.lock().remove(id);
+        self.spawning.lock().remove(id);
+        if let Some(process) = removed {
+            process.stop();
         }
-        process.close();
     }
 
     pub fn list(&self) -> Vec<PtyInfo> {
@@ -310,8 +392,7 @@ impl PtyManager {
     pub fn kill_all(&self) {
         let processes: Vec<_> = self.processes.lock().drain().collect();
         for (_, process) in processes {
-            let _ = process.killer.lock().kill();
-            process.close();
+            process.stop();
         }
     }
 }
@@ -347,7 +428,7 @@ fn spawn_reader(mut reader: Box<dyn Read + Send>, tx: mpsc::Sender<String>) {
     });
 }
 
-fn spawn_sender(rx: mpsc::Receiver<String>, output: Arc<Mutex<Output>>) {
+fn spawn_sender(rx: mpsc::Receiver<String>, exit: mpsc::Receiver<Option<u32>>, output: Arc<Mutex<Output>>) {
     thread::spawn(move || {
         while let Ok(mut batch) = rx.recv() {
             while batch.len() < SENDER_BATCH_LIMIT {
@@ -358,16 +439,23 @@ fn spawn_sender(rx: mpsc::Receiver<String>, output: Arc<Mutex<Output>>) {
             }
             output.lock().push(batch);
         }
-        let mut output = output.lock();
-        output.exited = true;
-        let code = output.exit_code;
-        output.emit(PtyEvent::Exit { code });
+        let code = exit.recv().ok().flatten();
+        output.lock().finish(code);
+    });
+}
+
+fn spawn_waiter(mut child: Box<dyn Child + Send + Sync>, process: Arc<PtyProcess>, exit: mpsc::Sender<Option<u32>>) {
+    thread::spawn(move || {
+        let code = child.wait().ok().map(|s| s.exit_code());
+        process.master.lock().take();
+        process.input.lock().take();
+        let _ = exit.send(code);
     });
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{drain_utf8, program_stem, ALLOWED_PROGRAMS};
+    use super::*;
 
     #[test]
     fn keeps_incomplete_multibyte_sequence_for_next_read() {
@@ -392,5 +480,35 @@ mod tests {
         assert!(ALLOWED_PROGRAMS.contains(&program_stem("C:\\Program Files\\PowerShell\\7\\pwsh.exe").as_str()));
         assert!(ALLOWED_PROGRAMS.contains(&program_stem("wsl.exe").as_str()));
         assert!(!ALLOWED_PROGRAMS.contains(&program_stem("calc.exe").as_str()));
+    }
+
+    #[test]
+    fn trims_replay_at_a_line_break() {
+        let replay = format!("{}{}\n{}", "a".repeat(REPLAY_LIMIT / 2), "x".repeat(500), "b".repeat(REPLAY_LIMIT / 2 - 1000));
+        let cut = replay_cut(&replay);
+        assert_eq!((&replay[cut - 1..cut], &replay[cut..cut + 1]), ("\n", "b"));
+        let unbroken = "é".repeat(REPLAY_LIMIT / 2 + 3);
+        assert!(unbroken.is_char_boundary(replay_cut(&unbroken)));
+    }
+
+    #[test]
+    fn validates_agent_names() {
+        assert!(check_agent_names(&["--agent".into(), "plugin:code-reviewer.v2".into()]).is_ok());
+        assert!(check_agent_names(&["--agent".into(), "x&calc".into()]).is_err());
+        assert!(check_agent_names(&["--resume".into(), "a&b".into()]).is_ok());
+    }
+
+    #[test]
+    fn guards_batch_file_arguments() {
+        let shim = Path::new(r"C:\Users\me\AppData\Roaming\npm\claude.cmd");
+        let ok = |args: &[&str]| check_batch_arguments(shim, &args.iter().map(|a| a.to_string()).collect::<Vec<_>>()).is_ok();
+        assert!(ok(&["--resume", "11111111-2222-4333-8444-555555555555", "--settings", r#"{"theme":"dark"}"#]));
+        assert!(ok(&["--append-system-prompt", "be brief & kind"]));
+        assert!(!ok(&["x&calc"]));
+        assert!(!ok(&[r#"a\"&calc"#]));
+        assert!(!ok(&["%PATH%"]));
+        assert!(!ok(&["line\nbreak"]));
+        assert_eq!(msvc_quote(r#"{"a":"b"}"#), r#""{\"a\":\"b\"}""#);
+        assert_eq!(msvc_quote(r"C:\dir with space\"), r#""C:\dir with space\\""#);
     }
 }

@@ -1,6 +1,6 @@
 import { toast } from "sonner";
 
-import { isPersisted, type LaunchOptions } from "@/lib/agents/launch";
+import { SUBAGENT_NAME } from "@/lib/agents/registry";
 import { externalLive } from "@/lib/sessions";
 import { api } from "@/lib/tauri/commands";
 import { pickFolder } from "@/lib/tauri/system";
@@ -9,15 +9,17 @@ import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { isTerminalAlive, useTerminalStore } from "@/stores/terminal-store";
 import { useUiStore } from "@/stores/ui-store";
+import { useViewerStore } from "@/stores/viewer-store";
+import { workspaceFromSession } from "@/stores/workspace-factory";
 import { findWorkspace, findWorkspaceBySession, useWorkspaceStore } from "@/stores/workspace-store";
 import type { AgentId, SessionInfo } from "@/types";
 
 const promptLabel = (count: number) => `${count} ${count === 1 ? "prompt" : "prompts"}`;
 
 const openElsewhere = (sessionId: string) => {
-  const { live } = useSessionsStore.getState();
+  const ownPids = Object.values(useTerminalStore.getState().terminals).map((t) => t.pid);
   return (
-    externalLive(live, useTerminalStore.getState().terminals).find(
+    externalLive(useSessionsStore.getState().live, ownPids).find(
       (l) => l.sessionId === sessionId,
     ) ?? null
   );
@@ -37,24 +39,24 @@ const confirmOpenElsewhere = async (sessionId: string) => {
 export const previewSession = (session: SessionInfo) =>
   useWorkspaceStore.getState().openSession(session);
 
-export const resumeWorkspace = async (workspaceId: string, options: LaunchOptions = {}) => {
+export const resumeWorkspace = async (workspaceId: string, options: { fork?: boolean } = {}) => {
   const workspace = findWorkspace(workspaceId);
   if (!workspace) return;
-  if (options.fork && !isPersisted(workspace)) {
-    toast.error("Nothing to fork yet — send a prompt in this session first.");
+  if (options.fork) {
+    useWorkspaceStore.getState().fork(workspace);
     return;
   }
-  if (
-    !options.fork &&
-    workspace.mode !== "live" &&
-    !(await confirmOpenElsewhere(workspace.sessionId))
-  )
-    return;
-  useWorkspaceStore.getState().launch(workspaceId, options);
+  if (workspace.mode !== "live" && !(await confirmOpenElsewhere(workspace.sessionId))) return;
+  useWorkspaceStore.getState().launch(workspaceId);
 };
 
-export const resumeSession = async (session: SessionInfo, options: LaunchOptions = {}) =>
-  resumeWorkspace(previewSession(session), options);
+export const resumeSession = async (session: SessionInfo) =>
+  resumeWorkspace(previewSession(session));
+
+export const forkSession = (session: SessionInfo) =>
+  useWorkspaceStore
+    .getState()
+    .fork(findWorkspaceBySession(session.id) ?? workspaceFromSession(session));
 
 export const openSessionByClick = (session: SessionInfo) =>
   useSettingsStore.getState().clickBehavior === "resume"
@@ -71,8 +73,13 @@ export const startSessionInPickedFolder = async (defaultPath?: string, agent?: A
   if (folder) startNewSession(folder, agent);
 };
 
-export const startAgentSession = (cwd: string, subagent: string) =>
+export const startAgentSession = (cwd: string, subagent: string) => {
+  if (!SUBAGENT_NAME.test(subagent)) {
+    toast.error(`“${subagent}” isn't a valid agent name.`);
+    return;
+  }
   useWorkspaceStore.getState().newSession(cwd, { subagent });
+};
 
 export const renameSession = (session: SessionInfo) =>
   useUiStore.getState().setRenameTarget(session);
@@ -98,7 +105,10 @@ export const deleteSessionWithConfirm = async (session: SessionInfo) => {
   if (!confirmed) return;
   try {
     await api.deleteSession(session.filePath, session.distro);
-    if (workspace) await useWorkspaceStore.getState().close(workspace.id);
+    if (workspace) {
+      await useWorkspaceStore.getState().close(workspace.id);
+      useViewerStore.getState().forget(workspace.openFiles);
+    }
     useSessionsStore.getState().removeSession(session.id);
     useSettingsStore.getState().forgetSession(session.id);
     toast.success(session.distro ? "Session deleted" : "Session moved to the Recycle Bin");

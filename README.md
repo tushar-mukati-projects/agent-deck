@@ -17,14 +17,15 @@ Built with **Tauri 2** (Rust backend, system WebView2) + **React 19 / TypeScript
 - **Delete sessions** — right-click → *Delete session…* (or the Delete button in the preview). Windows sessions go to the Recycle Bin; WSL sessions are deleted permanently. Running sessions can't be deleted.
 - **Detects sessions open elsewhere** (from `~/.claude/sessions`) and warns before double-resuming.
 - **Shells per session** — any number of PowerShell tabs in the session folder (`Ctrl+\``).
-- **Explorer + viewer** — virtualized tree with live file watching; markdown preview (GFM, sanitized), syntax-highlighted code with edit & save, images, PDF, audio/video. Files auto-reload when Claude edits them. "Mention in Claude" inserts `@path`.
+- **Explorer + viewer** — virtualized tree with live file watching (an inotify watcher inside WSL for Linux folders); markdown preview (GFM, sanitized), syntax-highlighted code with edit & save, images, PDF, audio/video. Files auto-reload when an agent edits them; saving detects changes made on disk meanwhile and asks before overwriting, keeps UTF-16 files in their encoding, and opens undecodable files read-only. "Mention" inserts `@path`.
 - **What changed** — files Claude edited in this session (with diffs against its own backups) plus uncommitted git changes.
 - **Claude view** (`Ctrl+Shift+J`) — everything Claude loads for the open folder: memory (CLAUDE.md files and auto memory), MCP servers, skills, agents, slash commands, hooks, permission rules, plugins and settings files. Click an MCP server to start it and try its tools; Postgres servers also get a table browser and SQL editor using the server's own credentials (secrets never reach the UI).
 - **Search inside conversations** (`Ctrl+Shift+F`) — full-text search across every transcript, Windows and WSL.
 - **Attention** — notification, sound and taskbar badge when Claude finishes while you're elsewhere; `Ctrl+Shift+A` or the status bar jumps to the waiting session.
-- **Pin / rename / archive** sessions, 21 themes, clickable file paths in terminal output, drag files from the explorer into a terminal to mention them.
+- **Pin / rename / archive** sessions, 21 themes, clickable file paths in terminal output (resolved against the agent's recent working folders, with `:line`), drag files from the explorer into a terminal to mention them.
 - **Command palette** (`Ctrl+Shift+P`), **quick open** (`Ctrl+P`) and a shortcut sheet (`Ctrl+/`).
-- Tabs survive app restarts (reopen as previews) and UI reloads (terminals reattach with replayed output).
+- Tabs survive app restarts (reopen as previews) and UI reloads (terminals reattach with replayed output). Closing a tab or quitting asks first when something is running or a file has unsaved edits.
+- **Safe by default** — local files reach the page only through Deck's own `deckfile:` scheme, which refuses network (UNC) paths and credential folders; "Open with default app" never launches programs or scripts; MCP secrets are masked in every view; the SQL editor and MCP tools ask before statements that change data.
 
 ## Shortcuts
 
@@ -68,12 +69,15 @@ src-tauri/src/
   sessions.rs   session index (incremental JSONL parsing, rayon), transcripts, search, rename, delete
   changes.rs    "what changed" from session file-history backups
   git.rs        hardened git status / HEAD reads
-  claude_config.rs  memory, MCP servers, skills, agents, commands, hooks, settings, plugins
-  mcp.rs        MCP client (stdio + streamable HTTP)
-  pg.rs         Postgres browser for database MCP servers
+  claude_config/ memory, MCP servers, skills, agents, commands, hooks, settings, plugins (ctx, servers, redact, overview)
+  mcp.rs        MCP client (stdio + streamable HTTP), one pooled client per server
+  pg.rs         Postgres browser for database MCP servers (tokio-postgres, cancel, WSL relay)
+  file_protocol.rs  deckfile: scheme for images and media, guarded before any file access
+  pool.rs       keyed get-or-create pool used by MCP and Postgres
+  process.rs    Windows Job Objects so helper processes die with their children
   wsl.rs        WSL bridge; wsl_agent.py runs inside the distro
   pty.rs        ConPTY terminals: reader + coalescing sender threads, replay buffer, env scrubbing
-  fsx.rs        directory listing, file read/write, gitignore-aware file list
+  fsx.rs        directory listing, file read/write with conflict detection, open/reveal, gitignore-aware file list
   watcher.rs    debounced file watchers (folders + ~/.claude)
 src/
   lib/terminal/registry.ts   xterm instances live outside React (never lost on tab switch)

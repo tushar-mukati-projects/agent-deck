@@ -9,8 +9,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/menu";
+import { useAgents } from "@/hooks/useAgents";
 import { useFolders } from "@/hooks/useFolders";
-import { agentName, listAgents } from "@/lib/agents/registry";
+import { agentName } from "@/lib/agents/registry";
 import { shortcutLabel } from "@/lib/shortcuts";
 import { basename, samePath, shortenHome } from "@/lib/utils";
 import { useSessionsStore } from "@/stores/sessions-store";
@@ -22,8 +23,7 @@ export const NewSessionMenu = ({ children }: { children: React.ReactNode }) => {
   const active = useActiveWorkspace();
   const home = useSessionsStore((s) => s.environment?.home ?? "");
   const defaultAgent = useSettingsStore((s) => s.defaultAgent);
-  useSettingsStore((s) => s.customAgents);
-  const agents = listAgents();
+  const agents = useAgents();
   const recent = folders.filter((f) => !active || !samePath(f.cwd, active.cwd)).slice(0, 7);
 
   return (

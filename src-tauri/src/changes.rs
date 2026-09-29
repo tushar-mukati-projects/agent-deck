@@ -18,11 +18,20 @@ const MAX_DIFF_BYTES: u64 = 2 * 1024 * 1024;
 const DIFF_TIMEOUT: Duration = Duration::from_millis(300);
 const EDIT_TOOLS: &[&str] = &["Write", "Edit", "MultiEdit", "NotebookEdit"];
 
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum ChangeStatus {
+    Added,
+    Modified,
+    Deleted,
+    Unchanged,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct ChangedFile {
     pub path: String,
-    pub status: String,
+    pub status: ChangeStatus,
     pub additions: u32,
     pub deletions: u32,
     pub edits: u32,
@@ -128,17 +137,18 @@ fn describe(path: PathBuf, info: Tracked, backups_dir: &Path) -> Option<ChangedF
     let exists = path.is_file();
     let status = match (&backup, exists) {
         (None, false) => return None,
-        (None, true) => "added",
-        (Some(_), false) => "deleted",
-        (Some(_), true) => "modified",
+        (None, true) => ChangeStatus::Added,
+        (Some(_), false) => ChangeStatus::Deleted,
+        (Some(_), true) => ChangeStatus::Modified,
     };
-    let before = backup.as_ref().and_then(|name| read_text(&backups_dir.join(name))).unwrap_or_default();
-    let after = if exists { read_text(&path).unwrap_or_default() } else { String::new() };
-    let status = if status == "modified" && before == after { "unchanged" } else { status };
-    let (additions, deletions) = line_stats(&before, &after);
+    let before = backup.as_ref().and_then(|name| read_text(&backups_dir.join(name)));
+    let after = if exists { read_text(&path) } else { None };
+    let same = matches!((&before, &after), (Some(b), Some(a)) if b == a);
+    let status = if status == ChangeStatus::Modified && same { ChangeStatus::Unchanged } else { status };
+    let (additions, deletions) = line_stats(before.as_deref().unwrap_or(""), after.as_deref().unwrap_or(""));
     Some(ChangedFile {
         path: path.to_string_lossy().to_string(),
-        status: status.to_string(),
+        status,
         additions,
         deletions,
         edits: info.edits,

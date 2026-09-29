@@ -2,7 +2,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { SearchAddon } from "@xterm/addon-search";
 import { Unicode11Addon } from "@xterm/addon-unicode11";
 import { WebLinksAddon } from "@xterm/addon-web-links";
-import { WebglAddon } from "@xterm/addon-webgl";
+import type { WebglAddon } from "@xterm/addon-webgl";
 import { Terminal } from "@xterm/xterm";
 
 import { api } from "@/lib/tauri/commands";
@@ -21,29 +21,26 @@ import {
   createPasteHandler,
 } from "@/lib/terminal/input";
 import { registerPathLinks, type PathLinkTarget } from "@/lib/terminal/links";
+import { ensureWebgl, releaseWebgl } from "@/lib/terminal/webgl";
 import { findTheme } from "@/lib/themes";
 import { errorMessage } from "@/lib/utils";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useTerminalStore } from "@/stores/terminal-store";
-import type { PtyEvent, TerminalKind } from "@/types";
+import type { AgentId, PtyEvent, TerminalKind } from "@/types";
 
 export interface TerminalSpec {
   id: string;
   kind: TerminalKind;
+  agent?: AgentId;
   workspaceId: string;
   cwd: string;
   root: string;
   program: string;
   args: string[];
-  initialInput?: string;
 }
 
 interface Entry {
   spec: TerminalSpec;
-  id: string;
-  kind: TerminalKind;
-  workspaceId: string;
-  cwd: string;
   term: Terminal;
   fit: FitAddon;
   search: SearchAddon;
@@ -51,12 +48,12 @@ interface Entry {
   webgl: WebglAddon | null;
   opened: boolean;
   spawned: boolean;
+  exited: boolean;
   generation: number;
   focusOnMount: boolean;
   activity: Activity;
 }
 
-const MAX_WEBGL_CONTEXTS = 6;
 const SEARCH_DECORATIONS = {
   matchBackground: "#88888855",
   activeMatchBackground: "#e27a55aa",
@@ -65,7 +62,6 @@ const SEARCH_DECORATIONS = {
 };
 
 const entries = new Map<string, Entry>();
-const webglOrder: string[] = [];
 const findListeners = new Set<(terminalId: string) => void>();
 let pathLinkHandler: ((workspaceId: string, target: PathLinkTarget) => void) | null = null;
 let runningPtys = new Set<string>();
@@ -90,39 +86,11 @@ export const setPathLinkHandler = (
 };
 
 const isCurrent = (entry: Entry, generation: number) =>
-  entries.get(entry.id) === entry && entry.generation === generation;
-
-const releaseWebgl = (entry: Entry) => {
-  entry.webgl?.dispose();
-  entry.webgl = null;
-  const index = webglOrder.indexOf(entry.id);
-  if (index >= 0) webglOrder.splice(index, 1);
-};
-
-const ensureWebgl = (entry: Entry) => {
-  const index = webglOrder.indexOf(entry.id);
-  if (index >= 0) webglOrder.splice(index, 1);
-  webglOrder.push(entry.id);
-  if (!entry.webgl) {
-    try {
-      const addon = new WebglAddon();
-      addon.onContextLoss(() => releaseWebgl(entry));
-      entry.term.loadAddon(addon);
-      entry.webgl = addon;
-    } catch {
-      entry.webgl = null;
-    }
-  }
-  while (webglOrder.length > MAX_WEBGL_CONTEXTS) {
-    const oldest = entries.get(webglOrder[0]);
-    if (oldest) releaseWebgl(oldest);
-    else webglOrder.shift();
-  }
-};
+  entries.get(entry.spec.id) === entry && entry.generation === generation;
 
 const send = (entry: Entry, data: string) => {
   noteInput(entry);
-  api.ptyWrite(entry.id, data).catch(() => undefined);
+  api.ptyWrite(entry.spec.id, data).catch(() => undefined);
 };
 
 const handlePtyEvent = (entry: Entry, generation: number) => (event: PtyEvent) => {
@@ -132,13 +100,15 @@ const handlePtyEvent = (entry: Entry, generation: number) => (event: PtyEvent) =
     noteOutput(entry);
     return;
   }
+  entry.exited = true;
   resetActivity(entry);
-  runningPtys.delete(entry.id);
-  store().update(entry.id, { status: "exited", exitCode: event.code });
+  runningPtys.delete(entry.spec.id);
+  store().update(entry.spec.id, { status: "exited", exitCode: event.code });
 };
 
 const createEntry = (spec: TerminalSpec): Entry => {
   const { fontSize, themeId } = useSettingsStore.getState();
+  const theme = findTheme(themeId);
   const term = new Terminal({
     allowProposedApi: true,
     fontFamily: '"JetBrains Mono Variable", "Cascadia Code", Consolas, monospace',
@@ -151,16 +121,15 @@ const createEntry = (spec: TerminalSpec): Entry => {
     cursorWidth: 2,
     scrollback: 10_000,
     smoothScrollDuration: 90,
-    minimumContrastRatio: findTheme(themeId).terminalContrast,
+    minimumContrastRatio: theme.terminalContrast,
     drawBoldTextInBrightColors: false,
-    theme: findTheme(themeId).terminal,
+    theme: theme.terminal,
   });
   const fit = new FitAddon();
   const search = new SearchAddon();
-  const unicode = new Unicode11Addon();
   term.loadAddon(fit);
   term.loadAddon(search);
-  term.loadAddon(unicode);
+  term.loadAddon(new Unicode11Addon());
   term.loadAddon(new WebLinksAddon((_event, uri) => void openExternal(uri)));
   term.unicode.activeVersion = "11";
 
@@ -170,10 +139,6 @@ const createEntry = (spec: TerminalSpec): Entry => {
 
   const entry: Entry = {
     spec,
-    id: spec.id,
-    kind: spec.kind,
-    workspaceId: spec.workspaceId,
-    cwd: spec.root,
     term,
     fit,
     search,
@@ -181,24 +146,23 @@ const createEntry = (spec: TerminalSpec): Entry => {
     webgl: null,
     opened: false,
     spawned: false,
+    exited: false,
     generation: 0,
     focusOnMount: false,
     activity: createActivity(),
   };
 
   const owner = {
-    kind: spec.kind,
+    get agent() {
+      return entry.spec.kind === "agent" ? (entry.spec.agent ?? null) : null;
+    },
     term,
     send: (data: string) => send(entry, data),
-    onFind: () => findListeners.forEach((listener) => listener(entry.id)),
+    onFind: () => findListeners.forEach((listener) => listener(entry.spec.id)),
   };
   term.attachCustomKeyEventHandler(createKeyHandler(owner));
   term.onData((data) => send(entry, data));
-  registerPathLinks(
-    term,
-    () => entry.spec.root,
-    (target) => pathLinkHandler?.(entry.workspaceId, target),
-  );
+  registerPathLinks(term, (target) => pathLinkHandler?.(entry.spec.workspaceId, target));
   element.addEventListener("paste", createPasteHandler(owner), true);
   element.addEventListener("contextmenu", createContextMenuHandler(owner));
   return entry;
@@ -209,6 +173,7 @@ const spawnPty = async (entry: Entry) => {
   const { spec, term } = entry;
   const attaching = runningPtys.has(spec.id);
   entry.spawned = true;
+  entry.exited = false;
   store().update(spec.id, { status: "starting", error: null, exitCode: null });
   try {
     const onEvent = handlePtyEvent(entry, generation);
@@ -229,15 +194,19 @@ const spawnPty = async (entry: Entry) => {
       void api.ptyKill(spec.id).catch(() => undefined);
       return;
     }
-    if (!info.exited) runningPtys.add(spec.id);
-    store().update(spec.id, {
-      status: info.exited ? "exited" : "running",
-      pid: info.pid,
-      exitCode: info.exitCode,
-    });
-    if (info.exited) return;
+    if (info.exited || entry.exited) {
+      entry.exited = true;
+      runningPtys.delete(spec.id);
+      store().update(spec.id, {
+        status: "exited",
+        pid: info.pid,
+        ...(info.exited ? { exitCode: info.exitCode } : {}),
+      });
+      return;
+    }
+    runningPtys.add(spec.id);
+    store().update(spec.id, { status: "running", pid: info.pid, exitCode: null });
     void api.ptyResize(spec.id, term.cols, term.rows).catch(() => undefined);
-    if (!attaching && spec.initialInput) send(entry, `${spec.initialInput}\r`);
   } catch (error) {
     if (!isCurrent(entry, generation)) return;
     entry.spawned = false;
@@ -337,14 +306,14 @@ export const clearTerminalSearch = (id: string) => {
   entry?.term.clearSelection();
 };
 
-export const restartTerminal = async (id: string, spec?: TerminalSpec) => {
+export const restartTerminal = async (id: string, spec: TerminalSpec) => {
   const entry = entries.get(id);
   if (!entry) return;
   entry.generation += 1;
   resetActivity(entry);
   runningPtys.delete(id);
   await api.ptyKill(id).catch(() => undefined);
-  if (spec) entry.spec = spec;
+  entry.spec = spec;
   entry.term.reset();
   await spawnPty(entry);
 };

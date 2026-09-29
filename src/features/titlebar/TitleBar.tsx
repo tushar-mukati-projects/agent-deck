@@ -12,23 +12,33 @@ import {
   X,
 } from "lucide-react";
 
+import { useShallow } from "zustand/react/shallow";
+
 import { IconButton } from "@/components/ui/icon-button";
 import { Kbd } from "@/components/ui/kbd";
+import { TabStrip } from "@/components/ui/tabs";
 import { NewSessionMenu } from "@/features/titlebar/NewSessionMenu";
 import { WorkspaceTab } from "@/features/titlebar/WorkspaceTab";
 import { shortcutLabel } from "@/lib/shortcuts";
 import { appWindow } from "@/lib/tauri/system";
 import { useUiStore } from "@/stores/ui-store";
-import { useActiveWorkspace, useWorkspaceStore } from "@/stores/workspace-store";
+import { useWorkspaceStore } from "@/stores/workspace-store";
 
 const WindowControls = () => {
   const [maximized, setMaximized] = useState(false);
 
   useEffect(() => {
+    let timer: number | undefined;
     const sync = () => void appWindow.isMaximized().then(setMaximized);
     sync();
-    const unlisten = appWindow.onResized(sync);
-    return () => void unlisten.then((fn) => fn());
+    const unlisten = appWindow.onResized(() => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(sync, 120);
+    });
+    return () => {
+      window.clearTimeout(timer);
+      void unlisten.then((fn) => fn());
+    };
   }, []);
 
   const controlClass =
@@ -69,11 +79,11 @@ const WindowControls = () => {
 };
 
 export const TitleBar = () => {
-  const workspaces = useWorkspaceStore((s) => s.workspaces);
+  const workspaceIds = useWorkspaceStore(useShallow((s) => s.workspaces.map((w) => w.id)));
   const openPalette = useUiStore((s) => s.openPalette);
   const sessionsOpen = useUiStore((s) => s.sessionsOpen);
   const contextOpen = useUiStore((s) => s.contextOpen);
-  const hasWorkspace = !!useActiveWorkspace();
+  const hasWorkspace = useWorkspaceStore((s) => s.workspaces.some((w) => w.id === s.activeId));
   const { toggleSessions, toggleContext, setShortcutsOpen, setSettingsOpen } =
     useUiStore.getState();
 
@@ -92,17 +102,11 @@ export const TitleBar = () => {
       </div>
 
       <div className="flex min-w-0 flex-1 items-stretch">
-        <div
-          role="tablist"
-          onWheel={(e) => {
-            if (e.deltaY) e.currentTarget.scrollLeft += e.deltaY;
-          }}
-          className="no-scrollbar flex min-w-0 items-stretch overflow-x-auto"
-        >
-          {workspaces.map((workspace) => (
-            <WorkspaceTab key={workspace.id} workspace={workspace} />
+        <TabStrip label="Session tabs" className="min-w-0 items-stretch">
+          {workspaceIds.map((id) => (
+            <WorkspaceTab key={id} workspaceId={id} />
           ))}
-        </div>
+        </TabStrip>
         <div data-tauri-drag-region className="flex min-w-10 flex-1 items-center pl-1">
           <NewSessionMenu>
             <IconButton label="New session" shortcut={shortcutLabel("newSession")}>

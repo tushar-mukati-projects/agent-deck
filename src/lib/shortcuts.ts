@@ -28,12 +28,13 @@ interface Shortcut {
   action: ShortcutAction;
   key: string;
   ctrl?: boolean;
-  shift?: boolean;
+  shift?: boolean | "any";
   alt?: boolean;
   label: string;
   description: string;
   group: ShortcutGroup;
   passToShell?: boolean;
+  passToEditor?: boolean;
 }
 
 export const SHORTCUTS: Shortcut[] = [
@@ -79,6 +80,7 @@ export const SHORTCUTS: Shortcut[] = [
     label: "Ctrl /",
     description: "Keyboard shortcuts",
     group: "General",
+    passToEditor: true,
   },
   {
     action: "newSession",
@@ -208,6 +210,7 @@ export const SHORTCUTS: Shortcut[] = [
     action: "fontBigger",
     key: "=",
     ctrl: true,
+    shift: "any",
     label: "Ctrl +",
     description: "Bigger terminal font",
     group: "Terminal & files",
@@ -238,11 +241,18 @@ export const EXTRA_SHORTCUT_HINTS: { label: string; description: string; group: 
     { label: "Ctrl C", description: "Copy selection in terminal", group: "Terminal & files" },
   ];
 
+const CODE_KEYS: Record<string, string> = {
+  Backquote: "`",
+  Equal: "=",
+  NumpadAdd: "=",
+  Minus: "-",
+  NumpadSubtract: "-",
+  Numpad0: "0",
+  Slash: "/",
+};
+
 const normalizedKey = (event: KeyboardEvent) => {
-  if (event.code === "Backquote") return "`";
-  if (event.code === "Equal") return "=";
-  if (event.code === "Minus") return "-";
-  if (event.code === "Slash") return "/";
+  if (CODE_KEYS[event.code]) return CODE_KEYS[event.code];
   if (/^Key[A-Z]$/.test(event.code)) return event.code.slice(3).toLowerCase();
   return event.key.toLowerCase();
 };
@@ -255,7 +265,7 @@ const find = (event: KeyboardEvent) => {
       (s) =>
         s.key === key &&
         !!s.ctrl === event.ctrlKey &&
-        !!s.shift === event.shiftKey &&
+        (s.shift === "any" || !!s.shift === event.shiftKey) &&
         !!s.alt === event.altKey,
     ) ?? null
   );
@@ -265,10 +275,13 @@ const focusedTerminalKind = () =>
   (document.activeElement?.closest("[data-terminal-kind]") as HTMLElement | null)?.dataset
     .terminalKind ?? null;
 
+const editorFocused = () => !!document.activeElement?.closest(".cm-editor");
+
 export const matchShortcut = (event: KeyboardEvent): ShortcutAction | null => {
   const shortcut = find(event);
   if (!shortcut) return null;
   if (shortcut.passToShell && focusedTerminalKind() === "shell") return null;
+  if (shortcut.passToEditor && editorFocused()) return null;
   return shortcut.action;
 };
 

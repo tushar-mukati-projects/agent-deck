@@ -28,22 +28,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self' ipc: http://ipc.localhost; img-src 'self' asset: http://asset.localhost data: blob: https:; media-src 'self' asset: http://asset.localhost; frame-src 'self' asset: http://asset.localhost; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self'; connect-src 'self' ipc: http://ipc.localhost asset: http://asset.localhost",
-      "assetProtocol": {
-        "enable": true,
-        "scope": {
-          "allow": [
-            "**"
-          ],
-          "deny": [
-            "$HOME/.ssh/**",
-            "$HOME/.aws/**",
-            "$HOME/.gnupg/**",
-            "$HOME/.kube/**",
-            "$HOME/.azure/**"
-          ]
-        }
-      }
+      "csp": "default-src 'self' ipc: http://ipc.localhost; img-src 'self' deckfile: http://deckfile.localhost data: blob: https:; media-src 'self' deckfile: http://deckfile.localhost blob:; frame-src 'self' deckfile: http://deckfile.localhost; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self'; connect-src 'self' ipc: http://ipc.localhost deckfile: http://deckfile.localhost"
     }
   },
   "bundle": {

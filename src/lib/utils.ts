@@ -8,11 +8,14 @@ export const cn = (...inputs: ClassValue[]) => twMerge(clsx(inputs));
 
 const trimTrailingSeparators = (path: string) => path.replace(/[\\/]+$/, "");
 
+const unifySeparators = (path: string) => trimTrailingSeparators(path).replace(/\//g, "\\");
+
+const WSL_ROOT = /^\\\\wsl(?:\$|\.localhost)\\([^\\]*)(.*)$/i;
+
 export const normalizePath = (path: string) => {
-  const unified = trimTrailingSeparators(path)
-    .replace(/\//g, "\\")
-    .replace(/^\\\\wsl\$\\/i, "\\\\wsl.localhost\\");
-  return parseWslPath(unified) ? unified : unified.toLowerCase();
+  const unified = unifySeparators(path);
+  const wsl = WSL_ROOT.exec(unified);
+  return wsl ? `\\\\wsl.localhost\\${wsl[1].toLowerCase()}${wsl[2]}` : unified.toLowerCase();
 };
 
 export const samePath = (a: string, b: string) => normalizePath(a) === normalizePath(b);
@@ -49,7 +52,7 @@ export const resolvePath = (baseDir: string, relative: string) => {
 
 export const relativePath = (path: string, root: string) =>
   isWithin(path, root) && !samePath(path, root)
-    ? path.slice(trimTrailingSeparators(root).length + 1)
+    ? unifySeparators(path).split("\\").slice(normalizePath(root).split("\\").length).join("\\")
     : path;
 
 export const extension = (path: string) => {
@@ -90,6 +93,12 @@ export const timeAgo = (ms: number) => {
 };
 
 export const newId = () => crypto.randomUUID();
+
+export const omitKey = <T>(record: Record<string, T>, key: string): Record<string, T> => {
+  if (!(key in record)) return record;
+  const { [key]: _omitted, ...rest } = record;
+  return rest;
+};
 
 export const errorMessage = (error: unknown) =>
   error instanceof Error

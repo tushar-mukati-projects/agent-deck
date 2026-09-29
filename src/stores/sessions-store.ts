@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-import { liveSignature, mergeSessions, sessionsSignature } from "@/lib/sessions";
+import { liveSignature, mergeSessions, reuseSessions } from "@/lib/sessions";
 import { singleFlight } from "@/lib/single-flight";
 import { api } from "@/lib/tauri/commands";
 import { errorMessage } from "@/lib/utils";
@@ -15,11 +15,11 @@ interface SessionsState {
   byId: Record<string, SessionInfo>;
   live: LiveSession[];
   loaded: boolean;
+  loadError: string | null;
   refreshing: boolean;
   distros: WslDistro[];
   wslLoading: boolean;
   wslErrors: Record<string, string>;
-  wslShells: Record<string, string>;
   loadEnvironment: () => Promise<void>;
   refresh: () => Promise<void>;
   refreshWsl: () => Promise<void>;
@@ -36,53 +36,65 @@ const withTitles = (sessions: SessionInfo[]) => {
   );
 };
 
-const merged = (windowsSessions: SessionInfo[], wslSessions: SessionInfo[]) =>
-  mergeSessions(withTitles(windowsSessions), withTitles(wslSessions));
-
 export const useSessionsStore = create<SessionsState>((set, get) => {
-  const setSessions = (windowsSessions: SessionInfo[], wslSessions: SessionInfo[]) => {
+  let wslIndexed = false;
+
+  const setLists = (windowsSessions: SessionInfo[], wslSessions: SessionInfo[]) => {
     const state = get();
-    const unchanged =
-      sessionsSignature(windowsSessions) === sessionsSignature(state.windowsSessions) &&
-      sessionsSignature(wslSessions) === sessionsSignature(state.wslSessions);
-    if (unchanged && state.loaded) return;
+    const merged = mergeSessions(withTitles(windowsSessions), withTitles(wslSessions));
+    const sessions = reuseSessions(state.sessions, merged);
     set({
       windowsSessions,
       wslSessions,
       loaded: true,
-      ...merged(windowsSessions, wslSessions),
+      ...(sessions === state.sessions
+        ? {}
+        : { sessions, byId: Object.fromEntries(sessions.map((s) => [s.id, s])) }),
     });
   };
+
+  const updateLists = (update: (list: SessionInfo[]) => SessionInfo[]) =>
+    setLists(update(get().windowsSessions), update(get().wslSessions));
 
   const setLive = (live: LiveSession[]) => {
     if (liveSignature(live) !== liveSignature(get().live)) set({ live });
   };
 
-  const refreshLive = singleFlight(async () => setLive(await api.liveSessions()));
+  const refreshLive = singleFlight(async () => {
+    const live = await api.liveSessions().catch(() => null);
+    if (live) setLive(live);
+  });
 
   const refresh = singleFlight(async () => {
     set({ refreshing: true });
     try {
       const [windowsSessions, live] = await Promise.all([api.listSessions(), api.liveSessions()]);
-      setSessions(windowsSessions, get().wslSessions);
+      setLists(windowsSessions, get().wslSessions);
       setLive(live);
+      set({ loadError: null });
+    } catch (error) {
+      set({ loaded: true, loadError: errorMessage(error) });
     } finally {
       set({ refreshing: false });
     }
   });
 
+  const clearWsl = () => {
+    set({ wslErrors: {}, wslLoading: false });
+    if (get().wslSessions.length) setLists(get().windowsSessions, []);
+  };
+
   const refreshWsl = singleFlight(async () => {
-    const clear = () => setSessions(get().windowsSessions, []);
-    if (!useSettingsStore.getState().includeWsl) return clear();
-    const distros = await api.wslDistros().catch(() => []);
-    set({ distros });
-    if (!distros.some((d) => d.running)) return clear();
-    set({ wslLoading: get().wslSessions.length === 0 });
+    if (!useSettingsStore.getState().includeWsl) return clearWsl();
+    if (!wslIndexed) set({ wslLoading: true });
     try {
       const index = await api.listWslSessions();
-      set({ wslErrors: index.errors, wslShells: index.shells });
-      setSessions(get().windowsSessions, index.sessions);
-      setLive(await api.liveSessions());
+      set({ distros: index.distros });
+      wslIndexed = true;
+      if (!index.distros.some((d) => d.running)) return clearWsl();
+      set({ wslErrors: index.errors });
+      setLists(get().windowsSessions, index.sessions);
+      await refreshLive();
     } catch (error) {
       set({ wslErrors: { WSL: errorMessage(error) } });
     } finally {
@@ -98,11 +110,11 @@ export const useSessionsStore = create<SessionsState>((set, get) => {
     byId: {},
     live: [],
     loaded: false,
+    loadError: null,
     refreshing: false,
     distros: [],
     wslLoading: false,
     wslErrors: {},
-    wslShells: {},
     loadEnvironment: async () => set({ environment: await api.environment() }),
     refresh,
     refreshWsl,
@@ -113,20 +125,11 @@ export const useSessionsStore = create<SessionsState>((set, get) => {
         await api.wslStart(name);
       } finally {
         set({ wslLoading: false });
+        void refreshWsl();
       }
-      await refreshWsl();
     },
-    patchSession: (id, patch) => {
-      const apply = (list: SessionInfo[]) =>
-        list.map((s) => (s.id === id ? { ...s, ...patch } : s));
-      const windowsSessions = apply(get().windowsSessions);
-      const wslSessions = apply(get().wslSessions);
-      set({ windowsSessions, wslSessions, ...merged(windowsSessions, wslSessions) });
-    },
-    removeSession: (id) => {
-      const windowsSessions = get().windowsSessions.filter((s) => s.id !== id);
-      const wslSessions = get().wslSessions.filter((s) => s.id !== id);
-      set({ windowsSessions, wslSessions, ...merged(windowsSessions, wslSessions) });
-    },
+    patchSession: (id, patch) =>
+      updateLists((list) => list.map((s) => (s.id === id ? { ...s, ...patch } : s))),
+    removeSession: (id) => updateLists((list) => list.filter((s) => s.id !== id)),
   };
 });

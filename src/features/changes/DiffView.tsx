@@ -1,17 +1,19 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { unifiedMergeView } from "@codemirror/merge";
 import { EditorView } from "@codemirror/view";
 import CodeMirror from "@uiw/react-codemirror";
 import { FileCode2, FolderOpen } from "lucide-react";
 
-import { EmptyState, Spinner } from "@/components/ui/feedback";
+import { EmptyState, LoadingState } from "@/components/ui/feedback";
 import { IconButton } from "@/components/ui/icon-button";
 import { useDeckTheme, useLanguage } from "@/features/viewer/CodeView";
+import { useAsync } from "@/hooks/useAsync";
+import { useSessionFile } from "@/hooks/useSessionFile";
 import type { DiffTab } from "@/lib/diff-tabs";
+import { subscribeFileChanges } from "@/lib/file-events";
 import { api } from "@/lib/tauri/commands";
 import { revealInExplorer } from "@/lib/tauri/system";
-import { basename, errorMessage, relativePath } from "@/lib/utils";
-import { useSessionsStore } from "@/stores/sessions-store";
+import { basename, relativePath, samePath } from "@/lib/utils";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import type { Workspace } from "@/types";
 
@@ -21,23 +23,33 @@ interface DiffContent {
   beforeLabel: string;
 }
 
+interface SessionFile {
+  filePath: string | null;
+  distro: string | null;
+}
+
 const readCurrent = async (path: string) => {
   const content = await api.readFile(path).catch(() => null);
   return content?.kind === "text" ? content.text : "";
 };
 
-const loadDiff = async (tab: DiffTab, sessionId: string): Promise<DiffContent> => {
+const loadDiff = async (tab: DiffTab, session: SessionFile): Promise<DiffContent> => {
   const after = await readCurrent(tab.path);
   if (tab.source === "git") {
     const before = await api.gitHeadFile(tab.path).catch(() => "");
     return { before, after, beforeLabel: "HEAD" };
   }
-  const session = useSessionsStore.getState().byId[sessionId];
   const before =
-    tab.backup && session
+    tab.backup && session.filePath
       ? await api.sessionBackup(session.filePath, tab.backup, session.distro)
       : "";
   return { before, after, beforeLabel: "before this session" };
+};
+
+const VIEW_SETUP = {
+  foldGutter: false,
+  highlightActiveLine: false,
+  highlightActiveLineGutter: false,
 };
 
 const diffTheme = EditorView.theme({
@@ -68,23 +80,27 @@ const diffTheme = EditorView.theme({
 });
 
 export const DiffView = ({ tab, workspace }: { tab: DiffTab; workspace: Workspace }) => {
-  const [content, setContent] = useState<DiffContent | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const session = useSessionFile(workspace);
   const language = useLanguage(tab.path);
   const theme = useDeckTheme();
   const openFile = useWorkspaceStore((s) => s.openFile);
+  const {
+    data: content,
+    error,
+    reload,
+  } = useAsync(
+    () => loadDiff(tab, session),
+    [tab.source, tab.path, tab.backup, session.filePath, session.distro],
+    { keepPrevious: true },
+  );
 
-  useEffect(() => {
-    let cancelled = false;
-    setContent(null);
-    setError(null);
-    loadDiff(tab, workspace.sessionId)
-      .then((result) => !cancelled && setContent(result))
-      .catch((e) => !cancelled && setError(errorMessage(e)));
-    return () => {
-      cancelled = true;
-    };
-  }, [tab.source, tab.path, tab.backup, workspace.sessionId]);
+  useEffect(
+    () =>
+      subscribeFileChanges((change) => {
+        if (change.paths.some((p) => samePath(p, tab.path))) void reload(true);
+      }),
+    [tab.path, reload],
+  );
 
   const extensions = useMemo(
     () =>
@@ -121,7 +137,7 @@ export const DiffView = ({ tab, workspace }: { tab: DiffTab; workspace: Workspac
         </IconButton>
       </div>
       <div className="min-h-0 flex-1 overflow-hidden bg-code-bg">
-        {error ? (
+        {error && !content ? (
           <EmptyState
             className="h-full"
             icon={<FileCode2 />}
@@ -129,9 +145,7 @@ export const DiffView = ({ tab, workspace }: { tab: DiffTab; workspace: Workspac
             description={error}
           />
         ) : !content ? (
-          <div className="flex h-full items-center justify-center">
-            <Spinner />
-          </div>
+          <LoadingState className="h-full" />
         ) : content.before === content.after ? (
           <EmptyState
             className="h-full"
@@ -148,11 +162,7 @@ export const DiffView = ({ tab, workspace }: { tab: DiffTab; workspace: Workspac
             editable={false}
             readOnly
             extensions={extensions}
-            basicSetup={{
-              foldGutter: false,
-              highlightActiveLine: false,
-              highlightActiveLineGutter: false,
-            }}
+            basicSetup={VIEW_SETUP}
           />
         )}
       </div>

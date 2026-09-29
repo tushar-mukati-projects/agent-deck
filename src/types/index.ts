@@ -24,6 +24,7 @@ export interface SessionInfo {
   promptCount: number;
   size: number;
   version: string | null;
+  recentCwds: string[];
 }
 
 export interface LiveSession {
@@ -53,10 +54,27 @@ export interface DirEntry {
   modifiedMs: number;
 }
 
+export interface TranscriptPage {
+  items: TranscriptItem[];
+  offset: number;
+  reset: boolean;
+}
+
+export type FileEncoding = "utf8" | "utf16le" | "utf16be" | "lossy";
+
 export type FileContent =
-  | { kind: "text"; text: string; size: number }
+  | { kind: "text"; text: string; size: number; modifiedMs: number; encoding: FileEncoding }
   | { kind: "binary"; size: number }
   | { kind: "tooLarge"; size: number };
+
+export type WriteOutcome =
+  { kind: "saved"; modifiedMs: number } | { kind: "conflict"; modifiedMs: number };
+
+export interface PathStat {
+  kind: "file" | "dir";
+  size: number;
+  modifiedMs: number;
+}
 
 export interface PtyInfo {
   id: string;
@@ -157,6 +175,7 @@ export interface SettingsFile {
   label: string;
   path: string;
   exists: boolean;
+  error?: string | null;
   model: string | null;
   defaultMode: string | null;
   allow: string[];
@@ -238,14 +257,15 @@ export interface WslDistro {
 
 export interface WslIndex {
   sessions: SessionInfo[];
-  shells: Record<string, string>;
   errors: Record<string, string>;
+  distros: WslDistro[];
 }
 
 export interface FsChange {
   root: string;
   dirs: string[];
   paths: string[];
+  rescan: boolean;
 }
 
 export type TerminalKind = "agent" | "shell";
@@ -271,8 +291,6 @@ export interface ShellTab {
   id: string;
   cwd: string;
   program: string;
-  label?: string;
-  command?: string;
 }
 
 export interface Workspace {

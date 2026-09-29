@@ -3,7 +3,7 @@ import { useMemo } from "react";
 import { basename, normalizePath } from "@/lib/utils";
 import { useSessionsStore } from "@/stores/sessions-store";
 
-export interface FolderSummary {
+interface FolderSummary {
   cwd: string;
   name: string;
   count: number;

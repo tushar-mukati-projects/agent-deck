@@ -2,8 +2,10 @@ import type { FsChange } from "@/types";
 
 type Listener = (change: FsChange) => void;
 
+const RELEASE_GRACE_MS = 3000;
+
 const listeners = new Set<Listener>();
-const watchCounts = new Map<string, number>();
+const watches = new Map<string, { count: number; releaseTimer?: number }>();
 
 export const subscribeFileChanges = (listener: Listener) => {
   listeners.add(listener);
@@ -15,17 +17,27 @@ export const publishFileChange = (change: FsChange) => {
 };
 
 export const retainWatch = (root: string, watch: (root: string) => Promise<void>) => {
-  const count = watchCounts.get(root) ?? 0;
-  watchCounts.set(root, count + 1);
-  if (count === 0) void watch(root).catch(() => undefined);
+  const current = watches.get(root);
+  if (current) {
+    window.clearTimeout(current.releaseTimer);
+    current.releaseTimer = undefined;
+    current.count += 1;
+    return false;
+  }
+  watches.set(root, { count: 1 });
+  void watch(root).catch(() => undefined);
+  return true;
 };
 
 export const releaseWatch = (root: string, unwatch: (root: string) => Promise<void>) => {
-  const count = (watchCounts.get(root) ?? 1) - 1;
-  if (count <= 0) {
-    watchCounts.delete(root);
+  const current = watches.get(root);
+  if (!current) return;
+  current.count -= 1;
+  if (current.count > 0) return;
+  current.releaseTimer = window.setTimeout(() => {
+    watches.delete(root);
     void unwatch(root).catch(() => undefined);
-  } else {
-    watchCounts.set(root, count);
-  }
+  }, RELEASE_GRACE_MS);
 };
+
+export const watchedRoots = () => [...watches.keys()];

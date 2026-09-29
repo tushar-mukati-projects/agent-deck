@@ -1,11 +1,12 @@
 import { create } from "zustand";
 
 import { api } from "@/lib/tauri/commands";
-import { dirname, errorMessage, isWithin, normalizePath } from "@/lib/utils";
+import { dirname, errorMessage, isWithin, normalizePath, omitKey } from "@/lib/utils";
 import type { DirEntry } from "@/types";
 
 interface ExplorerState {
   children: Record<string, DirEntry[]>;
+  paths: Record<string, string>;
   errors: Record<string, string>;
   expanded: Record<string, true>;
   loading: Record<string, true>;
@@ -18,12 +19,20 @@ interface ExplorerState {
   select: (path: string | null) => void;
   reveal: (path: string, root: string) => Promise<void>;
   refreshDirs: (dirs: string[]) => void;
+  refreshWithin: (root: string) => void;
+  forget: (root: string) => void;
 }
 
 const key = normalizePath;
+const requests = new Map<string, number>();
+let revealRequest = 0;
+
+const keepOutside = <T>(record: Record<string, T>, root: string) =>
+  Object.fromEntries(Object.entries(record).filter(([k]) => !isWithin(k, root)));
 
 export const useExplorerStore = create<ExplorerState>((set, get) => ({
   children: {},
+  paths: {},
   errors: {},
   expanded: {},
   loading: {},
@@ -31,21 +40,24 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
 
   load: async (dir) => {
     const k = key(dir);
+    const request = (requests.get(k) ?? 0) + 1;
+    requests.set(k, request);
     set((s) => ({ loading: { ...s.loading, [k]: true } }));
-    try {
-      const entries = await api.listDir(dir);
-      set((s) => {
-        const { [k]: _error, ...errors } = s.errors;
-        return { children: { ...s.children, [k]: entries }, errors };
-      });
-    } catch (error) {
-      set((s) => ({ errors: { ...s.errors, [k]: errorMessage(error) } }));
-    } finally {
-      set((s) => {
-        const { [k]: _done, ...loading } = s.loading;
-        return { loading };
-      });
-    }
+    const result = await api.listDir(dir).then(
+      (entries) => ({ entries }),
+      (error: unknown) => ({ error: errorMessage(error) }),
+    );
+    if (requests.get(k) !== request) return;
+    set((s) => ({
+      loading: omitKey(s.loading, k),
+      ...("entries" in result
+        ? {
+            children: { ...s.children, [k]: result.entries },
+            paths: { ...s.paths, [k]: dir },
+            errors: omitKey(s.errors, k),
+          }
+        : { errors: { ...s.errors, [k]: result.error } }),
+    }));
   },
 
   toggle: (dir) => (get().expanded[key(dir)] ? get().collapse(dir) : get().expand(dir)),
@@ -56,11 +68,7 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
     if (!get().children[k]) void get().load(dir);
   },
 
-  collapse: (dir) =>
-    set((s) => {
-      const { [key(dir)]: _collapsed, ...expanded } = s.expanded;
-      return { expanded };
-    }),
+  collapse: (dir) => set((s) => ({ expanded: omitKey(s.expanded, key(dir)) })),
 
   collapseAll: (root) =>
     set((s) => ({
@@ -74,6 +82,7 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
   select: (path) => set({ selected: path }),
 
   reveal: async (path, root) => {
+    const request = ++revealRequest;
     const ancestors: string[] = [];
     let current = dirname(path);
     while (isWithin(current, root) && key(current) !== key(root)) {
@@ -83,14 +92,29 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
       current = parent;
     }
     for (const dir of [root, ...ancestors]) {
+      if (request !== revealRequest) return;
       set((s) => ({ expanded: { ...s.expanded, [key(dir)]: true } }));
       if (!get().children[key(dir)]) await get().load(dir);
     }
-    set({ selected: path });
+    if (request === revealRequest) set({ selected: path });
   },
 
   refreshDirs: (dirs) => {
     const { children } = get();
     for (const dir of dirs) if (children[key(dir)]) void get().load(dir);
   },
+
+  refreshWithin: (root) => {
+    const { paths } = get();
+    for (const [k, path] of Object.entries(paths)) if (isWithin(k, root)) void get().load(path);
+  },
+
+  forget: (root) =>
+    set((s) => ({
+      children: keepOutside(s.children, root),
+      paths: keepOutside(s.paths, root),
+      errors: keepOutside(s.errors, root),
+      expanded: keepOutside(s.expanded, root),
+      selected: s.selected && isWithin(s.selected, root) ? null : s.selected,
+    })),
 }));

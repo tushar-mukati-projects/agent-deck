@@ -1,45 +1,69 @@
 import { toast } from "sonner";
 
-import { isTerminalAlive, useTerminalStore } from "@/stores/terminal-store";
+import { samePath } from "@/lib/utils";
+import { useExplorerStore } from "@/stores/explorer-store";
 import { useSessionsStore } from "@/stores/sessions-store";
+import { aliveTerminals, useTerminalStore } from "@/stores/terminal-store";
 import { useUiStore } from "@/stores/ui-store";
+import { dirtyPaths, useViewerStore } from "@/stores/viewer-store";
 import { getActiveWorkspace, useWorkspaceStore } from "@/stores/workspace-store";
 import type { Workspace } from "@/types";
 
-const runningTerminals = (workspace: Workspace) => ({
-  claude: isTerminalAlive(workspace.agentTerminalId),
-  shells: workspace.shells.filter((s) => isTerminalAlive(s.id)).length,
-});
+const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
 
 const describeRunning = (workspaces: Workspace[]) => {
-  const totals = workspaces
-    .map(runningTerminals)
-    .reduce(
-      (acc, r) => ({ claude: acc.claude + Number(r.claude), shells: acc.shells + r.shells }),
-      { claude: 0, shells: 0 },
-    );
-  const parts = [
-    totals.claude && `${totals.claude} Claude session${totals.claude > 1 ? "s" : ""}`,
-    totals.shells && `${totals.shells} shell${totals.shells > 1 ? "s" : ""}`,
-  ].filter(Boolean);
-  return parts.length ? parts.join(" and ") : null;
+  const agents = aliveTerminals(workspaces.map((w) => w.agentTerminalId));
+  const shells = aliveTerminals(workspaces.flatMap((w) => w.shells.map((s) => s.id)));
+  const parts = [agents && plural(agents, "running session"), shells && plural(shells, "shell")];
+  return parts.filter(Boolean).join(" and ") || null;
+};
+
+const confirmLoss = async (title: string, workspaces: Workspace[], files: string[]) => {
+  const running = describeRunning(workspaces);
+  const dirty = dirtyPaths(files);
+  if (!running && !dirty.length) return true;
+  const lines = [
+    running &&
+      `${running} will be stopped. Conversations stay saved and you can resume them any time.`,
+    dirty.length > 0 && `Unsaved changes to ${plural(dirty.length, "file")} will be lost.`,
+  ];
+  return useUiStore.getState().askConfirm({
+    title,
+    description: lines.filter(Boolean).join(" "),
+    confirmLabel: running ? "Close and stop" : "Discard changes",
+    destructive: true,
+  });
+};
+
+const filesOnlyIn = (targets: Workspace[], others: Workspace[]) => {
+  const elsewhere = others.flatMap((w) => w.openFiles);
+  return targets
+    .flatMap((w) => w.openFiles)
+    .filter((file) => !elsewhere.some((other) => samePath(other, file)));
 };
 
 export const closeWorkspaces = async (ids: string[]) => {
   const { workspaces, close } = useWorkspaceStore.getState();
   const targets = workspaces.filter((w) => ids.includes(w.id));
   if (!targets.length) return;
-  const running = describeRunning(targets);
-  if (running) {
-    const confirmed = await useUiStore.getState().askConfirm({
-      title: targets.length > 1 ? `Close ${targets.length} tabs?` : "Close this session tab?",
-      description: `${running} will be stopped. Conversations stay saved and you can resume them any time.`,
-      confirmLabel: "Close and stop",
-      destructive: true,
-    });
-    if (!confirmed) return;
-  }
+  const others = workspaces.filter((w) => !ids.includes(w.id));
+  const files = filesOnlyIn(targets, others);
+  const title = targets.length > 1 ? `Close ${targets.length} tabs?` : "Close this session tab?";
+  if (!(await confirmLoss(title, targets, files))) return;
   for (const workspace of targets) await close(workspace.id);
+  useViewerStore.getState().forget(files);
+  for (const workspace of targets)
+    if (!others.some((w) => samePath(w.cwd, workspace.cwd)))
+      useExplorerStore.getState().forget(workspace.cwd);
+};
+
+export const confirmQuit = () => {
+  const { workspaces } = useWorkspaceStore.getState();
+  return confirmLoss(
+    "Quit Claude Deck?",
+    workspaces,
+    workspaces.flatMap((w) => w.openFiles),
+  );
 };
 
 export const closeWorkspace = (id: string) => closeWorkspaces([id]);
@@ -62,9 +86,7 @@ export const closeIdleWorkspaces = () =>
   closeWorkspaces(
     useWorkspaceStore
       .getState()
-      .workspaces.filter(
-        (w) => !isTerminalAlive(w.agentTerminalId) && !w.shells.some((s) => isTerminalAlive(s.id)),
-      )
+      .workspaces.filter((w) => !aliveTerminals([w.agentTerminalId, ...w.shells.map((s) => s.id)]))
       .map((w) => w.id),
   );
 

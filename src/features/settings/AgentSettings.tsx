@@ -2,21 +2,20 @@ import { Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
-import { listAgents } from "@/lib/agents/registry";
+import { Input } from "@/components/ui/input";
+import { useAgents } from "@/hooks/useAgents";
+import { CLAUDE } from "@/lib/agents/registry";
 import { newId } from "@/lib/utils";
 import { useSettingsStore } from "@/stores/settings-store";
 import type { CustomAgent } from "@/types";
 
-const inputClass =
-  "h-8 w-full rounded-md border border-border-strong bg-bg px-2.5 font-mono text-xs text-fg outline-none placeholder:text-faint focus:border-accent/70";
-
-export const DefaultAgentPicker = () => {
+export const DefaultAgentPicker = ({ id }: { id?: string }) => {
   const defaultAgent = useSettingsStore((s) => s.defaultAgent);
-  useSettingsStore((s) => s.customAgents);
-  const agents = listAgents();
+  const agents = useAgents();
   return (
     <select
-      value={agents.some((a) => a.id === defaultAgent) ? defaultAgent : "claude"}
+      id={id}
+      value={agents.some((a) => a.id === defaultAgent) ? defaultAgent : CLAUDE}
       onChange={(e) => useSettingsStore.getState().set({ defaultAgent: e.target.value })}
       className="h-8 rounded-md border border-border-strong bg-bg px-2 text-xs text-fg outline-none focus:border-accent/70"
     >
@@ -29,6 +28,16 @@ export const DefaultAgentPicker = () => {
   );
 };
 
+const removeAgent = (agents: CustomAgent[], agent: CustomAgent) => {
+  const id = `custom:${agent.id}`;
+  const { defaultAgent, agentFilter, set } = useSettingsStore.getState();
+  set({
+    customAgents: agents.filter((a) => a.id !== agent.id),
+    ...(defaultAgent === id ? { defaultAgent: CLAUDE } : {}),
+    ...(agentFilter === id ? { agentFilter: "all" } : {}),
+  });
+};
+
 export const CustomAgentsEditor = () => {
   const agents = useSettingsStore((s) => s.customAgents);
   const update = (next: CustomAgent[]) => useSettingsStore.getState().set({ customAgents: next });
@@ -39,14 +48,16 @@ export const CustomAgentsEditor = () => {
     <div className="flex flex-col gap-1.5">
       {agents.map((agent) => (
         <div key={agent.id} className="grid grid-cols-[140px_1fr_auto] items-center gap-1.5">
-          <input
-            className={inputClass}
+          <Input
+            aria-label="Agent name"
+            className="font-mono text-xs"
             value={agent.name}
             placeholder="Name"
             onChange={(e) => change(agent.id, { name: e.target.value })}
           />
-          <input
-            className={inputClass}
+          <Input
+            aria-label="Agent command"
+            className="font-mono text-xs"
             value={agent.command}
             placeholder="Command, e.g. gemini or aider --model sonnet"
             spellCheck={false}
@@ -54,7 +65,7 @@ export const CustomAgentsEditor = () => {
           />
           <IconButton
             label={`Remove ${agent.name || "agent"}`}
-            onClick={() => update(agents.filter((a) => a.id !== agent.id))}
+            onClick={() => removeAgent(agents, agent)}
           >
             <Trash2 />
           </IconButton>

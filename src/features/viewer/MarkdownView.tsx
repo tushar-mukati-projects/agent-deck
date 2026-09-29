@@ -5,9 +5,10 @@ import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 
-import { assetUrl, openExternal } from "@/lib/tauri/system";
 import { splitFrontmatter } from "@/lib/frontmatter";
+import { assetUrl, openExternal } from "@/lib/tauri/system";
 import { cn, resolvePath } from "@/lib/utils";
+import { parseWslPath } from "@/lib/wsl";
 
 interface MarkdownViewProps {
   source: string;
@@ -28,7 +29,27 @@ const schema = {
 };
 
 const isExternal = (href: string) => /^(https?:|mailto:)/i.test(href);
-const isAbsoluteLocal = (href: string) => /^[a-zA-Z]:[\\/]/.test(href) || href.startsWith("\\\\");
+const isDrivePath = (path: string) => /^[a-zA-Z]:[\\/]/.test(path);
+const isUncPath = (path: string) => /^[\\/]{2}/.test(path);
+
+const safeDecode = (value: string) => {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+};
+
+const localTarget = (raw: string, baseDir?: string) => {
+  const target = safeDecode(raw.split(/[?#]/)[0]).replace(
+    /^file:\/\/\/?(?=[a-zA-Z]:|[\\/]{2})/i,
+    "",
+  );
+  if (!target || /^[a-z][\w+.-]*:(?![\\/])/i.test(target)) return null;
+  if (isUncPath(target)) return parseWslPath(target.replace(/\//g, "\\")) ? target : null;
+  if (isDrivePath(target)) return target;
+  return baseDir ? resolvePath(baseDir, target) : null;
+};
 
 const buildComponents = (baseDir?: string, onOpenPath?: (path: string) => void): Components => ({
   a: ({ href = "", children, ...props }) => {
@@ -39,9 +60,8 @@ const buildComponents = (baseDir?: string, onOpenPath?: (path: string) => void):
         void openExternal(href);
         return;
       }
-      const target = decodeURIComponent(href.split("#")[0]);
-      const resolved = isAbsoluteLocal(target) || !baseDir ? target : resolvePath(baseDir, target);
-      onOpenPath?.(resolved);
+      const target = localTarget(href, baseDir);
+      if (target) onOpenPath?.(target);
     };
     return (
       <a {...props} href={href} onClick={handleClick} title={href}>
@@ -51,14 +71,10 @@ const buildComponents = (baseDir?: string, onOpenPath?: (path: string) => void):
   },
   img: ({ src = "", alt, ...props }) => {
     const source = typeof src === "string" ? src : "";
-    const resolved =
-      !source || /^(https?:|data:)/i.test(source)
-        ? source
-        : assetUrl(
-            isAbsoluteLocal(source) || !baseDir
-              ? source
-              : resolvePath(baseDir, decodeURIComponent(source)),
-          );
+    const remote = /^(https?:|data:image\/)/i.test(source);
+    const local = remote ? null : localTarget(source, baseDir);
+    const resolved = remote ? source : local ? assetUrl(local) : undefined;
+    if (!resolved) return <span className="text-faint">{alt || source}</span>;
     return (
       <img {...props} src={resolved} alt={alt ?? ""} loading="lazy" className="inline rounded-md" />
     );

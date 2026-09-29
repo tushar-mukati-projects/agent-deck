@@ -1,6 +1,6 @@
 const WSL_PREFIXES = ["\\\\wsl.localhost\\", "\\\\wsl$\\"];
 
-export interface WslLocation {
+interface WslLocation {
   distro: string;
   linuxPath: string;
 }

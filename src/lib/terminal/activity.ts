@@ -6,9 +6,9 @@ import type { TerminalKind } from "@/types";
 const IDLE_AFTER_MS = 1600;
 const ECHO_WINDOW_MS = 400;
 const RESIZE_WINDOW_MS = 600;
-export const MIN_BUSY_FOR_ALERT_MS = 3000;
+const MIN_BUSY_FOR_ALERT_MS = 3000;
 const INPUT_PROMPT_PATTERN =
-  /Do you want to|Would you like to|\(y\/n\)|\[y\/N\]|❯ 1\. Yes|Yes, proceed|Enter to confirm|Esc to cancel|Allow this|Approve|allow command/i;
+  /Do you want to|Would you like to|\(y\/n\)|\[y\/N\]|❯ 1\. Yes|Yes, proceed|Enter to confirm|Esc to cancel|Allow this/i;
 
 export interface IdleEvent {
   terminalId: string;
@@ -27,10 +27,7 @@ export interface Activity {
 }
 
 interface ActivityOwner {
-  id: string;
-  kind: TerminalKind;
-  workspaceId: string;
-  cwd: string;
+  spec: { id: string; kind: TerminalKind; workspaceId: string; root: string };
   term: Terminal;
   element: HTMLElement;
   activity: Activity;
@@ -38,7 +35,7 @@ interface ActivityOwner {
 
 const listeners = new Set<(event: IdleEvent) => void>();
 
-export const onClaudeIdle = (listener: (event: IdleEvent) => void) => {
+export const onAgentIdle = (listener: (event: IdleEvent) => void) => {
   listeners.add(listener);
   return () => void listeners.delete(listener);
 };
@@ -71,17 +68,17 @@ export const noteResize = (owner: ActivityOwner) => {
 };
 
 const settle = (owner: ActivityOwner) => {
-  const { activity } = owner;
+  const { activity, spec } = owner;
   activity.busy = false;
   const busyMs = performance.now() - activity.busySince - IDLE_AFTER_MS;
   const visible = owner.element.isConnected && document.hasFocus();
-  const meaningful = owner.kind === "agent" && busyMs >= MIN_BUSY_FOR_ALERT_MS;
-  update(owner.id, { busy: false, ...(meaningful && !visible ? { attention: true } : {}) });
+  const meaningful = spec.kind === "agent" && busyMs >= MIN_BUSY_FOR_ALERT_MS;
+  update(spec.id, { busy: false, ...(meaningful && !visible ? { attention: true } : {}) });
   if (!meaningful) return;
   const event: IdleEvent = {
-    terminalId: owner.id,
-    workspaceId: owner.workspaceId,
-    cwd: owner.cwd,
+    terminalId: spec.id,
+    workspaceId: spec.workspaceId,
+    cwd: spec.root,
     busyMs,
     needsInput: INPUT_PROMPT_PATTERN.test(screenTail(owner.term, 18)),
     visible,
@@ -95,14 +92,14 @@ export const noteOutput = (owner: ActivityOwner) => {
   if (!activity.busy) {
     activity.busy = true;
     activity.busySince = performance.now();
-    update(owner.id, { busy: true });
+    update(owner.spec.id, { busy: true });
   }
   window.clearTimeout(activity.idleTimer);
   activity.idleTimer = window.setTimeout(() => settle(owner), IDLE_AFTER_MS);
 };
 
-export const resetActivity = (owner: Pick<ActivityOwner, "id" | "activity">) => {
+export const resetActivity = (owner: Pick<ActivityOwner, "spec" | "activity">) => {
   window.clearTimeout(owner.activity.idleTimer);
   owner.activity.busy = false;
-  update(owner.id, { busy: false, attention: false });
+  update(owner.spec.id, { busy: false, attention: false });
 };

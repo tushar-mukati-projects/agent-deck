@@ -44,17 +44,32 @@ interface ResultGridProps {
   columns: string[];
   rows: Cell[][];
   footer?: React.ReactNode;
+  rowsLabel?: string;
   className?: string;
 }
 
-export const ResultGrid = ({ columns, rows, footer, className }: ResultGridProps) => {
-  const [limit, setLimit] = useState(PAGE);
-  const copy = (text: string, what: string) =>
-    void copyText(text).then(() => toast.success(`${what} copied`));
+const copy = (text: string, what: string) =>
+  void copyText(text).then(() => toast.success(`${what} copied`));
+
+export const ResultGrid = ({ columns, rows, footer, rowsLabel, className }: ResultGridProps) => {
+  const [paging, setPaging] = useState({ rows, limit: PAGE });
+  const limit = paging.rows === rows ? paging.limit : PAGE;
+  const [picked, setPicked] = useState<{ rows: Cell[][]; r: number; c: number } | null>(null);
+  const selected = picked?.rows === rows ? picked : null;
+
+  const onKeyDown = (event: React.KeyboardEvent) => {
+    if (!selected || !(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "c") return;
+    event.preventDefault();
+    copy(rows[selected.r]?.[selected.c] ?? "NULL", "Value");
+  };
 
   return (
     <div className={cn("flex min-h-0 flex-col", className)}>
-      <div className="min-h-0 flex-1 overflow-auto rounded-md border border-border">
+      <div
+        tabIndex={0}
+        onKeyDown={onKeyDown}
+        className="min-h-0 flex-1 overflow-auto rounded-md border border-border outline-none focus-visible:border-border-strong"
+      >
         <table className="w-max min-w-full border-collapse font-mono text-[11.5px]">
           <thead className="sticky top-0 z-10 bg-elevated">
             <tr>
@@ -80,9 +95,13 @@ export const ResultGrid = ({ columns, rows, footer, className }: ResultGridProps
                 {row.map((cell, c) => (
                   <td
                     key={c}
-                    title={cell && cell.length > CELL_PREVIEW ? cell : "Double-click to copy"}
+                    title={cell && cell.length > CELL_PREVIEW ? cell : undefined}
+                    onClick={() => setPicked({ rows, r, c })}
                     onDoubleClick={() => copy(cell ?? "NULL", "Value")}
-                    className="max-w-[420px] truncate border-r border-b border-border px-2 py-0.5 whitespace-nowrap text-fg/85"
+                    className={cn(
+                      "max-w-[420px] truncate border-r border-b border-border px-2 py-0.5 whitespace-nowrap text-fg/85",
+                      selected?.r === r && selected.c === c && "bg-accent-soft",
+                    )}
                   >
                     {cell === null ? (
                       <span className="text-faint italic">NULL</span>
@@ -101,33 +120,31 @@ export const ResultGrid = ({ columns, rows, footer, className }: ResultGridProps
       </div>
       <div className="flex shrink-0 flex-wrap items-center gap-2 pt-1.5 text-[11px] text-faint">
         <span className="tabular-nums">
-          {rows.length} {rows.length === 1 ? "row" : "rows"}
+          {rowsLabel ?? `${rows.length} ${rows.length === 1 ? "row" : "rows"}`}
         </span>
         {footer}
         {rows.length > limit && (
           <Button
-            size="sm"
+            size="xs"
             variant="ghost"
-            className="h-6"
-            onClick={() => setLimit((l) => l + PAGE)}
+            onClick={() => setPaging({ rows, limit: limit + PAGE })}
           >
             Show {Math.min(PAGE, rows.length - limit)} more
           </Button>
         )}
         <div className="ml-auto flex items-center gap-1">
+          {rows.length > 0 && <span>Click a cell, then Ctrl C to copy it</span>}
           <Button
-            size="sm"
+            size="xs"
             variant="ghost"
-            className="h-6"
             disabled={!rows.length}
             onClick={() => copy(toCsv(columns, rows), "CSV")}
           >
             <Copy /> CSV
           </Button>
           <Button
-            size="sm"
+            size="xs"
             variant="ghost"
-            className="h-6"
             disabled={!rows.length}
             onClick={() => copy(toJson(columns, rows), "JSON")}
           >

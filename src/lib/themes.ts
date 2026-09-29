@@ -2,7 +2,7 @@ import type { ITheme } from "@xterm/xterm";
 
 import { contrast, ensureContrast } from "@/lib/contrast";
 
-export type ThemeKind = "dark" | "light";
+type ThemeKind = "dark" | "light";
 
 type Ansi = [
   black: string,
@@ -46,7 +46,7 @@ interface ThemeInput {
   syntax?: Partial<Syntax>;
 }
 
-export interface Syntax {
+interface Syntax {
   comment: string;
   keyword: string;
   string: string;

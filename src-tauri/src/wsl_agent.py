@@ -7,199 +7,267 @@ import shutil
 import subprocess
 import sys
 
-SHORT_LINE = 64 * 1024
 PROMPT_CHARS = 4000
-TEXT_CHARS = 24000
-TYPE_RE = re.compile(rb'"type":"(user|assistant)"')
-STRING_FIELD = {
-    key: re.compile(rb'"' + key.encode() + rb'":"((?:[^"\\]|\\.)*)"')
-    for key in ("timestamp", "cwd", "gitBranch", "version")
-}
-TEXT_BLOCK_RE = re.compile(rb'"type":"text","text":"((?:[^"\\]|\\.)*)"')
-SIDECHAIN_RE = re.compile(rb'"isSidechain":(true|false)')
+TEXT_CHARS = 24001
+TOOL_CHARS = 1000
+PATCH_CHARS = 1000000
+LONG_LINE = 64 * 1024
+SNIFF_BYTES = 8192
+HUGE_LINE = 16 * 1024 * 1024
+INDEX_BUDGET = 1024 * 1024 * 1024
+SEARCH_LINES_PER_FILE = 20
+MAX_LIST = 60000
+TOP_KEYS = ("type", "timestamp", "cwd", "gitBranch", "version", "isSidechain", "isMeta")
+TITLE_KEYS = ("type", "customTitle", "aiTitle", "lastPrompt")
+TITLE_TYPES = ("custom-title", "ai-title", "last-prompt")
 TOOL_FIELDS = ("description", "command", "file_path", "pattern", "url", "query", "prompt")
-STRING_CONTENT_RE = re.compile(rb'"content":"((?:[^"\\]|\\.){0,4000})')
-META_RE = re.compile(rb'"isMeta":(true|false)')
 RELEVANT = (b'"type":"user"', b'"type":"assistant"', b'-title"', b'"last-prompt"')
-SESSION_ID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
-GIT = ["git", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null"]
-CODEX_KINDS = ("session_meta", "event_msg", "response_item", "turn_context")
 CODEX_INDEX_MARKERS = (b'"session_meta"', b'"user_message"', b'"turn_context"')
-CODEX_TRANSCRIPT_MARKERS = CODEX_INDEX_MARKERS + (b'"agent_message"', b'"function_call"', b'"custom_tool_call"')
+CODEX_FULL_MARKERS = CODEX_INDEX_MARKERS + (b'"agent_message"', b'"function_call"', b'"custom_tool_call"')
+HUGE_FIELDS = {
+    key: re.compile(rb'"' + key.encode() + rb'":"((?:[^"\\]|\\.)*)"')
+    for key in ("type", "timestamp", "cwd", "gitBranch", "version")
+}
+FLAG_FIELDS = {key: re.compile(rb'"' + key.encode() + rb'":(true|false)') for key in ("isSidechain", "isMeta")}
 TIMESTAMP_RE = re.compile(rb'"timestamp":"([^"]+)"')
+SESSION_ID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+GIT = ["git", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", "-c", "core.quotePath=false"]
+EDIT_TOOLS = ("Write", "Edit", "MultiEdit", "NotebookEdit")
+MAX_DIFF_BYTES = 2 * 1024 * 1024
+EXACT_DIFF_LINES = 4000
+NOISY_DIRS = (".git", "node_modules", "target", ".next", "__pycache__", ".venv")
+
+
+def homes(variable, name, marker):
+    candidates = []
+    override = os.environ.get(variable)
+    if override:
+        candidates.append(override)
+    candidates += sorted(glob.glob("/home/*/" + name)) + ["/root/" + name]
+    seen, result = set(), []
+    for home in candidates:
+        real = os.path.realpath(home)
+        if real not in seen and os.path.isdir(os.path.join(real, marker)):
+            seen.add(real)
+            result.append(real)
+    return result
 
 
 def claude_homes():
-    homes = []
-    override = os.environ.get("CLAUDE_CONFIG_DIR")
-    if override:
-        homes.append(override)
-    homes += sorted(glob.glob("/home/*/.claude")) + ["/root/.claude"]
-    seen, result = set(), []
-    for home in homes:
-        real = os.path.realpath(home)
-        if real not in seen and os.path.isdir(os.path.join(home, "projects")):
-            seen.add(real)
-            result.append(home)
-    return result
+    return homes("CLAUDE_CONFIG_DIR", ".claude", "projects")
 
 
 def codex_homes():
-    homes = []
-    override = os.environ.get("CODEX_HOME")
-    if override:
-        homes.append(override)
-    homes += sorted(glob.glob("/home/*/.codex")) + ["/root/.codex"]
-    seen, result = set(), []
-    for home in homes:
-        real = os.path.realpath(home)
-        if real not in seen and os.path.isdir(os.path.join(home, "sessions")):
-            seen.add(real)
-            result.append(home)
-    return result
+    return homes("CODEX_HOME", ".codex", "sessions")
+
+
+def claude_files():
+    for home in claude_homes():
+        for path in glob.glob(os.path.join(home, "projects", "*", "*.jsonl")):
+            yield path
 
 
 def codex_files():
     for home in codex_homes():
-        yield from glob.glob(os.path.join(home, "sessions", "*", "*", "*", "rollout-*.jsonl"))
+        for path in glob.glob(os.path.join(home, "sessions", "*", "*", "*", "rollout-*.jsonl")):
+            yield path
 
 
-def is_codex(path):
+def resolve_session(path):
     real = os.path.realpath(path)
-    return os.path.basename(real).startswith("rollout-") and real.endswith(".jsonl") and any(
-        real.startswith(os.path.realpath(os.path.join(home, "sessions")) + os.sep) for home in codex_homes()
-    )
+    name = os.path.basename(real)
+    if not real.endswith(".jsonl"):
+        raise ValueError("not a session file")
+    for home in codex_homes():
+        root = os.path.join(home, "sessions") + os.sep
+        if real.startswith(root) and name.startswith("rollout-") and SESSION_ID_RE.fullmatch(name[:-6][-36:]):
+            return {"path": real, "codex": True, "home": home, "id": name[:-6][-36:]}
+    for home in claude_homes():
+        if os.path.dirname(os.path.dirname(real)) == os.path.join(home, "projects") and SESSION_ID_RE.fullmatch(name[:-6]):
+            return {"path": real, "codex": False, "home": home, "id": name[:-6]}
+    raise ValueError("not a session file")
 
 
-def reduce_codex(line, full):
-    if not any(marker in line for marker in (CODEX_TRANSCRIPT_MARKERS if full else CODEX_INDEX_MARKERS)):
+def text_of(value):
+    return value if isinstance(value, str) else ""
+
+
+def has_tool_result(content):
+    return isinstance(content, list) and any(isinstance(b, dict) and b.get("type") == "tool_result" for b in content)
+
+
+def slim_input(value):
+    if not isinstance(value, dict):
+        return {}
+    return {k: value[k][:TOOL_CHARS] for k in TOOL_FIELDS if isinstance(value.get(k), str)}
+
+
+def slim_content(content, limit, assistant):
+    if isinstance(content, str):
+        return content[:limit]
+    if not isinstance(content, list):
         return None
+    blocks = []
+    for block in content:
+        if not isinstance(block, dict):
+            continue
+        kind = block.get("type")
+        if kind == "text":
+            blocks.append({"type": "text", "text": text_of(block.get("text"))[:limit]})
+        elif kind == "tool_use" and assistant:
+            blocks.append({"type": "tool_use", "name": block.get("name"), "input": slim_input(block.get("input"))})
+        elif not assistant:
+            blocks.append({"type": kind})
+    return blocks
+
+
+def top_level(data, keys):
+    return {k: data[k] for k in keys if k in data}
+
+
+def huge_record(line):
+    head, tail = line[:4000], line[-4000:]
+    record = {}
+    for key, pattern in HUGE_FIELDS.items():
+        match = pattern.search(head) or pattern.search(tail)
+        if match:
+            try:
+                record[key] = json.loads(b'"' + match.group(1) + b'"')
+            except ValueError:
+                pass
+    for key, pattern in FLAG_FIELDS.items():
+        match = pattern.search(head) or pattern.search(tail)
+        record[key] = bool(match and match.group(1) == b"true")
+    return record if record.get("type") in ("user", "assistant") else None
+
+
+def loads(line):
     try:
         data = json.loads(line)
     except ValueError:
         return None
-    kind, payload = data.get("type"), data.get("payload") or {}
-    if kind not in CODEX_KINDS:
-        return None
-    limit = TEXT_CHARS if full else PROMPT_CHARS
-    record = {"timestamp": data.get("timestamp"), "type": kind}
-    if kind == "session_meta":
-        record["payload"] = {k: payload.get(k) for k in ("id", "cwd", "cli_version")}
-        record["payload"]["git"] = {"branch": (payload.get("git") or {}).get("branch")}
-    elif kind == "turn_context":
-        record["payload"] = {"cwd": payload.get("cwd")}
-    elif payload.get("type") in ("user_message", "agent_message"):
-        if payload["type"] == "agent_message" and not full:
-            return None
-        record["payload"] = {"type": payload["type"], "message": (payload.get("message") or "")[:limit]}
-    elif full and payload.get("type") in ("function_call", "custom_tool_call"):
-        record["payload"] = {
-            "type": payload["type"],
-            "name": payload.get("name"),
-            "arguments": (payload.get("arguments") or "")[:2000],
-            "input": (payload.get("input") or "")[:200000] if payload.get("name") == "apply_patch" else None,
-        }
-    else:
-        return None
-    return record
+    return data if isinstance(data, dict) else None
 
 
-def codex_lines(path, full):
-    with open(path, "rb") as handle:
-        return [record for line in handle if (record := reduce_codex(line, full))]
+def is_bulky(line):
+    if len(line) > HUGE_LINE:
+        return True
+    if len(line) <= LONG_LINE:
+        return False
+    head = line[:SNIFF_BYTES]
+    match = HUGE_FIELDS["type"].search(head)
+    kind = match.group(1) if match else b""
+    return kind == b"assistant" or (kind == b"user" and b'"tool_result"' in head)
 
 
-def decode(raw):
-    for candidate in (raw, raw.rsplit(b"\\", 1)[0]):
-        try:
-            return json.loads(b'"' + candidate + b'"')
-        except ValueError:
-            continue
-    return None
-
-
-def field(chunk, key):
-    match = STRING_FIELD[key].search(chunk)
-    return decode(match.group(1)) if match else None
-
-
-def is_system_text(text):
-    trimmed = text.lstrip()
-    return not trimmed or trimmed.startswith(("<", "Caveat:", "[Request interrupted", "This session is being continued"))
-
-
-def prompt_text(content):
-    if isinstance(content, str):
-        return None if is_system_text(content) else content
-    if isinstance(content, list):
-        if any(isinstance(b, dict) and b.get("type") == "tool_result" for b in content):
-            return None
-        for block in content:
-            if isinstance(block, dict) and block.get("type") == "text" and block.get("text"):
-                if not is_system_text(block["text"]):
-                    return block["text"]
-    return None
-
-
-def base_record(data):
-    return {k: data.get(k) for k in ("type", "timestamp", "cwd", "gitBranch", "version", "isSidechain", "isMeta")}
-
-
-def reduce_short(line):
+def claude_index_record(line):
+    if is_bulky(line):
+        return huge_record(line)
     if not any(marker in line for marker in RELEVANT):
         return None
-    try:
-        data = json.loads(line)
-    except ValueError:
+    data = loads(line)
+    if data is None:
         return None
     kind = data.get("type")
-    if kind in ("custom-title", "ai-title", "last-prompt"):
-        return {k: data.get(k) for k in ("type", "customTitle", "aiTitle", "lastPrompt")}
+    if kind in TITLE_TYPES:
+        return top_level(data, TITLE_KEYS)
     if kind not in ("user", "assistant"):
         return None
-    record = base_record(data)
-    if kind == "user":
-        text = prompt_text((data.get("message") or {}).get("content"))
-        if text:
-            record["message"] = {"content": text[:PROMPT_CHARS]}
+    record = top_level(data, TOP_KEYS)
+    message = data.get("message")
+    if kind == "user" and isinstance(message, dict) and not data.get("isMeta") and not data.get("isSidechain"):
+        content = message.get("content")
+        if not has_tool_result(content):
+            slim = slim_content(content, PROMPT_CHARS, False)
+            if slim:
+                record["message"] = {"content": slim}
     return record
 
 
-def reduce_long(line):
-    head, tail = line[:20000], line[-6000:]
-    match = TYPE_RE.search(head[:1500]) or TYPE_RE.search(tail)
-    if not match:
+def claude_full_record(line):
+    if b'"type":"user"' not in line and b'"type":"assistant"' not in line:
         return None
-    kind = match.group(1).decode()
-    record = {"type": kind}
-    for key in ("timestamp", "cwd", "gitBranch", "version"):
-        record[key] = field(tail, key) or field(head[:1500], key)
-    side = SIDECHAIN_RE.search(head[:600])
-    record["isSidechain"] = bool(side and side.group(1) == b"true")
-    meta = META_RE.search(tail) or META_RE.search(head[:1500])
-    record["isMeta"] = bool(meta and meta.group(1) == b"true")
-    if kind == "user" and b'"tool_result"' not in head[:4000]:
-        text = TEXT_BLOCK_RE.search(head) or STRING_CONTENT_RE.search(head)
-        decoded = decode(text.group(1)) if text else None
-        if decoded and not is_system_text(decoded):
-            record["message"] = {"content": decoded[:PROMPT_CHARS]}
+    data = loads(line)
+    if data is None or data.get("type") not in ("user", "assistant") or data.get("isSidechain"):
+        return None
+    message = data.get("message")
+    if not isinstance(message, dict):
+        return None
+    assistant = data["type"] == "assistant"
+    content = message.get("content")
+    if not assistant and (data.get("isMeta") or has_tool_result(content)):
+        return None
+    slim = slim_content(content, TEXT_CHARS, assistant)
+    if not slim:
+        return None
+    record = top_level(data, TOP_KEYS)
+    record["message"] = {"content": slim}
+    return record
+
+
+def slim_arguments(arguments):
+    if not isinstance(arguments, str):
+        return None
+    try:
+        value = json.loads(arguments)
+    except ValueError:
+        return None
+    if not isinstance(value, dict):
+        return None
+    kept = {}
+    for key, item in value.items():
+        limit = PATCH_CHARS if key in ("input", "patch") else TOOL_CHARS
+        if isinstance(item, str):
+            kept[key] = item[:limit]
+        elif isinstance(item, list) and all(isinstance(part, str) for part in item):
+            kept[key] = [part[:TOOL_CHARS] for part in item]
+    return json.dumps(kept, ensure_ascii=False)
+
+
+def codex_record(line, full):
+    if (not full and len(line) > HUGE_LINE) or not any(marker in line for marker in (CODEX_FULL_MARKERS if full else CODEX_INDEX_MARKERS)):
+        return None
+    data = loads(line)
+    if data is None:
+        return None
+    kind = data.get("type")
+    payload = data.get("payload") if isinstance(data.get("payload"), dict) else {}
+    ptype = payload.get("type")
+    record = {"timestamp": data.get("timestamp"), "type": kind}
+    if kind == "session_meta":
+        record["payload"] = top_level(payload, ("id", "timestamp", "cwd", "cli_version"))
+        git = payload.get("git")
+        if isinstance(git, dict):
+            record["payload"]["git"] = top_level(git, ("branch",))
+    elif kind == "turn_context":
+        record["payload"] = top_level(payload, ("cwd",))
+    elif kind == "event_msg" and ptype in ("user_message", "agent_message"):
+        if ptype == "agent_message" and not full:
+            return None
+        record["payload"] = {"type": ptype, "message": text_of(payload.get("message"))[:TEXT_CHARS if full else PROMPT_CHARS]}
+    elif full and kind == "response_item" and ptype in ("function_call", "custom_tool_call"):
+        name = payload.get("name")
+        record["payload"] = {"type": ptype, "name": name, "arguments": slim_arguments(payload.get("arguments"))}
+        if name == "apply_patch" and isinstance(payload.get("input"), str):
+            record["payload"]["input"] = payload["input"][:PATCH_CHARS]
+    else:
+        return None
     return record
 
 
 def compact(records):
     kept, pending, context, titles = [], None, None, {}
     for record in records:
-        if record.get("type") in ("custom-title", "ai-title", "last-prompt"):
+        if record.get("type") in TITLE_TYPES:
             titles[record["type"]] = record
             continue
-        is_activity = record.get("type") in ("user", "assistant") and "message" not in record
-        if not is_activity:
+        if record.get("isSidechain"):
+            continue
+        if "message" in record:
             if pending:
                 kept.append(pending)
                 pending = None
             kept.append(record)
-            continue
-        if record.get("isSidechain"):
             continue
         signature = (record.get("cwd"), record.get("gitBranch"), record.get("version"))
         if signature != context or not kept:
@@ -213,72 +281,78 @@ def compact(records):
     return kept + list(titles.values())
 
 
-def read_complete_lines(path, offset):
+class Budget:
+    def __init__(self, limit):
+        self.left = limit
+
+    def spend(self, amount):
+        self.left -= amount
+        return self.left > 0
+
+
+def scan(path, offset, reducer, budget=None):
+    records, end, last = [], offset, None
     with open(path, "rb") as handle:
+        if offset:
+            handle.seek(offset - 1)
+            if handle.read(1) != b"\n":
+                offset = end = 0
         handle.seek(offset)
-        data = handle.read()
-    end = data.rfind(b"\n")
-    if end < 0:
-        return [], offset
-    return data[: end + 1].splitlines(), offset + end + 1
+        for line in handle:
+            if not line.endswith(b"\n"):
+                break
+            end += len(line)
+            last = line
+            record = reducer(line)
+            if record is not None:
+                records.append(record)
+            if budget is not None and not budget.spend(len(line)):
+                break
+    return records, offset, end, last
+
+
+def index_file(path, stat, known, reducer, budget):
+    stamp = int(stat.st_mtime * 1000)
+    if known and known.get("size") == stat.st_size and known.get("mtime") == stamp:
+        return None
+    start = known["offset"] if known and stat.st_size >= known.get("offset", 0) else 0
+    records, start, end, last = scan(path, start, reducer, budget)
+    size, mtime = (stat.st_size, stamp) if end >= stat.st_size else (end, 0)
+    return {"path": path, "size": size, "mtime": mtime, "start": start, "end": end, "records": records, "last": last}
 
 
 def index(request):
-    offsets = request.get("offsets", {})
+    offsets = request.get("offsets") or {}
+    budget = Budget(request.get("budget") or INDEX_BUDGET)
     files, changes = [], []
-    for home in claude_homes():
-        for path in glob.glob(os.path.join(home, "projects", "*", "*.jsonl")):
-            try:
-                stat = os.stat(path)
-            except OSError:
-                continue
-            files.append(path)
-            stamp = int(stat.st_mtime * 1000)
-            known = offsets.get(path)
-            if known and known["size"] == stat.st_size and known["mtime"] == stamp:
-                continue
-            start = known["offset"] if known and stat.st_size >= known["offset"] else 0
-            lines, end = read_complete_lines(path, start)
-            records = compact(
-                record
-                for line in lines
-                if (record := reduce_short(line) if len(line) < SHORT_LINE else reduce_long(line))
-            )
-            changes.append({
-                "path": path,
-                "projectKey": os.path.basename(os.path.dirname(path)),
-                "size": stat.st_size,
-                "mtime": stamp,
-                "start": start,
-                "end": end,
-                "records": records,
-            })
-    for path in codex_files():
+    sources = [(path, "claude") for path in claude_files()] + [(path, "codex") for path in codex_files()]
+    for path, kind in sources:
         try:
             stat = os.stat(path)
         except OSError:
             continue
         files.append(path)
-        stamp = int(stat.st_mtime * 1000)
-        known = offsets.get(path)
-        if known and known["size"] == stat.st_size and known["mtime"] == stamp:
+        if budget.left <= 0:
             continue
-        start = known["offset"] if known and stat.st_size >= known["offset"] else 0
-        lines, end = read_complete_lines(path, start)
-        records = [record for line in lines if (record := reduce_codex(line, False))]
-        last = next((m.group(1).decode() for line in reversed(lines) if (m := TIMESTAMP_RE.search(line[:400]))), None)
-        if last:
-            records.append({"timestamp": last, "type": "event_msg", "payload": {"type": "activity"}})
-        changes.append({
-            "path": path,
-            "projectKey": "",
-            "size": stat.st_size,
-            "mtime": stamp,
-            "start": start,
-            "end": end,
-            "records": records,
-        })
-    return {"files": files, "changes": changes, "live": live_sessions(), "shell": login_shell()}
+        try:
+            reducer = claude_index_record if kind == "claude" else (lambda line: codex_record(line, False))
+            change = index_file(path, stat, offsets.get(path), reducer, budget)
+        except Exception:
+            continue
+        if change is None:
+            continue
+        last = change.pop("last")
+        if kind == "claude":
+            change["records"] = compact(change["records"])
+            change["projectKey"] = os.path.basename(os.path.dirname(path))
+        else:
+            change["projectKey"] = ""
+            match = TIMESTAMP_RE.search(last[:400]) if last else None
+            if match:
+                stamp = match.group(1).decode("utf-8", "replace")
+                change["records"].append({"timestamp": stamp, "type": "event_msg", "payload": {"type": "activity"}})
+        changes.append(change)
+    return {"files": files, "changes": changes, "live": live_sessions(), "shell": login_shell(), "more": budget.left <= 0}
 
 
 def live_sessions():
@@ -288,13 +362,17 @@ def live_sessions():
             try:
                 with open(path) as handle:
                     data = json.load(handle)
-                pid = int(data.get("pid"))
-                with open(f"/proc/{pid}/cmdline", "rb") as handle:
+                pid, session_id = int(data.get("pid")), data.get("sessionId")
+                if not isinstance(session_id, str):
+                    continue
+                with open("/proc/%d/cmdline" % pid, "rb") as handle:
                     if b"claude" not in handle.read():
                         continue
-            except (OSError, ValueError, TypeError):
+            except (OSError, ValueError, TypeError, AttributeError):
                 continue
-            result.append({k: data.get(k) for k in ("pid", "sessionId", "cwd", "status", "kind", "name")})
+            entry = {k: data.get(k) if isinstance(data.get(k), str) else None for k in ("cwd", "status", "kind", "name")}
+            entry.update({"pid": pid, "sessionId": session_id})
+            result.append(entry)
     return result
 
 
@@ -305,114 +383,61 @@ def login_shell():
         return os.environ.get("SHELL", "/bin/bash")
 
 
-def summarize_tool(block):
-    detail = next(
-        (block["input"][k] for k in TOOL_FIELDS if isinstance(block.get("input"), dict) and isinstance(block["input"].get(k), str)),
-        None,
-    )
-    return {"type": "tool_use", "name": block.get("name"), "input": {"description": detail[:300]} if detail else {}}
+def login_env():
+    shell = login_shell()
+    out = subprocess.run([shell, "-lic", "exec env -0"], stdin=subprocess.DEVNULL, capture_output=True, timeout=15).stdout
+    parts = out.split(b"\0")
+    env = {}
+    for index, part in enumerate(parts):
+        if index == 0:
+            part = part.rsplit(b"\n", 1)[-1]
+        text = part.decode("utf-8", "replace")
+        key, sep, value = text.partition("=")
+        if sep and key and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", key):
+            env[key] = value
+    return {"shell": shell, "env": env}
 
 
-def session_id_of(path):
-    session_id = os.path.basename(path)[: -len(".jsonl")]
-    if not path.endswith(".jsonl") or not SESSION_ID_RE.fullmatch(session_id):
-        raise ValueError("not a Claude session file")
-    return session_id
-
-
-def transcript(path):
-    if is_codex(path):
-        return {"lines": codex_lines(path, True)}
-    session_home(path)
-    out = []
-    with open(path, "rb") as handle:
-        for line in handle:
-            try:
-                data = json.loads(line)
-            except ValueError:
-                continue
-            kind = data.get("type")
-            if kind not in ("user", "assistant"):
-                continue
-            record = base_record(data)
-            content = (data.get("message") or {}).get("content")
-            if kind == "user":
-                text = prompt_text(content)
-                if not text:
-                    continue
-                record["message"] = {"content": text[:TEXT_CHARS]}
-            else:
-                blocks = content if isinstance(content, list) else [{"type": "text", "text": content or ""}]
-                kept = []
-                for block in blocks:
-                    if not isinstance(block, dict):
-                        continue
-                    if block.get("type") == "text" and (block.get("text") or "").strip():
-                        kept.append({"type": "text", "text": block["text"][:TEXT_CHARS]})
-                    elif block.get("type") == "tool_use":
-                        kept.append(summarize_tool(block))
-                if not kept:
-                    continue
-                record["message"] = {"content": kept}
-            out.append(record)
-    return {"lines": out}
-
-
-def in_projects(path):
-    real = os.path.realpath(path)
-    return path.endswith(".jsonl") and any(
-        os.path.dirname(os.path.dirname(real)) == os.path.realpath(os.path.join(home, "projects"))
-        for home in claude_homes()
-    )
+def transcript(path, offset):
+    session = resolve_session(path)
+    reducer = (lambda line: codex_record(line, True)) if session["codex"] else claude_full_record
+    records, start, end, _ = scan(session["path"], offset, reducer)
+    return {"lines": records, "start": start, "end": end}
 
 
 def delete(path):
-    if is_codex(path):
-        os.remove(path)
-        return {"deleted": path}
-    if not in_projects(path):
-        raise ValueError("not a Claude session file")
-    session_id = session_id_of(path)
-    home = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(path))))
-    os.remove(path)
-    for extra in (path[: -len(".jsonl")], os.path.join(home, "file-history", session_id), os.path.join(home, "session-env", session_id)):
-        if os.path.isdir(extra):
-            shutil.rmtree(extra, ignore_errors=True)
-    try:
-        os.rmdir(os.path.dirname(path))
-    except OSError:
-        pass
-    return {"deleted": path}
+    session = resolve_session(path)
+    real = session["path"]
+    os.remove(real)
+    if not session["codex"]:
+        home, session_id = session["home"], session["id"]
+        for extra in (real[: -len(".jsonl")], os.path.join(home, "file-history", session_id), os.path.join(home, "session-env", session_id)):
+            if os.path.isdir(extra) and not os.path.islink(extra):
+                shutil.rmtree(extra, ignore_errors=True)
+        try:
+            os.rmdir(os.path.dirname(real))
+        except OSError:
+            pass
+    return {"deleted": real}
 
 
 def list_files(root):
     try:
         output = subprocess.run(
-            GIT + ["-C", root, "ls-files", "-co", "--exclude-standard"],
+            GIT + ["-C", root, "ls-files", "-co", "--exclude-standard", "-z"],
             capture_output=True, timeout=20, check=True,
         ).stdout.decode("utf-8", "replace")
-        return {"files": [line for line in output.splitlines() if line][:60000]}
+        return {"files": [line for line in output.split("\0") if line][:MAX_LIST]}
     except (OSError, subprocess.SubprocessError):
         pass
     found = []
     for directory, dirs, names in os.walk(root):
-        dirs[:] = [d for d in dirs if d not in (".git", "node_modules", "target", ".venv", "__pycache__")]
+        dirs[:] = [d for d in dirs if d not in NOISY_DIRS]
         for name in names:
             found.append(os.path.relpath(os.path.join(directory, name), root))
-            if len(found) >= 60000:
+            if len(found) >= MAX_LIST:
                 return {"files": found}
     return {"files": found}
-
-
-EDIT_TOOLS = ("Write", "Edit", "MultiEdit", "NotebookEdit")
-MAX_DIFF_BYTES = 2 * 1024 * 1024
-
-
-def session_home(path):
-    if not in_projects(path):
-        raise ValueError("not a Claude session file")
-    session_id_of(path)
-    return os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(path))))
 
 
 def read_text(path):
@@ -427,22 +452,27 @@ def read_text(path):
 
 
 def line_stats(before, after):
+    if before == after:
+        return 0, 0
+    old, new = before.splitlines(), after.splitlines()
+    if len(old) + len(new) > EXACT_DIFF_LINES:
+        from collections import Counter
+
+        old_counts, new_counts = Counter(old), Counter(new)
+        return sum((new_counts - old_counts).values()), sum((old_counts - new_counts).values())
     import difflib
 
     additions = deletions = 0
-    for line in difflib.unified_diff(before.splitlines(), after.splitlines(), n=0, lineterm=""):
-        if line.startswith("+") and not line.startswith("+++"):
-            additions += 1
-        elif line.startswith("-") and not line.startswith("---"):
-            deletions += 1
+    for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(None, old, new, autojunk=False).get_opcodes():
+        if tag in ("replace", "delete"):
+            deletions += i2 - i1
+        if tag in ("replace", "insert"):
+            additions += j2 - j1
     return additions, deletions
 
 
-def changes(path):
-    if is_codex(path):
-        return {"lines": codex_lines(path, True)}
-    home = session_home(path)
-    session_id = os.path.basename(path)[: -len(".jsonl")]
+def claude_changes(session):
+    path, home, session_id = session["path"], session["home"], session["id"]
     backups = os.path.join(home, "file-history", session_id)
     cwd, tracked = "", {}
     with open(path, "rb") as handle:
@@ -450,22 +480,24 @@ def changes(path):
             snapshot, tool = b'"file-history-snapshot"' in line, b'"tool_use"' in line
             if not (snapshot or tool or (not cwd and b'"cwd"' in line)):
                 continue
-            try:
-                data = json.loads(line)
-            except ValueError:
+            data = loads(line)
+            if data is None:
                 continue
-            cwd = cwd or data.get("cwd") or ""
+            cwd = cwd or text_of(data.get("cwd"))
             if data.get("type") == "file-history-snapshot":
-                for target, backup in ((data.get("snapshot") or {}).get("trackedFileBackups") or {}).items():
+                backups_map = (data.get("snapshot") or {}).get("trackedFileBackups") if isinstance(data.get("snapshot"), dict) else None
+                for target, backup in (backups_map or {}).items():
                     entry = tracked.setdefault(target, {"hash": None, "edits": 0})
-                    name = (backup or {}).get("backupFileName")
-                    if not entry["hash"] and name:
+                    name = backup.get("backupFileName") if isinstance(backup, dict) else None
+                    if not entry["hash"] and isinstance(name, str):
                         entry["hash"] = name.split("@")[0]
-            elif data.get("type") == "assistant":
-                for block in (data.get("message") or {}).get("content") or []:
+            elif data.get("type") == "assistant" and isinstance(data.get("message"), dict):
+                content = data["message"].get("content")
+                for block in content if isinstance(content, list) else []:
                     if isinstance(block, dict) and block.get("type") == "tool_use" and block.get("name") in EDIT_TOOLS:
-                        target = (block.get("input") or {}).get("file_path") or (block.get("input") or {}).get("notebook_path")
-                        if target:
+                        tool_input = block.get("input") if isinstance(block.get("input"), dict) else {}
+                        target = tool_input.get("file_path") or tool_input.get("notebook_path")
+                        if isinstance(target, str) and target:
                             tracked.setdefault(target, {"hash": None, "edits": 0})["edits"] += 1
     merged = {}
     for target, info in tracked.items():
@@ -475,7 +507,7 @@ def changes(path):
         entry["hash"] = entry["hash"] or info["hash"]
     files = []
     for absolute, info in sorted(merged.items()):
-        backup = f"{info['hash']}@v1" if info["hash"] else None
+        backup = "%s@v1" % info["hash"] if info["hash"] else None
         if backup and not os.path.isfile(os.path.join(backups, backup)):
             backup = None
         exists = os.path.isfile(absolute)
@@ -494,156 +526,228 @@ def changes(path):
     return {"files": files}
 
 
+def changes(path):
+    session = resolve_session(path)
+    if session["codex"]:
+        return {"lines": scan(session["path"], 0, lambda line: codex_record(line, True))[0]}
+    return claude_changes(session)
+
+
+def exists(paths):
+    return {"exists": [p for p in paths if isinstance(p, str) and os.path.isfile(p)]}
+
+
 def backup(path, name):
     if not re.fullmatch(r"[0-9a-f]+@v\d+", name):
         raise ValueError("invalid backup name")
-    session_id = os.path.basename(path)[: -len(".jsonl")]
-    text = read_text(os.path.join(session_home(path), "file-history", session_id, name))
+    session = resolve_session(path)
+    text = read_text(os.path.join(session["home"], "file-history", session["id"], name))
     if text is None:
         raise ValueError("Backup not available")
     return {"text": text}
 
 
 def git_status(root):
-    top = subprocess.run(GIT + ["-C", root, "rev-parse", "--show-toplevel"], capture_output=True, check=True, timeout=15).stdout.decode().strip()
+    top = subprocess.run(GIT + ["-C", root, "rev-parse", "--show-toplevel"], capture_output=True, check=True, timeout=15).stdout.decode("utf-8", "replace").strip()
     out = subprocess.run(GIT + ["-C", root, "status", "--porcelain=v1", "-z", "--untracked-files=all"], capture_output=True, check=True, timeout=15).stdout
     entries = [e for e in out.split(b"\0") if e]
     result, index = [], 0
     while index < len(entries):
-        text = entries[index].decode("utf-8", "replace")
+        entry = entries[index]
         index += 1
-        if len(text) < 4:
+        if len(entry) < 4:
             continue
-        code = text[:2].strip() or "M"
-        if code[0] in "RC":
+        if entry[0:1] in (b"R", b"C") or entry[1:2] in (b"R", b"C"):
             index += 1
-        result.append({"path": os.path.join(top, text[3:]), "code": code})
+        code = entry[:2].decode("utf-8", "replace").strip() or "M"
+        result.append({"path": os.path.join(top, entry[3:].decode("utf-8", "replace")), "code": code})
     return {"changes": result}
 
 
 def git_head(path):
     directory, name = os.path.split(path)
-    out = subprocess.run(GIT + ["-C", directory, "show", f"HEAD:./{name}"], capture_output=True, timeout=15)
+    out = subprocess.run(GIT + ["-C", directory, "show", "HEAD:./%s" % name], capture_output=True, timeout=15)
     if out.returncode != 0:
         raise ValueError(out.stderr.decode("utf-8", "replace").strip() or "not in HEAD")
     return {"text": out.stdout.decode("utf-8", "replace")}
 
 
 def rename(path, title):
-    session_home(path)
+    session = resolve_session(path)
+    if session["codex"]:
+        raise ValueError("Codex sessions are renamed inside Deck")
     title = title.strip()
     if not title:
         raise ValueError("Title can't be empty")
-    session_id = os.path.basename(path)[: -len(".jsonl")]
-    record = json.dumps({"type": "custom-title", "customTitle": title, "sessionId": session_id}, ensure_ascii=False)
-    with open(path, "rb") as handle:
-        handle.seek(0, os.SEEK_END)
-        needs_newline = False
-        if handle.tell():
+    real = session["path"]
+    record = json.dumps({"type": "custom-title", "customTitle": title, "sessionId": session["id"]}, ensure_ascii=False)
+
+    def complete():
+        with open(real, "rb") as handle:
+            handle.seek(0, os.SEEK_END)
+            if not handle.tell():
+                return True
             handle.seek(-1, os.SEEK_END)
-            needs_newline = handle.read(1) != b"\n"
-    with open(path, "a", encoding="utf-8") as handle:
-        handle.write(("\n" if needs_newline else "") + record + "\n")
-    return {"renamed": path}
+            return handle.read(1) == b"\n"
+
+    done = complete()
+    if not done:
+        import time
+
+        time.sleep(0.3)
+        done = complete()
+    with open(real, "a", encoding="utf-8") as handle:
+        handle.write(("" if done else "\n") + record + "\n")
+    return {"renamed": real}
 
 
-def search(query):
-    needle = query.strip().lower()
-    hits = []
-    if len(needle) < 2:
-        return {"hits": hits}
-    raw_needle = needle.encode()
-    for home in claude_homes():
-        for path in glob.glob(os.path.join(home, "projects", "*", "*.jsonl")):
-            session_id = os.path.basename(path)[: -len(".jsonl")]
-            found = 0
+def searchable_texts(record):
+    if "payload" in record:
+        payload = record["payload"]
+        return [payload.get("message")] if payload.get("type") in ("user_message", "agent_message") else []
+    content = record.get("message", {}).get("content")
+    if isinstance(content, str):
+        return [content]
+    return [block.get("text") for block in content or [] if block.get("type") == "text"]
+
+
+def search(request):
+    needle = (request.get("prefilter") or "").encode("utf-8")
+    query = request.get("query") or ""
+    fold = bool(request.get("fold"))
+    found = []
+    if len(needle) < 2 or not query:
+        return {"files": found}
+    sources = [(path, False) for path in claude_files()] + [(path, True) for path in codex_files()]
+    for path, codex in sources:
+        lines = []
+        try:
             with open(path, "rb") as handle:
                 for line in handle:
-                    if raw_needle not in line.lower():
+                    if needle not in (line.lower() if fold else line):
                         continue
-                    try:
-                        data = json.loads(line)
-                    except ValueError:
-                        continue
-                    if data.get("type") not in ("user", "assistant") or data.get("isSidechain"):
-                        continue
-                    content = (data.get("message") or {}).get("content")
-                    texts = [prompt_text(content)] if data["type"] == "user" else [
-                        b.get("text", "") for b in (content if isinstance(content, list) else [{"text": content or ""}])
-                        if isinstance(b, dict) and b.get("type", "text") == "text"
-                    ]
-                    for text in filter(None, texts):
-                        index = text.lower().find(needle)
-                        if index < 0:
-                            continue
-                        start, end = max(0, index - 90), min(len(text), index + len(needle) + 90)
-                        snippet = " ".join(text[start:end].split())
-                        hits.append({
-                            "sessionId": session_id,
-                            "role": data["type"],
-                            "snippet": ("…" if start else "") + snippet + ("…" if end < len(text) else ""),
-                            "timestamp": data.get("timestamp"),
-                        })
-                        found += 1
-                    if found >= 3:
-                        break
-    for path in codex_files():
-        session_id = os.path.basename(path)[: -len(".jsonl")][-36:]
-        found = 0
-        with open(path, "rb") as handle:
-            for line in handle:
-                if raw_needle not in line.lower():
+                    record = codex_record(line, True) if codex else claude_full_record(line)
+                    if record is not None and any(isinstance(t, str) and query in t.lower() for t in searchable_texts(record)):
+                        lines.append(record)
+                        if len(lines) >= SEARCH_LINES_PER_FILE:
+                            break
+        except Exception:
+            continue
+        if lines:
+            found.append({"path": path, "lines": lines})
+    return {"files": found}
+
+
+def emit(message):
+    sys.stdout.buffer.write(json.dumps(message, ensure_ascii=False).encode("utf-8", "replace") + b"\n")
+    sys.stdout.flush()
+
+
+def watch(root):
+    import ctypes
+    import errno
+    import select
+    import struct
+    import time
+
+    libc = ctypes.CDLL(None, use_errno=True)
+    fd = libc.inotify_init1(os.O_NONBLOCK | 0o2000000)
+    if fd < 0:
+        raise OSError(ctypes.get_errno(), "inotify is not available")
+    mask = 0x2 | 0x8 | 0x40 | 0x80 | 0x100 | 0x200 | 0x400 | 0x800 | 0x1000000 | 0x2000000 | 0x4000000
+    watches, warned = {}, [False]
+
+    def noisy(path):
+        return any(part in NOISY_DIRS for part in path.split("/")) or path.endswith(".claude-deck-tmp")
+
+    def add(path):
+        for directory, dirs, _ in os.walk(path):
+            dirs[:] = [d for d in dirs if d not in NOISY_DIRS]
+            wd = libc.inotify_add_watch(fd, os.fsencode(directory), mask)
+            if wd < 0:
+                if ctypes.get_errno() == errno.ENOSPC and not warned[0]:
+                    warned[0] = True
+                    emit({"warning": "inotify watch limit reached; some folders aren't watched"})
+                continue
+            watches[wd] = directory
+
+    add(root)
+    emit({"ready": True})
+    pending, deadline, rescan = set(), None, False
+    while True:
+        timeout = max(0.0, deadline - time.monotonic()) if deadline else None
+        readable = select.select([fd, 0], [], [], timeout)[0]
+        if 0 in readable and not os.read(0, 4096):
+            return
+        if fd in readable:
+            try:
+                data = os.read(fd, 1 << 16)
+            except BlockingIOError:
+                data = b""
+            offset = 0
+            while offset + 16 <= len(data):
+                wd, event, _, length = struct.unpack_from("iIII", data, offset)
+                name = data[offset + 16: offset + 16 + length].rstrip(b"\0").decode("utf-8", "replace")
+                offset += 16 + length
+                if event & 0x4000:
+                    rescan = True
                     continue
-                record = reduce_codex(line, True)
-                message = ((record or {}).get("payload") or {}).get("message")
-                if not message:
+                directory = watches.get(wd)
+                if event & 0x8000:
+                    watches.pop(wd, None)
+                    if not watches:
+                        emit({"rescan": True})
+                        return
+                if directory is None:
                     continue
-                index = message.lower().find(needle)
-                if index < 0:
+                path = os.path.join(directory, name) if name else directory
+                if noisy(path):
                     continue
-                start, end = max(0, index - 90), min(len(message), index + len(needle) + 90)
-                hits.append({
-                    "sessionId": session_id,
-                    "role": "user" if record["payload"]["type"] == "user_message" else "assistant",
-                    "snippet": ("…" if start else "") + " ".join(message[start:end].split()) + ("…" if end < len(message) else ""),
-                    "timestamp": record.get("timestamp"),
-                })
-                found += 1
-                if found >= 3:
-                    break
-    return {"hits": hits}
+                if event & 0x40000000 and event & (0x100 | 0x80):
+                    add(path)
+                pending.add(path)
+            if (pending or rescan) and deadline is None:
+                deadline = time.monotonic() + 0.15
+        if deadline is not None and time.monotonic() >= deadline:
+            if rescan or len(pending) > 5000:
+                emit({"rescan": True})
+            else:
+                emit({"paths": sorted(pending)})
+            pending, deadline, rescan = set(), None, False
+
+
+def read_stdin_json():
+    text = sys.stdin.read()
+    return json.loads(text) if text.strip() else {}
 
 
 def main():
-    mode = sys.argv[1]
-    if mode == "index":
-        result = index(json.load(sys.stdin))
-    elif mode == "transcript":
-        result = transcript(sys.argv[2])
-    elif mode == "delete":
-        result = delete(sys.argv[2])
-    elif mode == "files":
-        result = list_files(sys.argv[2])
-    elif mode == "changes":
-        result = changes(sys.argv[2])
-    elif mode == "backup":
-        result = backup(sys.argv[2], sys.argv[3])
-    elif mode == "git_status":
-        result = git_status(sys.argv[2])
-    elif mode == "git_head":
-        result = git_head(sys.argv[2])
-    elif mode == "search":
-        result = search(sys.stdin.read())
-    elif mode == "rename":
-        result = rename(sys.argv[2], sys.stdin.read())
-    else:
-        raise ValueError(f"unknown mode {mode}")
-    sys.stdout.write(json.dumps(result, ensure_ascii=False, separators=(",", ":")))
+    mode, args = sys.argv[1], sys.argv[2:]
+    handlers = {
+        "index": lambda: index(read_stdin_json()),
+        "transcript": lambda: transcript(args[0], int(args[1]) if len(args) > 1 else 0),
+        "delete": lambda: delete(args[0]),
+        "files": lambda: list_files(args[0]),
+        "changes": lambda: changes(args[0]),
+        "exists": lambda: exists(read_stdin_json() or []),
+        "backup": lambda: backup(args[0], args[1]),
+        "git_status": lambda: git_status(args[0]),
+        "git_head": lambda: git_head(args[0]),
+        "search": lambda: search(read_stdin_json()),
+        "rename": lambda: rename(args[0], sys.stdin.read()),
+        "loginenv": login_env,
+        "watch": lambda: watch(args[0]),
+    }
+    if mode not in handlers:
+        raise ValueError("unknown mode %s" % mode)
+    result = handlers[mode]()
+    if result is not None:
+        emit(result)
 
 
 if __name__ == "__main__":
     try:
         main()
     except Exception as error:
-        sys.stdout.write(json.dumps({"error": str(error)}))
+        emit({"error": str(error) or error.__class__.__name__})
         sys.exit(1)

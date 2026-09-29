@@ -7,8 +7,9 @@ import {
 } from "@tauri-apps/plugin-notification";
 import { toast } from "sonner";
 
+import { agentName } from "@/lib/agents/registry";
 import { playChime, unlockAudio } from "@/lib/chime";
-import { onClaudeIdle, type IdleEvent } from "@/lib/terminal/activity";
+import { onAgentIdle, type IdleEvent } from "@/lib/terminal/activity";
 import { api } from "@/lib/tauri/commands";
 import { appWindow } from "@/lib/tauri/system";
 import { basename } from "@/lib/utils";
@@ -30,7 +31,8 @@ const handleIdle = async (event: IdleEvent) => {
   if (sound) void playChime(event.needsInput ? "input" : "done");
   if (event.visible || !notifications) return;
   const workspace = findWorkspace(event.workspaceId);
-  const title = event.needsInput ? "Claude needs your approval" : "Claude finished";
+  const name = agentName(workspace?.agent);
+  const title = event.needsInput ? `${name} needs your approval` : `${name} finished`;
   const body = workspace ? `${workspace.title} · ${basename(workspace.cwd)}` : basename(event.cwd);
 
   if (!(await appWindow.isFocused().catch(() => false))) {
@@ -54,7 +56,7 @@ const clearVisibleAttention = () => {
 export const useAttentionAlerts = () => {
   useEffect(() => {
     unlockAudio();
-    const unsubscribeIdle = onClaudeIdle((event) => void handleIdle(event));
+    const unsubscribeIdle = onAgentIdle((event) => void handleIdle(event));
     const unlistenFocus = appWindow.onFocusChanged(
       ({ payload: focused }) => focused && clearVisibleAttention(),
     );

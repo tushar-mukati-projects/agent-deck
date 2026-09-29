@@ -10,12 +10,13 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/menu";
+import { Tab, TabStrip } from "@/components/ui/tabs";
 import { decodeDiffTab, decodeMcpTab, tabTargetPath } from "@/lib/diff-tabs";
 import { FileIcon } from "@/lib/file-icons";
 import { DECK_PATH_MIME } from "@/lib/terminal/input";
 import { copyText, revealInExplorer } from "@/lib/tauri/system";
 import { basename, cn, normalizePath, relativePath, samePath } from "@/lib/utils";
-import { useViewerStore } from "@/stores/viewer-store";
+import { isDirty, useViewerStore } from "@/stores/viewer-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import type { Workspace } from "@/types";
 
@@ -40,7 +41,7 @@ const TabMenu = ({
   const isFile = decodeMcpTab(tab) === null;
   const path = tabTargetPath(tab);
   const close = (list: string[]) => void closeFilesWithConfirm(workspace.id, list);
-  const saved = () => tabs.filter((t) => !(normalizePath(t) in useViewerStore.getState().drafts));
+  const saved = () => tabs.filter((t) => !isDirty(t));
 
   return (
     <ContextMenu>
@@ -113,19 +114,25 @@ const FileTab = ({ workspace, tab }: { workspace: Workspace; tab: string }) => {
 
   return (
     <TabMenu workspace={workspace} tab={tab}>
-      <div
+      <Tab
         ref={ref}
-        role="tab"
-        tabIndex={0}
-        aria-selected={active}
+        selected={active}
+        onSelect={() => useWorkspaceStore.getState().setActiveFile(workspace.id, tab)}
+        onClose={() => void closeFileWithConfirm(workspace.id, tab)}
+        closeLabel={dirty ? `Close ${label} (unsaved changes)` : `Close ${label}`}
+        closeIcon={
+          dirty ? (
+            <>
+              <span className="size-2 rounded-full bg-fg/70 group-hover:hidden" />
+              <X className="hidden size-3 group-hover:block" />
+            </>
+          ) : undefined
+        }
         title={isMcp ? `MCP server ${label}` : target}
         draggable={!isMcp}
         onDragStart={(e) => e.dataTransfer.setData(DECK_PATH_MIME, target)}
-        onClick={() => useWorkspaceStore.getState().setActiveFile(workspace.id, tab)}
-        onMouseDown={(e) => e.button === 1 && e.preventDefault()}
-        onAuxClick={(e) => e.button === 1 && void closeFileWithConfirm(workspace.id, tab)}
         className={cn(
-          "group relative flex max-w-[200px] shrink-0 cursor-default items-center gap-1.5 border-r border-border pr-1 pl-2.5 text-[12px]",
+          "max-w-[200px] cursor-default border-r border-border pr-1 pl-2.5 text-[12px]",
           active ? "bg-bg text-fg" : "text-muted hover:text-fg",
         )}
       >
@@ -133,39 +140,18 @@ const FileTab = ({ workspace, tab }: { workspace: Workspace; tab: string }) => {
         {isMcp ? <Plug className="size-3.5 shrink-0 text-info" /> : <FileIcon path={target} />}
         <span className="truncate">{label}</span>
         {isDiff && <GitCompare className="size-3 shrink-0 text-faint" />}
-        <button
-          type="button"
-          aria-label={`Close ${label}`}
-          onClick={(e) => {
-            e.stopPropagation();
-            void closeFileWithConfirm(workspace.id, tab);
-          }}
-          className="flex size-5 items-center justify-center rounded text-faint hover:bg-active hover:text-fg"
-        >
-          {dirty && <span className="size-2 rounded-full bg-fg/70 group-hover:hidden" />}
-          <X
-            className={cn(
-              "size-3",
-              dirty && "hidden group-hover:block",
-              !active && !dirty && "opacity-0 group-hover:opacity-100",
-            )}
-          />
-        </button>
-      </div>
+      </Tab>
     </TabMenu>
   );
 };
 
 export const FileTabs = ({ workspace }: { workspace: Workspace }) => (
-  <div
-    role="tablist"
-    onWheel={(e) => {
-      if (e.deltaY) e.currentTarget.scrollLeft += e.deltaY;
-    }}
-    className="no-scrollbar flex h-9 shrink-0 items-stretch overflow-x-auto border-b border-border bg-panel"
+  <TabStrip
+    label="Open files"
+    className="h-9 shrink-0 items-stretch border-b border-border bg-panel"
   >
     {workspace.openFiles.map((tab) => (
       <FileTab key={tab} workspace={workspace} tab={tab} />
     ))}
-  </div>
+  </TabStrip>
 );

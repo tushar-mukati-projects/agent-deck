@@ -13,14 +13,46 @@ const toneClass: Record<DotTone, string> = {
   error: "bg-danger",
 };
 
+export const TONE_LABEL: Record<DotTone, string> = {
+  running: "Running in Deck",
+  busy: "Working",
+  attention: "Finished — needs your attention",
+  external: "Open in another terminal",
+  exited: "Process exited",
+  error: "Failed to start",
+};
+
 export const StatusDot = ({ tone, className }: { tone: DotTone; className?: string }) => (
   <span
+    role="img"
+    aria-label={TONE_LABEL[tone]}
+    title={TONE_LABEL[tone]}
     className={cn("inline-block size-[7px] shrink-0 rounded-full", toneClass[tone], className)}
   />
 );
 
 export const Spinner = ({ className }: { className?: string }) => (
   <Loader2 className={cn("size-4 animate-spin text-faint", className)} />
+);
+
+export const LoadingState = ({ label, className }: { label?: string; className?: string }) => (
+  <div
+    role="status"
+    className={cn("flex items-center justify-center gap-2 py-10 text-xs text-faint", className)}
+  >
+    <Spinner />
+    {label}
+  </div>
+);
+
+export const Hint = ({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) => (
+  <p className={cn("px-3 py-2 text-[11.5px] leading-relaxed text-faint", className)}>{children}</p>
 );
 
 interface EmptyStateProps {

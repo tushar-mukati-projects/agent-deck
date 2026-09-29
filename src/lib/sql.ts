@@ -2,13 +2,12 @@ export const quoteIdent = (name: string) => `"${name.replace(/"/g, '""')}"`;
 
 export const quoteLiteral = (value: string) => `'${value.replace(/'/g, "''")}'`;
 
+const NOISE = /--[^\n]*|\/\*[\s\S]*?\*\/|\$(\w*)\$[\s\S]*?\$\1\$|'(?:[^']|'')*'|"(?:[^"]|"")*"/g;
+
 const stripNoise = (sql: string) =>
-  sql
-    .replace(/--[^\n]*/g, " ")
-    .replace(/\/\*[\s\S]*?\*\//g, " ")
-    .replace(/\$([A-Za-z_]*)\$[\s\S]*?\$\1\$/g, " ''")
-    .replace(/'(?:[^']|'')*'/g, " ''")
-    .replace(/"(?:[^"]|"")*"/g, ' ""');
+  sql.replace(NOISE, (match) =>
+    match.startsWith('"') ? ' ""' : match.startsWith("'") || match.startsWith("$") ? " ''" : " ",
+  );
 
 const READ_ONLY = new Set(["select", "show", "values", "table", "fetch"]);
 const WRITES = /\b(insert|update|delete|merge|truncate|drop|alter|create|grant|revoke)\b/i;

@@ -22,7 +22,18 @@ describe("isMutating", () => {
     "select * into backup from t",
     "vacuum",
     "set role admin",
+    "select '--'; drop table users",
+    "select '/*'; delete from t; select '*/'",
+    'select "a--b"; truncate t',
+    "select $$ -- $$; drop table t",
+    "select 'unterminated; drop table t",
   ])("flags %s", (sql) => expect(isMutating(sql)).toBe(true));
+
+  it("ignores writes inside comments and strings", () => {
+    expect(isMutating("select 1 /* ; drop table t */")).toBe(false);
+    expect(isMutating("select $body$ delete from t; $body$")).toBe(false);
+    expect(isMutating('select "delete" from t')).toBe(false);
+  });
 });
 
 describe("quoting", () => {

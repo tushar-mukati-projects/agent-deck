@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { CODEX, findAgent, listAgents } from "@/lib/agents/registry";
+import { CODEX, findAgent, getAgent, listAgents } from "@/lib/agents/registry";
 import { useSettingsStore } from "@/stores/settings-store";
 
 const id = "019a0000-0000-7000-8000-000000000001";
@@ -35,45 +35,40 @@ describe("agent registry", () => {
     useSettingsStore.getState().set({ codexArgs: "--model gpt-5" });
     const codex = findAgent(CODEX);
     expect(codex.command).toEqual(["codex"]);
-    expect(codex.newArgs(id, {})).toEqual(["--model", "gpt-5"]);
-    expect(codex.resumeArgs(id)).toEqual(["resume", id, "--model", "gpt-5"]);
-    expect(codex.forkArgs(id, "ignored")).toEqual(["fork", id, "--model", "gpt-5"]);
+    expect(codex.newArgs(id, {})).toEqual([]);
+    expect(codex.resumeArgs(id)).toEqual(["resume", id]);
+    expect(codex.forkArgs(id, "ignored")).toEqual(["fork", id]);
+    expect(codex.extraArgs()).toEqual(["--model", "gpt-5"]);
     expect(codex.assignsSessionIds).toBe(false);
   });
 
   it("adds custom agents without history", () => {
     useSettingsStore.getState().set({
       customAgents: [
-        { id: "g1", name: "Gemini", command: "gemini --yolo" },
+        { id: "g1", name: "", command: "gemini --yolo" },
         { id: "blank", name: "Empty", command: "  " },
       ],
     });
     const custom = listAgents().filter((a) => a.id.startsWith("custom:"));
     expect(custom.map((a) => a.id)).toEqual(["custom:g1"]);
+    expect(custom[0].name).toBe("gemini");
     expect(custom[0].command).toEqual(["gemini", "--yolo"]);
     expect(custom[0].history).toBe(false);
   });
 
-  it("tells Claude to use the Deck theme's light or dark colors", () => {
+  it("tells Claude to use the Deck theme's light or dark colors when Deck launches it", () => {
+    const claude = findAgent("claude");
     useSettingsStore.getState().set({ matchAgentTheme: true, themeId: "snow" });
-    expect(findAgent("claude").resumeArgs(id)).toEqual([
-      "--resume",
-      id,
-      "--settings",
-      '{"theme":"light"}',
-    ]);
+    expect(claude.extraArgs({ deckTheme: true })).toEqual(["--settings", '{"theme":"light"}']);
+    expect(claude.extraArgs()).toEqual([]);
     useSettingsStore.getState().set({ themeId: "deck" });
-    expect(findAgent("claude").resumeArgs(id)).toEqual([
-      "--resume",
-      id,
-      "--settings",
-      '{"theme":"dark"}',
-    ]);
+    expect(claude.extraArgs({ deckTheme: true })).toEqual(["--settings", '{"theme":"dark"}']);
     useSettingsStore.getState().set({ claudeArgs: "--settings my.json" });
-    expect(findAgent("claude").resumeArgs(id)).toEqual(["--resume", id, "--settings", "my.json"]);
+    expect(claude.extraArgs({ deckTheme: true })).toEqual(["--settings", "my.json"]);
   });
 
-  it("falls back to Claude for unknown agents", () => {
+  it("falls back to Claude for display but reports removed agents", () => {
     expect(findAgent("custom:missing").id).toBe("claude");
+    expect(getAgent("custom:missing")).toBeNull();
   });
 });

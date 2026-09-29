@@ -1,6 +1,6 @@
-import { useMemo } from "react";
 import { Bell, FolderOpen, GitBranch, Hash, SquareTerminal } from "lucide-react";
 import { toast } from "sonner";
+import { useShallow } from "zustand/react/shallow";
 
 import { focusNextAttention, toggleShellPanel } from "@/actions/workspaces";
 import { StatusDot } from "@/components/ui/feedback";
@@ -10,6 +10,7 @@ import { shortenHome } from "@/lib/utils";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useTerminalStore } from "@/stores/terminal-store";
 import { useActiveWorkspace } from "@/stores/workspace-store";
+import type { TerminalState } from "@/types";
 
 const Item = ({
   children,
@@ -31,20 +32,24 @@ const Item = ({
   </button>
 );
 
+const agentCounts = (terminals: Record<string, TerminalState>) => {
+  const agents = Object.values(terminals).filter(
+    (t) => t.kind === "agent" && t.status === "running",
+  );
+  return [
+    agents.length,
+    agents.filter((t) => t.busy).length,
+    agents.filter((t) => t.attention).length,
+  ];
+};
+
 export const StatusBar = () => {
   const workspace = useActiveWorkspace();
   const session = useSessionsStore((s) => (workspace ? s.byId[workspace.sessionId] : undefined));
   const home = useSessionsStore((s) => s.environment?.home ?? "");
-  const terminals = useTerminalStore((s) => s.terminals);
-
-  const { agentsRunning, agentsBusy, waiting } = useMemo(() => {
-    const list = Object.values(terminals).filter((t) => t.status === "running");
-    return {
-      waiting: list.filter((t) => t.kind === "agent" && t.attention).length,
-      agentsRunning: list.filter((t) => t.kind === "agent").length,
-      agentsBusy: list.filter((t) => t.kind === "agent" && t.busy).length,
-    };
-  }, [terminals]);
+  const [agentsRunning, agentsBusy, waiting] = useTerminalStore(
+    useShallow((s) => agentCounts(s.terminals)),
+  );
 
   return (
     <footer className="flex h-6 shrink-0 items-stretch justify-between border-t border-border bg-panel text-[11px]">
@@ -59,9 +64,9 @@ export const StatusBar = () => {
               <span className="truncate">{shortenHome(workspace.cwd, home)}</span>
             </Item>
             {session?.gitBranch && session.gitBranch !== "HEAD" && (
-              <Item>
+              <Item title={session.gitBranch}>
                 <GitBranch />
-                {session.gitBranch}
+                <span className="max-w-[220px] truncate">{session.gitBranch}</span>
               </Item>
             )}
             <Item

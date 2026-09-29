@@ -1,5 +1,6 @@
 import { create } from "zustand";
 
+import { omitKey } from "@/lib/utils";
 import type { TerminalState } from "@/types";
 
 interface TerminalStore {
@@ -9,7 +10,7 @@ interface TerminalStore {
   remove: (id: string) => void;
 }
 
-export const isAlive = (terminal: TerminalState | undefined) =>
+const isAlive = (terminal: TerminalState | undefined) =>
   terminal?.status === "running" || terminal?.status === "starting";
 
 export const useTerminalStore = create<TerminalStore>((set) => ({
@@ -24,12 +25,10 @@ export const useTerminalStore = create<TerminalStore>((set) => ({
       );
       return changed ? { terminals: { ...s.terminals, [id]: { ...current, ...patch } } } : s;
     }),
-  remove: (id) =>
-    set((s) => {
-      const { [id]: _removed, ...rest } = s.terminals;
-      return { terminals: rest };
-    }),
+  remove: (id) => set((s) => ({ terminals: omitKey(s.terminals, id) })),
 }));
 
 export const isTerminalAlive = (id: string | null | undefined) =>
   !!id && isAlive(useTerminalStore.getState().terminals[id]);
+
+export const aliveTerminals = (ids: (string | null)[]) => ids.filter(isTerminalAlive).length;

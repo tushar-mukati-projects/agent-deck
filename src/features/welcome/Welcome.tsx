@@ -1,14 +1,19 @@
+import { useMemo } from "react";
 import { FolderPlus, MessageSquare, Play, Search } from "lucide-react";
 
-import { previewSession, resumeSession, startSessionInPickedFolder } from "@/actions/sessions";
+import { openSessionByClick, resumeSession, startSessionInPickedFolder } from "@/actions/sessions";
 import { AgentBadge } from "@/components/ui/agent-badge";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
-import { CLAUDE } from "@/lib/agents/registry";
+import { Alert } from "@/components/ui/panel";
+import { TimeAgo } from "@/components/ui/time-ago";
+import { CLAUDE, CODEX } from "@/lib/agents/registry";
 import { shortcutLabel, type ShortcutAction } from "@/lib/shortcuts";
-import { basename, timeAgo } from "@/lib/utils";
+import { basename } from "@/lib/utils";
 import { useSessionsStore } from "@/stores/sessions-store";
+import { useSettingsStore } from "@/stores/settings-store";
 import { useUiStore } from "@/stores/ui-store";
+import type { SessionInfo } from "@/types";
 
 const TIPS: { action: ShortcutAction; label: string }[] = [
   { action: "palette", label: "Search sessions & actions" },
@@ -20,11 +25,71 @@ const TIPS: { action: ShortcutAction; label: string }[] = [
   { action: "shortcuts", label: "All keyboard shortcuts" },
 ];
 
+const RECENT_COUNT = 6;
+
+const MissingAgent = () => {
+  const environment = useSessionsStore((s) => s.environment);
+  const defaultAgent = useSettingsStore((s) => s.defaultAgent);
+  if (!environment) return null;
+  const missing =
+    defaultAgent === CLAUDE && !environment.claudeFound
+      ? "claude"
+      : defaultAgent === CODEX && !environment.codexFound
+        ? "codex"
+        : null;
+  if (!missing) return null;
+  return (
+    <Alert tone="warning" className="mt-6">
+      The <code className="font-mono">{missing}</code> command wasn't found on your Windows PATH.
+      Install it and restart Deck, or start sessions in WSL folders where it is installed.
+    </Alert>
+  );
+};
+
+const RecentCard = ({ session }: { session: SessionInfo }) => (
+  <div className="group relative rounded-lg border border-border bg-panel transition-colors hover:border-border-strong hover:bg-elevated">
+    <button
+      type="button"
+      onClick={() => openSessionByClick(session)}
+      className="flex w-full flex-col gap-1.5 p-3 pr-10 text-left"
+    >
+      <div className="flex items-center gap-2">
+        <span className="min-w-0 flex-1 truncate text-[13px] font-medium">
+          {session.title ?? "Untitled session"}
+        </span>
+        {session.agent !== CLAUDE && <AgentBadge agent={session.agent} />}
+      </div>
+      <div className="flex items-center gap-2 text-[11px] text-faint">
+        <span className="truncate">{basename(session.cwd)}</span>
+        <span>·</span>
+        <TimeAgo ms={session.modifiedMs} className="shrink-0" />
+        <span className="ml-auto flex shrink-0 items-center gap-1">
+          <MessageSquare className="size-3" />
+          {session.promptCount}
+        </span>
+      </div>
+    </button>
+    <button
+      type="button"
+      aria-label={`Resume ${session.title ?? "session"}`}
+      title="Resume"
+      onClick={() => void resumeSession(session)}
+      className="absolute top-2.5 right-2.5 flex size-6 items-center justify-center rounded-md text-faint opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 hover:bg-hover hover:text-fg"
+    >
+      <Play className="size-3.5" />
+    </button>
+  </div>
+);
+
 export const Welcome = () => {
   const sessions = useSessionsStore((s) => s.sessions);
-  const environment = useSessionsStore((s) => s.environment);
+  const loaded = useSessionsStore((s) => s.loaded);
+  const archived = useSettingsStore((s) => s.archivedSessions);
   const openPalette = useUiStore((s) => s.openPalette);
-  const recent = sessions.slice(0, 6);
+  const recent = useMemo(() => {
+    const hidden = new Set(archived);
+    return sessions.filter((s) => !hidden.has(s.id)).slice(0, RECENT_COUNT);
+  }, [sessions, archived]);
 
   return (
     <div className="flex h-full items-center justify-center overflow-y-auto bg-bg">
@@ -34,17 +99,14 @@ export const Welcome = () => {
           <div>
             <h1 className="text-[20px] font-semibold tracking-tight">Claude Deck</h1>
             <p className="text-[12.5px] text-faint">
-              {sessions.length} sessions across your folders. Pick one up or start fresh.
+              {!loaded
+                ? "Loading your sessions…"
+                : `${sessions.length} ${sessions.length === 1 ? "session" : "sessions"} across your folders. Pick one up or start fresh.`}
             </p>
           </div>
         </div>
 
-        {environment && !environment.claudeFound && (
-          <div className="mt-6 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
-            The <code className="font-mono">claude</code> command wasn't found on your PATH. Install
-            Claude Code, then restart Deck.
-          </div>
-        )}
+        <MissingAgent />
 
         <div className="mt-7 flex gap-2">
           <Button variant="primary" size="lg" onClick={() => void startSessionInPickedFolder()}>
@@ -62,31 +124,7 @@ export const Welcome = () => {
             </h2>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {recent.map((session) => (
-                <button
-                  key={session.id}
-                  type="button"
-                  data-opens-preview
-                  onClick={() => previewSession(session)}
-                  onDoubleClick={() => void resumeSession(session)}
-                  className="group flex flex-col gap-1.5 rounded-lg border border-border bg-panel p-3 text-left transition-colors hover:border-border-strong hover:bg-elevated"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="min-w-0 flex-1 truncate text-[13px] font-medium">
-                      {session.title ?? "Untitled session"}
-                    </span>
-                    {session.agent !== CLAUDE && <AgentBadge agent={session.agent} />}
-                    <Play className="size-3.5 text-faint opacity-0 transition-opacity group-hover:opacity-100" />
-                  </div>
-                  <div className="flex items-center gap-2 text-[11px] text-faint">
-                    <span className="truncate">{basename(session.cwd)}</span>
-                    <span>·</span>
-                    <span className="shrink-0">{timeAgo(session.modifiedMs)}</span>
-                    <span className="ml-auto flex shrink-0 items-center gap-1">
-                      <MessageSquare className="size-3" />
-                      {session.promptCount}
-                    </span>
-                  </div>
-                </button>
+                <RecentCard key={session.id} session={session} />
               ))}
             </div>
           </div>

@@ -1,12 +1,12 @@
 use serde::Serialize;
-use tauri::{ipc::Channel, AppHandle, Manager, State};
+use tauri::{ipc::Channel, AppHandle, Manager};
 
 use crate::{
     changes, claude_config, fsx, git,
     mcp::{self, McpManager},
     pg::{self, PgManager},
     pty::{self, PtyEvent, PtyInfo, PtyManager, SpawnRequest},
-    sessions::{self, LiveSession, SearchHit, SessionInfo, TranscriptItem},
+    sessions::{self, LiveSession, Needle, SearchHit, SessionInfo, TranscriptPage},
     watcher::Watchers,
     wsl,
 };
@@ -20,22 +20,11 @@ async fn blocking<T: Send + 'static>(work: impl FnOnce() -> anyhow::Result<T> + 
         .map_err(|e| format!("{e:#}"))
 }
 
-macro_rules! local_or_wsl {
-    ($distro:expr, |$d:ident| $wsl:expr, $local:expr) => {
-        match $distro {
-            Some($d) => $wsl,
-            None => $local,
-        }
-    };
-}
-
-macro_rules! host_path {
-    ($path:expr, |$d:ident, $linux:ident| $wsl:expr, $local:expr) => {
-        match wsl::parse_host_path(&$path) {
-            Some(($d, $linux)) => $wsl,
-            None => $local,
-        }
-    };
+fn on_host<T>(path: &str, wsl: impl FnOnce(&str, &str) -> T, local: impl FnOnce() -> T) -> T {
+    match wsl::parse_host_path(path) {
+        Some((distro, linux)) => wsl(&distro, &linux),
+        None => local(),
+    }
 }
 
 #[derive(Serialize)]
@@ -49,15 +38,18 @@ pub struct Environment {
 }
 
 #[tauri::command]
-pub fn environment() -> Environment {
-    let home = dirs::home_dir().unwrap_or_default();
-    Environment {
-        home: home.to_string_lossy().to_string(),
-        claude_home: sessions::claude_home().to_string_lossy().to_string(),
-        shell: pty::default_shell(),
-        claude_found: which::which("claude").is_ok() || home.join(".local").join("bin").join("claude.exe").is_file(),
-        codex_found: which::which("codex").is_ok(),
-    }
+pub async fn environment() -> CmdResult<Environment> {
+    blocking(|| {
+        let home = dirs::home_dir().unwrap_or_default();
+        Ok(Environment {
+            home: home.to_string_lossy().to_string(),
+            claude_home: sessions::claude_home().to_string_lossy().to_string(),
+            shell: pty::default_shell(),
+            claude_found: which::which("claude").is_ok() || home.join(".local").join("bin").join("claude.exe").is_file(),
+            codex_found: which::which("codex").is_ok(),
+        })
+    })
+    .await
 }
 
 #[tauri::command]
@@ -68,11 +60,6 @@ pub async fn list_sessions() -> CmdResult<Vec<SessionInfo>> {
 #[tauri::command]
 pub async fn list_wsl_sessions() -> CmdResult<wsl::WslIndex> {
     blocking(|| Ok(wsl::index())).await
-}
-
-#[tauri::command]
-pub async fn wsl_distros() -> CmdResult<Vec<wsl::Distro>> {
-    blocking(|| Ok(wsl::distros())).await
 }
 
 #[tauri::command]
@@ -91,58 +78,74 @@ pub async fn live_sessions() -> CmdResult<Vec<LiveSession>> {
 }
 
 #[tauri::command]
-pub async fn session_transcript(file_path: String, distro: Option<String>) -> CmdResult<Vec<TranscriptItem>> {
-    blocking(move || local_or_wsl!(distro, |d| wsl::transcript(&d, &file_path), sessions::transcript(&file_path))).await
+pub async fn session_transcript(file_path: String, distro: Option<String>, from_offset: Option<u64>) -> CmdResult<TranscriptPage> {
+    let from = from_offset.unwrap_or(0);
+    blocking(move || match distro {
+        Some(distro) => wsl::transcript(&distro, &file_path, from),
+        None => sessions::transcript(&file_path, from),
+    })
+    .await
 }
 
 #[tauri::command]
 pub async fn delete_session(file_path: String, distro: Option<String>) -> CmdResult<()> {
-    blocking(move || local_or_wsl!(distro, |d| wsl::delete_session(&d, &file_path), sessions::delete_session(&file_path)))
-        .await
+    blocking(move || match distro {
+        Some(distro) => wsl::delete_session(&distro, &file_path),
+        None => sessions::delete_session(&file_path),
+    })
+    .await
 }
 
 #[tauri::command]
 pub async fn rename_session(file_path: String, distro: Option<String>, title: String) -> CmdResult<()> {
-    blocking(move || {
-        local_or_wsl!(distro, |d| wsl::rename_session(&d, &file_path, &title), sessions::rename_session(&file_path, &title))
+    blocking(move || match distro {
+        Some(distro) => wsl::rename_session(&distro, &file_path, &title),
+        None => sessions::rename_session(&file_path, &title),
     })
     .await
 }
 
 #[tauri::command]
 pub async fn search_sessions(query: String, include_wsl: bool) -> CmdResult<Vec<SearchHit>> {
+    let generation = sessions::begin_search();
     blocking(move || {
-        let mut hits = sessions::search(&query);
-        if include_wsl {
-            hits.extend(wsl::search(&query));
-        }
-        Ok(hits)
+        let Some(needle) = Needle::new(&query) else { return Ok(Vec::new()) };
+        let (mut hits, wsl_hits) = rayon::join(
+            || sessions::search(&needle, generation),
+            || if include_wsl { wsl::search(&needle, generation) } else { Vec::new() },
+        );
+        hits.extend(wsl_hits);
+        Ok(if sessions::search_is_current(generation) { hits } else { Vec::new() })
     })
     .await
 }
 
 #[tauri::command]
 pub async fn session_changes(file_path: String, distro: Option<String>) -> CmdResult<Vec<changes::ChangedFile>> {
-    blocking(move || local_or_wsl!(distro, |d| wsl::session_changes(&d, &file_path), changes::session_changes(&file_path)))
-        .await
+    blocking(move || match distro {
+        Some(distro) => wsl::session_changes(&distro, &file_path),
+        None => changes::session_changes(&file_path),
+    })
+    .await
 }
 
 #[tauri::command]
 pub async fn session_backup(file_path: String, backup: String, distro: Option<String>) -> CmdResult<String> {
-    blocking(move || {
-        local_or_wsl!(distro, |d| wsl::session_backup(&d, &file_path, &backup), changes::session_backup(&file_path, &backup))
+    blocking(move || match distro {
+        Some(distro) => wsl::session_backup(&distro, &file_path, &backup),
+        None => changes::session_backup(&file_path, &backup),
     })
     .await
 }
 
 #[tauri::command]
 pub async fn git_status(root: String) -> CmdResult<Vec<git::GitChange>> {
-    blocking(move || host_path!(root, |d, linux| wsl::git_status(&d, &linux), git::status(&root))).await
+    blocking(move || on_host(&root, wsl::git_status, || git::status(&root))).await
 }
 
 #[tauri::command]
 pub async fn git_head_file(path: String) -> CmdResult<String> {
-    blocking(move || host_path!(path, |d, linux| wsl::git_head_file(&d, &linux), git::head_file(&path))).await
+    blocking(move || on_host(&path, wsl::git_head_file, || git::head_file(&path))).await
 }
 
 #[tauri::command]
@@ -171,8 +174,13 @@ pub async fn mcp_read_resource(app: AppHandle, cwd: String, id: String, uri: Str
 }
 
 #[tauri::command]
-pub fn mcp_disconnect(state: State<McpManager>, cwd: String, id: String) {
-    state.disconnect(&cwd, &id);
+pub async fn mcp_disconnect(app: AppHandle, cwd: String, id: String) -> CmdResult<()> {
+    blocking(move || {
+        app.state::<McpManager>().disconnect(&cwd, &id);
+        app.state::<PgManager>().disconnect(&cwd, &id);
+        Ok(())
+    })
+    .await
 }
 
 #[tauri::command]
@@ -182,47 +190,45 @@ pub async fn pg_info(app: AppHandle, cwd: String, id: String) -> CmdResult<pg::C
 
 #[tauri::command]
 pub async fn pg_query(app: AppHandle, cwd: String, id: String, sql: String) -> CmdResult<pg::QueryOutput> {
+    blocking(move || app.state::<PgManager>().query(&cwd, &id, &sql)).await
+}
+
+#[tauri::command]
+pub async fn pg_cancel(app: AppHandle, cwd: String, id: String) -> CmdResult<()> {
+    blocking(move || app.state::<PgManager>().cancel(&cwd, &id)).await
+}
+
+#[tauri::command]
+pub async fn pty_spawn(app: AppHandle, request: SpawnRequest, on_event: Channel<PtyEvent>) -> CmdResult<PtyInfo> {
+    blocking(move || app.state::<PtyManager>().spawn(request, on_event)).await
+}
+
+#[tauri::command(async)]
+pub fn pty_attach(state: tauri::State<PtyManager>, id: String, on_event: Channel<PtyEvent>) -> CmdResult<PtyInfo> {
+    state.attach(&id, on_event).map_err(|e| format!("{e:#}"))
+}
+
+#[tauri::command(async)]
+pub fn pty_write(state: tauri::State<PtyManager>, id: String, data: String) -> CmdResult<()> {
+    state.write(&id, &data).map_err(|e| format!("{e:#}"))
+}
+
+#[tauri::command(async)]
+pub fn pty_resize(state: tauri::State<PtyManager>, id: String, cols: u16, rows: u16) -> CmdResult<()> {
+    state.resize(&id, cols, rows).map_err(|e| format!("{e:#}"))
+}
+
+#[tauri::command]
+pub async fn pty_kill(app: AppHandle, id: String) -> CmdResult<()> {
     blocking(move || {
-        let pg = app.state::<PgManager>();
-        pg.query(&cwd, &id, &sql).or_else(|first| {
-            if first.to_string().contains("closed") || first.to_string().contains("connection") {
-                pg.disconnect(&cwd, &id);
-                pg.query(&cwd, &id, &sql)
-            } else {
-                Err(first)
-            }
-        })
+        app.state::<PtyManager>().kill(&id);
+        Ok(())
     })
     .await
 }
 
 #[tauri::command(async)]
-pub fn pty_spawn(state: State<PtyManager>, request: SpawnRequest, on_event: Channel<PtyEvent>) -> CmdResult<PtyInfo> {
-    state.spawn(request, on_event).map_err(|e| format!("{e:#}"))
-}
-
-#[tauri::command(async)]
-pub fn pty_attach(state: State<PtyManager>, id: String, on_event: Channel<PtyEvent>) -> CmdResult<PtyInfo> {
-    state.attach(&id, on_event).map_err(|e| format!("{e:#}"))
-}
-
-#[tauri::command(async)]
-pub fn pty_write(state: State<PtyManager>, id: String, data: String) -> CmdResult<()> {
-    state.write(&id, &data).map_err(|e| format!("{e:#}"))
-}
-
-#[tauri::command(async)]
-pub fn pty_resize(state: State<PtyManager>, id: String, cols: u16, rows: u16) -> CmdResult<()> {
-    state.resize(&id, cols, rows).map_err(|e| format!("{e:#}"))
-}
-
-#[tauri::command(async)]
-pub fn pty_kill(state: State<PtyManager>, id: String) {
-    state.kill(&id);
-}
-
-#[tauri::command(async)]
-pub fn pty_list(state: State<PtyManager>) -> Vec<PtyInfo> {
+pub fn pty_list(state: tauri::State<PtyManager>) -> Vec<PtyInfo> {
     state.list()
 }
 
@@ -237,18 +243,23 @@ pub async fn read_file(path: String) -> CmdResult<fsx::FileContent> {
 }
 
 #[tauri::command]
-pub async fn write_file(path: String, contents: String) -> CmdResult<()> {
-    blocking(move || fsx::write_file(&path, &contents)).await
+pub async fn write_file(
+    path: String,
+    contents: String,
+    encoding: Option<fsx::Encoding>,
+    expected_modified_ms: Option<u64>,
+) -> CmdResult<fsx::WriteOutcome> {
+    blocking(move || fsx::write_file(&path, &contents, encoding, expected_modified_ms)).await
+}
+
+#[tauri::command]
+pub async fn stat_path(path: String) -> CmdResult<Option<fsx::PathStat>> {
+    blocking(move || fsx::stat_path(&path)).await
 }
 
 #[tauri::command]
 pub async fn list_files(root: String) -> CmdResult<Vec<String>> {
-    blocking(move || host_path!(root, |d, linux| wsl::list_files(&d, &linux), Ok(fsx::list_files(&root)))).await
-}
-
-#[tauri::command]
-pub async fn path_is_dir(path: String) -> CmdResult<bool> {
-    blocking(move || Ok(std::path::Path::new(&path).is_dir())).await
+    blocking(move || on_host(&root, wsl::list_files, || fsx::list_files(&root))).await
 }
 
 #[tauri::command]
@@ -256,14 +267,28 @@ pub async fn open_in_editor(path: String) -> CmdResult<()> {
     blocking(move || fsx::open_in_editor(&path)).await
 }
 
-#[tauri::command(async)]
-pub fn watch_dir(app: AppHandle, state: State<Watchers>, root: String) -> CmdResult<()> {
-    state.watch(app, root).map_err(|e| format!("{e:#}"))
+#[tauri::command]
+pub async fn open_path(path: String) -> CmdResult<()> {
+    blocking(move || fsx::open_path(&path)).await
 }
 
-#[tauri::command(async)]
-pub fn unwatch_dir(state: State<Watchers>, root: String) {
-    state.unwatch(&root);
+#[tauri::command]
+pub async fn reveal_path(path: String) -> CmdResult<()> {
+    blocking(move || fsx::reveal_path(&path)).await
+}
+
+#[tauri::command]
+pub async fn watch_dir(app: AppHandle, root: String) -> CmdResult<()> {
+    blocking(move || app.state::<Watchers>().watch(app.clone(), root)).await
+}
+
+#[tauri::command]
+pub async fn unwatch_dir(app: AppHandle, root: String) -> CmdResult<()> {
+    blocking(move || {
+        app.state::<Watchers>().unwatch(&root);
+        Ok(())
+    })
+    .await
 }
 
 #[tauri::command]

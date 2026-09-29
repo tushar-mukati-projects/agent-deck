@@ -19,8 +19,6 @@ export const decodeDiffTab = (value: string): DiffTab | null => {
   return { source, backup: backup || null, path: rest.join("::") };
 };
 
-export const isDiffTab = (value: string) => value.startsWith(DIFF_PREFIX);
-
 export const encodeMcpTab = (serverId: string) => `${MCP_PREFIX}${serverId}`;
 
 export const decodeMcpTab = (value: string) =>
