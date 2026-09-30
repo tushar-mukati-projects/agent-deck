@@ -98,17 +98,21 @@ const AgentShellTab = ({
   task,
   state,
   active,
+  onClose,
 }: {
   workspace: Workspace;
   task: AgentTask;
   state: TaskState;
   active: boolean;
+  onClose?: () => void;
 }) => (
   <Tab
     selected={active}
     onSelect={() => useAgentTasksStore.getState().select(workspace.id, task.id)}
+    onClose={onClose}
+    closeLabel="Close finished shell"
     title={`Started by ${agentName(workspace.agent)}: ${task.command}`}
-    className={cn(tabClass(active), "pr-2")}
+    className={cn(tabClass(active), !onClose && "pr-2")}
   >
     <StatusDot tone={TASK_TONE[state]} className="size-1.5" />
     <Bot className="size-3 shrink-0 text-info" />
@@ -130,6 +134,10 @@ export const ShellPanel = ({ workspace }: { workspace: Workspace }) => {
     ? undefined
     : (workspace.shells.find((s) => s.id === workspace.activeShellId) ?? workspace.shells[0]);
   const active = useTerminal(activeShell?.id);
+  const closeTask = (task: AgentTask) =>
+    taskState(task, agentStarted) === "running"
+      ? undefined
+      : () => useAgentTasksStore.getState().dismiss(workspace.sessionId, task.id);
 
   return (
     <div className="flex h-full min-h-0 flex-col border-t border-border bg-bg">
@@ -155,6 +163,7 @@ export const ShellPanel = ({ workspace }: { workspace: Workspace }) => {
               task={task}
               state={taskState(task, agentStarted)}
               active={task.id === showTask?.id}
+              onClose={closeTask(task)}
             />
           ))}
         </TabStrip>
@@ -200,6 +209,7 @@ export const ShellPanel = ({ workspace }: { workspace: Workspace }) => {
             workspaceId={workspace.id}
             task={showTask}
             state={taskState(showTask, agentStarted)}
+            onClose={closeTask(showTask)}
           />
         )}
         {activeShell && (

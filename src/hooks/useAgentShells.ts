@@ -22,10 +22,16 @@ export const useAgentStart = (workspace: Workspace) => {
   return running || external ? started : null;
 };
 
+const EMPTY: string[] = [];
+
 export const useAgentShells = (workspace: Workspace) => {
   const tasks = useAgentTasksStore((s) => s.bySession[workspace.sessionId]);
+  const dismissed = useAgentTasksStore((s) => s.dismissed[workspace.sessionId] ?? EMPTY);
   const started = useAgentStart(workspace);
-  return useMemo(() => shownTasks(tasks ?? [], started, Date.now()), [tasks, started]);
+  return useMemo(
+    () => shownTasks(tasks ?? [], started, Date.now(), dismissed),
+    [tasks, started, dismissed],
+  );
 };
 
 export const useAgentShellSync = (workspace: Workspace) => {

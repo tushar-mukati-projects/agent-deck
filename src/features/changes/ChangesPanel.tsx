@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Eye, EyeOff, GitCompare, RefreshCw } from "lucide-react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChevronRight, Eye, EyeOff, GitCompare, RefreshCw } from "lucide-react";
 
 import { EmptyState, Hint, LoadingState } from "@/components/ui/feedback";
 import { IconButton } from "@/components/ui/icon-button";
@@ -7,12 +7,13 @@ import { CollapsibleSection, PanelHeader } from "@/components/ui/panel";
 import { useAsync, useThrottledCallback } from "@/hooks/useAsync";
 import { useSessionFile } from "@/hooks/useSessionFile";
 import { agentName, CLAUDE } from "@/lib/agents/registry";
+import { buildChangeTree, type ChangeFolder, type ChangeNode } from "@/lib/change-tree";
 import { encodeDiffTab } from "@/lib/diff-tabs";
 import { subscribeFileChanges } from "@/lib/file-events";
-import { FileIcon } from "@/lib/file-icons";
+import { FileIcon, folderIcon } from "@/lib/file-icons";
 import { api } from "@/lib/tauri/commands";
 import { DECK_PATH_MIME } from "@/lib/terminal/input";
-import { basename, cn, dirname, errorMessage, isWithin, relativePath } from "@/lib/utils";
+import { basename, cn, errorMessage, isWithin, shortenHome } from "@/lib/utils";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useActiveWorkspace, useWorkspaceStore } from "@/stores/workspace-store";
 import type { ChangedFile, GitChange, Workspace } from "@/types";
@@ -32,6 +33,10 @@ const STATUS_BADGE: Record<string, Badge> = {
 
 const RELOAD_DELAY_MS = 1200;
 const RELOAD_MAX_WAIT_MS = 8000;
+const INDENT = 12;
+
+const rowClass =
+  "relative flex h-[26px] w-full min-w-0 items-center gap-1.5 rounded-md pr-2 text-left text-[12px] hover:bg-hover";
 
 const gitBadge = (code: string) => {
   if (code === "??" || code.includes("A")) return STATUS_BADGE.added;
@@ -42,46 +47,139 @@ const gitBadge = (code: string) => {
 const gitMessage = (error: string) =>
   /not a git repository/i.test(error) ? "Not a git repository." : error;
 
+const indent = (depth: number) => ({ paddingLeft: 8 + depth * INDENT });
+
+const Guides = ({ depth }: { depth: number }) =>
+  Array.from({ length: depth }, (_, level) => (
+    <span
+      key={level}
+      className="absolute top-0 bottom-0 w-px bg-border"
+      style={{ left: 14 + level * INDENT }}
+    />
+  ));
+
 const Row = ({
-  workspace,
   path,
+  depth,
   badge,
   onOpen,
   children,
 }: {
-  workspace: Workspace;
   path: string;
+  depth: number;
   badge: Badge;
   onOpen: () => void;
   children?: React.ReactNode;
+}) => (
+  <button
+    type="button"
+    onClick={onOpen}
+    title={path}
+    draggable
+    onDragStart={(e) => e.dataTransfer.setData(DECK_PATH_MIME, path)}
+    style={indent(depth)}
+    className={rowClass}
+  >
+    <Guides depth={depth} />
+    <span className="w-3 shrink-0" />
+    <FileIcon path={path} />
+    <span className="min-w-0 flex-1 truncate text-fg/90">{basename(path)}</span>
+    {children}
+    <span
+      title={badge.label}
+      className={cn(
+        "w-3 shrink-0 text-center font-mono text-[11px] font-semibold",
+        badge.className,
+      )}
+    >
+      {badge.letter}
+    </span>
+  </button>
+);
+
+const FolderRow = ({
+  folder,
+  depth,
+  open,
+  onToggle,
+}: {
+  folder: ChangeFolder<unknown>;
+  depth: number;
+  open: boolean;
+  onToggle: () => void;
 }) => {
-  const rel = relativePath(path, workspace.cwd);
-  const folder = rel === path ? dirname(path) : dirname(rel) === rel ? "" : dirname(rel);
+  const home = useSessionsStore((s) => s.environment?.home ?? "");
+  const { icon: Icon, color } = folderIcon(basename(folder.path), open);
   return (
     <button
       type="button"
-      onClick={onOpen}
-      title={path}
-      draggable
-      onDragStart={(e) => e.dataTransfer.setData(DECK_PATH_MIME, path)}
-      className="group flex h-[26px] w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-[12px] hover:bg-hover"
+      onClick={onToggle}
+      title={folder.path}
+      aria-expanded={open}
+      style={indent(depth)}
+      className={cn(rowClass, "text-fg/85")}
     >
-      <FileIcon path={path} />
-      <span className="max-w-[65%] min-w-0 truncate text-fg/90">{basename(path)}</span>
-      <span className="min-w-0 flex-1 truncate text-[11px] text-faint">{folder}</span>
-      {children}
-      <span
-        title={badge.label}
+      <Guides depth={depth} />
+      <ChevronRight
         className={cn(
-          "w-3 shrink-0 text-center font-mono text-[11px] font-semibold",
-          badge.className,
+          "size-3 shrink-0 text-faint transition-transform duration-100",
+          open && "rotate-90",
         )}
-      >
-        {badge.letter}
-      </span>
+      />
+      <Icon className={cn("size-3.5 shrink-0", color)} />
+      <span className="min-w-0 truncate">{shortenHome(folder.name, home)}</span>
     </button>
   );
 };
+
+const useCollapsed = () => {
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set());
+  const toggle = useCallback(
+    (key: string) =>
+      setCollapsed((current) => {
+        const next = new Set(current);
+        if (!next.delete(key)) next.add(key);
+        return next;
+      }),
+    [],
+  );
+  return [collapsed, toggle] as const;
+};
+
+interface ChangeTreeProps<T> {
+  nodes: ChangeNode<T>[];
+  depth?: number;
+  collapsed: ReadonlySet<string>;
+  onToggle: (key: string) => void;
+  renderFile: (item: T, depth: number) => React.ReactNode;
+}
+
+const ChangeTree = <T,>({
+  nodes,
+  depth = 0,
+  collapsed,
+  onToggle,
+  renderFile,
+}: ChangeTreeProps<T>) =>
+  nodes.map((node) => {
+    if (node.kind === "file")
+      return <Fragment key={node.key}>{renderFile(node.item, depth)}</Fragment>;
+    const open = !collapsed.has(node.key);
+    return (
+      <Fragment key={node.key}>
+        <FolderRow folder={node} depth={depth} open={open} onToggle={() => onToggle(node.key)} />
+        {open && (
+          <ChangeTree
+            nodes={node.children}
+            depth={depth + 1}
+            collapsed={collapsed}
+            onToggle={onToggle}
+            renderFile={renderFile}
+          />
+        )}
+      </Fragment>
+    );
+  });
 
 const loadChanges = async (cwd: string, filePath: string | null, distro: string | null) => {
   const [changes, status] = await Promise.allSettled([
@@ -110,10 +208,15 @@ const SessionChanges = ({
   sessionFile: string | null;
 }) => {
   const [open, setOpen] = useState(true);
+  const [collapsed, toggleFolder] = useCollapsed();
   const agent = useSessionsStore((s) => s.byId[workspace.sessionId]?.agent ?? workspace.agent);
   const visible = useMemo(
     () => files.filter((f) => showUnchanged || f.status !== "unchanged"),
     [files, showUnchanged],
+  );
+  const tree = useMemo(
+    () => buildChangeTree(visible, (f) => f.path, workspace.cwd),
+    [visible, workspace.cwd],
   );
   const totals = visible.reduce(
     (acc, f) => ({ add: acc.add + f.additions, del: acc.del + f.deletions }),
@@ -149,20 +252,24 @@ const SessionChanges = ({
             : "Changes appear here after the first prompt."}
         </Hint>
       )}
-      {visible.map((file) => (
-        <Row
-          key={file.path}
-          workspace={workspace}
-          path={file.path}
-          badge={STATUS_BADGE[file.status] ?? STATUS_BADGE.modified}
-          onOpen={() => openDiff(file)}
-        >
-          <span className="shrink-0 font-mono text-[10.5px]">
-            {file.additions > 0 && <span className="text-add">+{file.additions}</span>}
-            {file.deletions > 0 && <span className="ml-1 text-del">−{file.deletions}</span>}
-          </span>
-        </Row>
-      ))}
+      <ChangeTree
+        nodes={tree}
+        collapsed={collapsed}
+        onToggle={toggleFolder}
+        renderFile={(file, depth) => (
+          <Row
+            path={file.path}
+            depth={depth}
+            badge={STATUS_BADGE[file.status] ?? STATUS_BADGE.modified}
+            onOpen={() => openDiff(file)}
+          >
+            <span className="shrink-0 font-mono text-[10.5px]">
+              {file.additions > 0 && <span className="text-add">+{file.additions}</span>}
+              {file.deletions > 0 && <span className="ml-1 text-del">−{file.deletions}</span>}
+            </span>
+          </Row>
+        )}
+      />
     </CollapsibleSection>
   );
 };
@@ -177,6 +284,11 @@ const RepoChanges = ({
   error: string | null;
 }) => {
   const [open, setOpen] = useState(true);
+  const [collapsed, toggleFolder] = useCollapsed();
+  const tree = useMemo(
+    () => buildChangeTree(git, (c) => c.path, workspace.cwd),
+    [git, workspace.cwd],
+  );
   return (
     <CollapsibleSection
       title="Uncommitted in repo"
@@ -186,22 +298,26 @@ const RepoChanges = ({
     >
       {error && <Hint>{gitMessage(error)}</Hint>}
       {!error && git.length === 0 && <Hint>Working tree is clean.</Hint>}
-      {git.map((change) => (
-        <Row
-          key={change.path}
-          workspace={workspace}
-          path={change.path}
-          badge={gitBadge(change.code)}
-          onOpen={() =>
-            useWorkspaceStore
-              .getState()
-              .openFile(
-                workspace.id,
-                encodeDiffTab({ source: "git", path: change.path, backup: null }),
-              )
-          }
-        />
-      ))}
+      <ChangeTree
+        nodes={tree}
+        collapsed={collapsed}
+        onToggle={toggleFolder}
+        renderFile={(change, depth) => (
+          <Row
+            path={change.path}
+            depth={depth}
+            badge={gitBadge(change.code)}
+            onOpen={() =>
+              useWorkspaceStore
+                .getState()
+                .openFile(
+                  workspace.id,
+                  encodeDiffTab({ source: "git", path: change.path, backup: null }),
+                )
+            }
+          />
+        )}
+      />
     </CollapsibleSection>
   );
 };

@@ -36,6 +36,12 @@ describe("agent shells", () => {
     expect(shownTasks(tasks, null, NOW)).toEqual([]);
   });
 
+  it("hides finished shells the user closed without bringing older ones back", () => {
+    const finished = Array.from({ length: 7 }, (_, i) => task(`f${i}`, "completed", 20, 5 + i));
+    const shown = shownTasks([task("a", "running", 10), ...finished], START, NOW, ["f0", "a"]);
+    expect(shown.map((t) => t.id)).toEqual(["a", "f1", "f2", "f3", "f4"]);
+  });
+
   it("treats shells from an earlier run, or with the agent gone, as ended", () => {
     expect(taskState(task("old", "running", 120), START)).toBe("ended");
     expect(taskState(task("a", "running", 10), START)).toBe("running");

@@ -55,6 +55,8 @@ export const relativePath = (path: string, root: string) =>
     ? unifySeparators(path).split("\\").slice(normalizePath(root).split("\\").length).join("\\")
     : path;
 
+export const DOCKERFILE_NAME = /^(docker|container)file([.-].+)?$|[.-](docker|container)file$/i;
+
 export const extension = (path: string) => {
   const name = basename(path);
   const index = name.lastIndexOf(".");

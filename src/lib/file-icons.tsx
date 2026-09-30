@@ -19,7 +19,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import { basename, extension } from "@/lib/utils";
+import { basename, DOCKERFILE_NAME, extension } from "@/lib/utils";
 
 interface IconSpec {
   icon: LucideIcon;
@@ -97,6 +97,7 @@ const byName: Record<string, IconSpec> = {
 export const fileIcon = (path: string): IconSpec => {
   const name = basename(path).toLowerCase();
   if (name.startsWith(".env")) return byExtension.env;
+  if (DOCKERFILE_NAME.test(name)) return byName.dockerfile;
   return byName[name] ?? byExtension[extension(path)] ?? { icon: File, color: "text-faint" };
 };
 

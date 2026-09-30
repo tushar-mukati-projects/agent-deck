@@ -1,4 +1,9 @@
 import { memo, useMemo } from "react";
+import dockerfile from "highlight.js/lib/languages/dockerfile";
+import dos from "highlight.js/lib/languages/dos";
+import nginx from "highlight.js/lib/languages/nginx";
+import powershell from "highlight.js/lib/languages/powershell";
+import { common } from "lowlight";
 import ReactMarkdown, { type Components } from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import rehypeRaw from "rehype-raw";
@@ -17,6 +22,11 @@ interface MarkdownViewProps {
   className?: string;
   compact?: boolean;
 }
+
+const highlightOptions = {
+  detect: false,
+  languages: { ...common, dockerfile, dos, nginx, powershell },
+};
 
 const schema = {
   ...defaultSchema,
@@ -119,11 +129,7 @@ export const MarkdownView = memo(
         {fields.length > 0 && <Frontmatter fields={fields} />}
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
-          rehypePlugins={[
-            rehypeRaw,
-            [rehypeSanitize, schema],
-            [rehypeHighlight, { detect: false }],
-          ]}
+          rehypePlugins={[rehypeRaw, [rehypeSanitize, schema], [rehypeHighlight, highlightOptions]]}
           components={components}
         >
           {body}

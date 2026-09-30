@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { LanguageDescription } from "@codemirror/language";
-import { languages } from "@codemirror/language-data";
 import { EditorState, type Extension } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
 import { tags as t } from "@lezer/highlight";
 import { createTheme } from "@uiw/codemirror-themes";
 import CodeMirror from "@uiw/react-codemirror";
 
+import { findLanguage } from "@/lib/languages";
 import { findTheme } from "@/lib/themes";
 import { basename, normalizePath } from "@/lib/utils";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -61,10 +60,7 @@ const THEMES = { dark: makeTheme("dark"), light: makeTheme("light") };
 export const useDeckTheme = () => THEMES[findTheme(useSettingsStore((s) => s.themeId)).kind];
 
 export const useLanguage = (path: string) => {
-  const description = useMemo(
-    () => LanguageDescription.matchFilename(languages, basename(path)),
-    [path],
-  );
+  const description = useMemo(() => findLanguage(basename(path)), [path]);
   const [loaded, setLoaded] = useState<{ path: string; support: Extension } | null>(null);
   useEffect(() => {
     if (!description || description.support) return;

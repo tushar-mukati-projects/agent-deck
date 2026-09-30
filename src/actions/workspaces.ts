@@ -125,8 +125,13 @@ const agentShellsNow = (workspace: Workspace) => {
   const alive =
     (workspace.mode === "live" && isTerminalAlive(workspace.agentTerminalId)) ||
     live.some((l) => l.sessionId === workspace.sessionId);
-  const tasks = useAgentTasksStore.getState().bySession[workspace.sessionId] ?? [];
-  return shownTasks(tasks, alive ? processStart(live, workspace.sessionId) : null, Date.now());
+  const { bySession, dismissed } = useAgentTasksStore.getState();
+  return shownTasks(
+    bySession[workspace.sessionId] ?? [],
+    alive ? processStart(live, workspace.sessionId) : null,
+    Date.now(),
+    dismissed[workspace.sessionId],
+  );
 };
 
 export const toggleShellPanel = () => {

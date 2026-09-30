@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDown, Copy, FileText } from "lucide-react";
+import { ArrowDown, Copy, FileText, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -60,10 +60,12 @@ export const AgentShellView = ({
   workspaceId,
   task,
   state,
+  onClose,
 }: {
   workspaceId: string;
   task: AgentTask;
   state: TaskState;
+  onClose?: () => void;
 }) => {
   const { tail, error } = useOutput(task.outputPath, state === "running");
   const text = useMemo(() => cleanOutput(tail?.text ?? ""), [tail?.text]);
@@ -94,6 +96,11 @@ export const AgentShellView = ({
               onClick={() => useWorkspaceStore.getState().openFile(workspaceId, task.outputPath!)}
             >
               <FileText /> Open output
+            </Button>
+          )}
+          {onClose && (
+            <Button size="xs" variant="ghost" onClick={onClose}>
+              <X /> Close
             </Button>
           )}
         </div>
