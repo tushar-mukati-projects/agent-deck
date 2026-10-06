@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { filterOverview, invocation } from "@/features/claude/filter-overview";
-import type { ClaudeOverview, SettingsFile } from "@/types";
+import { filterOverview, invocation, scopeLabel } from "@/features/agent-config/filter-overview";
+import type { AgentOverview, SettingsFile } from "@/types";
 
 const settings = (extra: Partial<SettingsFile>): SettingsFile => ({
   scope: "user",
@@ -17,8 +17,8 @@ const settings = (extra: Partial<SettingsFile>): SettingsFile => ({
   ...extra,
 });
 
-const overview: ClaudeOverview = {
-  claudeHome: "C:\\u\\.claude",
+const overview: AgentOverview = {
+  home: "C:\\u\\.claude",
   distro: null,
   memory: [],
   mcp: [],
@@ -43,6 +43,13 @@ describe("filterOverview", () => {
     expect(filterOverview(overview, "git").permissions.map((p) => p.rule)).toEqual(["Bash(git:*)"]);
     expect(filterOverview(overview, "opus").modes).toHaveLength(1);
     expect(filterOverview(overview, "zzz").modes).toHaveLength(0);
+  });
+
+  it("labels auto memory and built-in items", () => {
+    expect(scopeLabel("auto")).toBe("auto memory");
+    expect(scopeLabel("system")).toBe("built-in");
+    expect(scopeLabel("plugin", "tools")).toBe("tools");
+    expect(scopeLabel("project")).toBe("project");
   });
 
   it("prefixes plugin items with the plugin name once", () => {

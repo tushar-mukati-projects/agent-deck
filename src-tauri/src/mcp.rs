@@ -17,10 +17,10 @@ use serde::Serialize;
 use serde_json::{json, Value};
 
 use crate::{
-    claude_config::{self, url_host, Launch, ResolvedServer, Transport},
+    agent_config::{self, url_host, Launch, ResolvedServer, Transport},
     pool::{server_key, Pool},
     process::Managed,
-    util::hidden,
+    util::{hidden, sh_quote},
     wsl,
 };
 
@@ -78,7 +78,7 @@ pub struct McpManager {
 impl McpManager {
     fn client(&self, cwd: &str, id: &str) -> anyhow::Result<Arc<Client>> {
         self.clients.get(&server_key(cwd, id), Client::alive, || {
-            let server = claude_config::resolve_server(cwd, id)?;
+            let server = agent_config::resolve_server(cwd, id)?;
             let client = Client::start(&server)?;
             client.initialize()?;
             Ok(client)
@@ -126,10 +126,6 @@ fn resolve_program(command: &str) -> String {
     which::which(command).map(|p| p.to_string_lossy().to_string()).unwrap_or_else(|_| command.to_string())
 }
 
-fn sh_quote(value: &str) -> String {
-    format!("'{}'", value.replace('\'', r"'\''"))
-}
-
 fn valid_env_name(name: &str) -> bool {
     let mut chars = name.chars();
     chars.next().is_some_and(|c| c.is_ascii_alphabetic() || c == '_') && chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
@@ -140,8 +136,7 @@ fn stdio_command(server: &ResolvedServer, launch: &Launch) -> anyhow::Result<Com
     Ok(match &server.distro {
         Some(distro) => {
             let script = std::iter::once(&command).chain(launch.args.iter()).map(|a| sh_quote(a)).collect::<Vec<_>>().join(" ");
-            let mut cmd = Command::new("wsl.exe");
-            cmd.args(["-d", distro, "--cd", &server.cwd, "-e", &wsl::login_shell(distro), "-lic"]).arg(format!("exec {script}"));
+            let mut cmd = wsl::login_command(distro, &server.cwd, &script);
             let names: Vec<&String> = launch.env.keys().filter(|k| valid_env_name(k)).collect();
             for name in &names {
                 cmd.env(name, &launch.env[*name]);
@@ -341,7 +336,7 @@ fn describe_http_error(error: &ureq::Error) -> String {
 
 impl Client {
     fn start(server: &ResolvedServer) -> anyhow::Result<Self> {
-        let launch = claude_config::launch(server);
+        let launch = agent_config::launch(server);
         let connection = match &launch.transport {
             Transport::Stdio => Connection::Stdio(spawn_stdio(server, &launch)?),
             Transport::Http => Connection::Http(http_transport(&launch)?),

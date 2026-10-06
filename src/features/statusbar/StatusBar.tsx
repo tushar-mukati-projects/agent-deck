@@ -67,7 +67,7 @@ export const StatusBar = () => {
   );
 
   return (
-    <footer className="flex h-6 shrink-0 items-stretch justify-between border-t border-border bg-panel text-[11px]">
+    <footer className="flex h-6 shrink-0 items-stretch justify-between border-t border-border bg-chrome text-[11px]">
       <div className="flex min-w-0 items-stretch">
         {workspace && (
           <>

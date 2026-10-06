@@ -11,6 +11,7 @@ import {
   Sparkles,
   SquareSlash,
   Terminal,
+  Trash2,
   Webhook,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -23,23 +24,36 @@ import { ListRow } from "@/components/ui/list-row";
 import { ScopeBadge } from "@/components/ui/panel";
 import { TimeAgo } from "@/components/ui/time-ago";
 import {
-  invocation,
   modeLabel,
   scopeLabel,
   serverDetail,
   type FilteredOverview,
-} from "@/features/claude/filter-overview";
-import { agentName } from "@/lib/agents/registry";
+} from "@/features/agent-config/filter-overview";
+import type { AgentProfile, SectionKey } from "@/features/agent-config/profiles";
+import {
+  canRemove,
+  fileRemoval,
+  hookRemoval,
+  memoryRemoval,
+  pluginRemoval,
+  removeConfig,
+  ruleRemoval,
+  type RemovalRequest,
+  serverRemoval,
+  skillRemoval,
+} from "@/features/agent-config/remove-config";
 import { encodeMcpTab } from "@/lib/diff-tabs";
 import { api } from "@/lib/tauri/commands";
 import { revealInExplorer } from "@/lib/tauri/system";
 import { cn, errorMessage } from "@/lib/utils";
 import { useViewerStore } from "@/stores/viewer-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
-import type { ConfigItem, Workspace } from "@/types";
+import type { ConfigAgent, ConfigItem, Workspace } from "@/types";
 
 export interface SectionProps {
   workspace: Workspace;
+  agent: ConfigAgent;
+  profile: AgentProfile;
   data: FilteredOverview;
   reload: () => void;
 }
@@ -58,7 +72,25 @@ const createMemory = async (workspace: Workspace, path: string, reload: () => vo
   }
 };
 
-const MemorySection = ({ workspace, data, reload }: SectionProps) => (
+const RemoveButton = ({
+  workspace,
+  agent,
+  request,
+}: {
+  workspace: Workspace;
+  agent: ConfigAgent;
+  request: RemovalRequest;
+}) => (
+  <IconButton
+    label={`Remove ${request.name}`}
+    className="hover:bg-danger/15 hover:text-danger"
+    onClick={() => void removeConfig(workspace, agent, request)}
+  >
+    <Trash2 />
+  </IconButton>
+);
+
+const MemorySection = ({ workspace, agent, profile, data, reload }: SectionProps) => (
   <>
     {data.memory.map((file) =>
       file.exists ? (
@@ -70,6 +102,9 @@ const MemorySection = ({ workspace, data, reload }: SectionProps) => (
           badge={<ScopeBadge>{scopeLabel(file.scope)}</ScopeBadge>}
           meta={<TimeAgo ms={file.modifiedMs} />}
           onClick={() => openFile(workspace, file.path)}
+          actions={
+            <RemoveButton workspace={workspace} agent={agent} request={memoryRemoval(file)} />
+          }
         />
       ) : (
         <ListRow
@@ -78,8 +113,8 @@ const MemorySection = ({ workspace, data, reload }: SectionProps) => (
           title={`Create ${file.label}`}
           subtitle={
             file.scope === "user"
-              ? "Personal instructions Claude reads in every folder."
-              : "Project instructions Claude reads at the start of every session here."
+              ? `Personal instructions ${profile.name} reads in every folder.`
+              : `Project instructions ${profile.name} reads at the start of every session here.`
           }
           dim
           onClick={() => void createMemory(workspace, file.path, reload)}
@@ -89,9 +124,9 @@ const MemorySection = ({ workspace, data, reload }: SectionProps) => (
   </>
 );
 
-const McpSection = ({ workspace, data }: SectionProps) => (
+const McpSection = ({ workspace, agent, profile, data }: SectionProps) => (
   <>
-    {data.mcp.length === 0 && <Hint>No MCP servers configured for this folder.</Hint>}
+    {data.mcp.length === 0 && <Hint>{profile.empty.mcp}</Hint>}
     {data.mcp.map((server) => (
       <ListRow
         key={server.id}
@@ -107,47 +142,9 @@ const McpSection = ({ workspace, data }: SectionProps) => (
         meta={server.disabled ? "disabled" : undefined}
         dim={server.disabled}
         onClick={() => openFile(workspace, encodeMcpTab(server.id))}
-      />
-    ))}
-  </>
-);
-
-const ItemRows = ({
-  items,
-  icon,
-  workspace,
-  kind,
-}: {
-  items: ConfigItem[];
-  icon: React.ReactNode;
-  workspace: Workspace;
-  kind: "slash" | "agent";
-}) => (
-  <>
-    {items.map((item) => (
-      <ListRow
-        key={item.path}
-        icon={icon}
-        title={kind === "slash" ? `/${invocation(item)}` : item.name}
-        mono={kind === "slash"}
-        subtitle={item.description}
-        badge={<ScopeBadge>{scopeLabel(item.scope, item.plugin)}</ScopeBadge>}
-        onClick={() => openFile(workspace, item.path)}
         actions={
-          kind === "agent" ? (
-            <IconButton
-              label={`New session with ${item.name}`}
-              onClick={() => startAgentSession(workspace.cwd, item.name)}
-            >
-              <Sparkles />
-            </IconButton>
-          ) : (
-            <IconButton
-              label={`Type /${invocation(item)} in ${agentName(workspace.agent)}`}
-              onClick={() => sendToAgent(workspace, `/${invocation(item)} `)}
-            >
-              <Terminal />
-            </IconButton>
+          canRemove(server.scope) && (
+            <RemoveButton workspace={workspace} agent={agent} request={serverRemoval(server)} />
           )
         }
       />
@@ -155,38 +152,113 @@ const ItemRows = ({
   </>
 );
 
-const SkillsSection = ({ workspace, data }: SectionProps) => (
-  <>
-    {data.skills.length === 0 && <Hint>No skills found.</Hint>}
-    <ItemRows items={data.skills} icon={<BookOpen />} workspace={workspace} kind="slash" />
-  </>
-);
+const ItemAction = ({
+  workspace,
+  profile,
+  item,
+  kind,
+}: {
+  workspace: Workspace;
+  profile: AgentProfile;
+  item: ConfigItem;
+  kind: "skill" | "command" | "agent";
+}) => {
+  if (kind === "agent")
+    return (
+      <IconButton
+        label={`New session with ${item.name}`}
+        onClick={() => startAgentSession(workspace.cwd, item.name)}
+      >
+        <Sparkles />
+      </IconButton>
+    );
+  const typed = profile.typed(item, kind);
+  return (
+    <IconButton
+      label={`Type ${typed} in ${profile.name}`}
+      onClick={() => sendToAgent(workspace, `${typed} `)}
+    >
+      <Terminal />
+    </IconButton>
+  );
+};
 
-const AgentsSection = ({ workspace, data }: SectionProps) => (
+const ItemRows = ({
+  workspace,
+  agent,
+  profile,
+  items,
+  icon,
+  kind,
+}: Omit<SectionProps, "data" | "reload"> & {
+  items: ConfigItem[];
+  icon: React.ReactNode;
+  kind: "skill" | "command" | "agent";
+}) => (
   <>
-    {data.agents.length === 0 && <Hint>No agents in ~/.claude/agents or .claude/agents.</Hint>}
-    <ItemRows items={data.agents} icon={<Sparkles />} workspace={workspace} kind="agent" />
-  </>
-);
-
-const CommandsSection = ({ workspace, data }: SectionProps) => (
-  <>
-    {data.commands.length === 0 && <Hint>No custom slash commands.</Hint>}
-    <ItemRows items={data.commands} icon={<SquareSlash />} workspace={workspace} kind="slash" />
-  </>
-);
-
-const HooksSection = ({ workspace, data }: SectionProps) => (
-  <>
-    {data.hooks.length === 0 && <Hint>No hooks configured.</Hint>}
-    {data.hooks.map((hook, index) => (
+    {items.map((item) => (
       <ListRow
-        key={`${hook.source}:${index}`}
+        key={item.path}
+        icon={icon}
+        title={kind === "agent" ? item.name : profile.typed(item, kind)}
+        mono={kind !== "agent"}
+        subtitle={item.description}
+        badge={<ScopeBadge>{scopeLabel(item.scope, item.plugin)}</ScopeBadge>}
+        onClick={() => openFile(workspace, item.path)}
+        actions={
+          <>
+            <ItemAction workspace={workspace} profile={profile} item={item} kind={kind} />
+            {canRemove(item.scope) && (
+              <RemoveButton
+                workspace={workspace}
+                agent={agent}
+                request={kind === "skill" ? skillRemoval(item) : fileRemoval(item)}
+              />
+            )}
+          </>
+        }
+      />
+    ))}
+  </>
+);
+
+const SkillsSection = ({ data, ...props }: SectionProps) => (
+  <>
+    {data.skills.length === 0 && <Hint>{props.profile.empty.skills}</Hint>}
+    <ItemRows {...props} items={data.skills} icon={<BookOpen />} kind="skill" />
+  </>
+);
+
+const AgentsSection = ({ data, ...props }: SectionProps) => (
+  <>
+    {data.agents.length === 0 && <Hint>{props.profile.empty.agents}</Hint>}
+    <ItemRows {...props} items={data.agents} icon={<Sparkles />} kind="agent" />
+  </>
+);
+
+const CommandsSection = ({ data, ...props }: SectionProps) => (
+  <>
+    {data.commands.length === 0 && <Hint>{props.profile.empty.commands}</Hint>}
+    <ItemRows {...props} items={data.commands} icon={<SquareSlash />} kind="command" />
+  </>
+);
+
+const HooksSection = ({ workspace, agent, profile, data }: SectionProps) => (
+  <>
+    {data.hooks.length === 0 && <Hint>{profile.empty.hooks}</Hint>}
+    {data.hooks.map((hook) => (
+      <ListRow
+        key={`${hook.source}:${hook.event}:${hook.group}:${hook.index}`}
         icon={<Webhook />}
         title={hook.matcher ? `${hook.event} · ${hook.matcher}` : hook.event}
         subtitle={hook.command}
         badge={<ScopeBadge>{scopeLabel(hook.scope, hook.plugin)}</ScopeBadge>}
         onClick={() => openFile(workspace, hook.source)}
+        actions={
+          canRemove(hook.scope) && (
+            <RemoveButton workspace={workspace} agent={agent} request={hookRemoval(hook)} />
+          )
+        }
       />
     ))}
   </>
@@ -194,7 +266,7 @@ const HooksSection = ({ workspace, data }: SectionProps) => (
 
 const RULE_TONE = { allow: "text-success", deny: "text-danger", ask: "text-warning" } as const;
 
-const PermissionsSection = ({ workspace, data }: SectionProps) => (
+const PermissionsSection = ({ workspace, agent, profile, data }: SectionProps) => (
   <>
     {data.modes.map((file) => (
       <ListRow
@@ -205,24 +277,27 @@ const PermissionsSection = ({ workspace, data }: SectionProps) => (
         onClick={() => openFile(workspace, file.path)}
       />
     ))}
-    {data.permissions.length === 0 && <Hint>No allow, ask or deny rules.</Hint>}
-    {data.permissions.map(({ kind, rule, file }, index) => (
+    {data.permissions.length === 0 && <Hint>{profile.empty.permissions}</Hint>}
+    {data.permissions.map((permission, index) => (
       <ListRow
-        key={`${file.path}:${kind}:${index}`}
-        icon={<ShieldCheck className={cn(RULE_TONE[kind])} />}
-        title={rule}
+        key={`${permission.file.path}:${permission.kind}:${index}`}
+        icon={<ShieldCheck className={cn(RULE_TONE[permission.kind])} />}
+        title={permission.rule}
         mono
-        badge={<ScopeBadge>{kind}</ScopeBadge>}
-        meta={scopeLabel(file.scope)}
-        onClick={() => openFile(workspace, file.path)}
+        badge={<ScopeBadge>{permission.kind}</ScopeBadge>}
+        meta={scopeLabel(permission.file.scope)}
+        onClick={() => openFile(workspace, permission.file.path)}
+        actions={
+          <RemoveButton workspace={workspace} agent={agent} request={ruleRemoval(permission)} />
+        }
       />
     ))}
   </>
 );
 
-const PluginsSection = ({ data }: SectionProps) => (
+const PluginsSection = ({ workspace, agent, profile, data }: SectionProps) => (
   <>
-    {data.plugins.length === 0 && <Hint>No plugins installed.</Hint>}
+    {data.plugins.length === 0 && <Hint>{profile.empty.plugins}</Hint>}
     {data.plugins.map((plugin) => {
       const [name, source] = plugin.name.split("@");
       return (
@@ -235,6 +310,13 @@ const PluginsSection = ({ data }: SectionProps) => (
           meta={plugin.enabled ? plugin.version : "disabled"}
           dim={!plugin.enabled}
           onClick={() => void revealInExplorer(plugin.path)}
+          actions={
+            <RemoveButton
+              workspace={workspace}
+              agent={agent}
+              request={pluginRemoval(plugin, agent)}
+            />
+          }
         />
       );
     })}
@@ -248,9 +330,7 @@ const SettingsSection = ({ workspace, data }: SectionProps) => (
         key={file.path}
         icon={<Settings2 />}
         title={file.label}
-        subtitle={
-          file.error ? `Invalid JSON: ${file.error}` : file.exists ? file.path : "Not created yet"
-        }
+        subtitle={file.error ? file.error : file.exists ? file.path : "Not created yet"}
         badge={<ScopeBadge>{scopeLabel(file.scope)}</ScopeBadge>}
         meta={file.error ? <span className="text-danger">error</span> : undefined}
         dim={!file.exists}
@@ -261,85 +341,57 @@ const SettingsSection = ({ workspace, data }: SectionProps) => (
   </>
 );
 
-export type SectionKey =
-  | "memory"
-  | "mcp"
-  | "skills"
-  | "agents"
-  | "commands"
-  | "hooks"
-  | "permissions"
-  | "plugins"
-  | "settings";
-
-export const SECTIONS: {
-  key: SectionKey;
-  title: string;
-  icon: React.ReactNode;
-  count: (data: FilteredOverview) => number;
-  Body: (props: SectionProps) => React.ReactNode;
-}[] = [
+export const SECTIONS: Record<
+  SectionKey,
   {
-    key: "memory",
+    title: string;
+    icon: React.ReactNode;
+    count: (data: FilteredOverview) => number;
+    Body: (props: SectionProps) => React.ReactNode;
+  }
+> = {
+  memory: {
     title: "Memory",
     icon: <BrainCircuit />,
     count: (d) => d.memory.filter((m) => m.exists).length,
     Body: MemorySection,
   },
-  {
-    key: "mcp",
-    title: "MCP servers",
-    icon: <Plug />,
-    count: (d) => d.mcp.length,
-    Body: McpSection,
-  },
-  {
-    key: "skills",
+  mcp: { title: "MCP servers", icon: <Plug />, count: (d) => d.mcp.length, Body: McpSection },
+  skills: {
     title: "Skills",
     icon: <BookOpen />,
     count: (d) => d.skills.length,
     Body: SkillsSection,
   },
-  {
-    key: "agents",
+  agents: {
     title: "Agents",
     icon: <Sparkles />,
     count: (d) => d.agents.length,
     Body: AgentsSection,
   },
-  {
-    key: "commands",
-    title: "Slash commands",
+  commands: {
+    title: "Commands",
     icon: <SquareSlash />,
     count: (d) => d.commands.length,
     Body: CommandsSection,
   },
-  {
-    key: "hooks",
-    title: "Hooks",
-    icon: <Webhook />,
-    count: (d) => d.hooks.length,
-    Body: HooksSection,
-  },
-  {
-    key: "permissions",
+  hooks: { title: "Hooks", icon: <Webhook />, count: (d) => d.hooks.length, Body: HooksSection },
+  permissions: {
     title: "Permissions",
     icon: <ShieldCheck />,
     count: (d) => d.permissions.length,
     Body: PermissionsSection,
   },
-  {
-    key: "plugins",
+  plugins: {
     title: "Plugins",
     icon: <Blocks />,
     count: (d) => d.plugins.length,
     Body: PluginsSection,
   },
-  {
-    key: "settings",
+  settings: {
     title: "Settings files",
     icon: <Settings2 />,
     count: (d) => d.settings.filter((s) => s.exists).length,
     Body: SettingsSection,
   },
-];
+};

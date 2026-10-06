@@ -1,16 +1,18 @@
 import { Channel, invoke } from "@tauri-apps/api/core";
 
 import type {
+  AgentOverview,
   AgentTask,
   AppEnvironment,
   ChangedFile,
+  ConfigAgent,
+  ConfigRemoval,
   GitChange,
   DirEntry,
   FileContent,
   FileEncoding,
   FileTail,
   LiveSession,
-  ClaudeOverview,
   McpDescription,
   PathStat,
   PgInfo,
@@ -44,6 +46,8 @@ export const api = {
     invoke<TranscriptPage>("session_transcript", { filePath, distro, fromOffset }),
   deleteSession: (filePath: string, distro: string | null) =>
     invoke<void>("delete_session", { filePath, distro }),
+  terminateLiveSession: ({ sessionId, pid, distro }: LiveSession) =>
+    invoke<void>("terminate_live_session", { sessionId, pid, distro }),
   sessionTasks: (filePath: string, distro: string | null) =>
     invoke<AgentTask[]>("session_tasks", { filePath, distro }),
   sessionChanges: (filePath: string, distro: string | null) =>
@@ -56,7 +60,10 @@ export const api = {
     invoke<void>("rename_session", { filePath, distro, title }),
   searchSessions: (query: string, includeWsl: boolean) =>
     invoke<SearchHit[]>("search_sessions", { query, includeWsl }),
-  claudeOverview: (cwd: string) => invoke<ClaudeOverview>("claude_overview", { cwd }),
+  agentOverview: (cwd: string, agent: ConfigAgent) =>
+    invoke<AgentOverview>("agent_overview", { cwd, agent }),
+  removeAgentConfig: (cwd: string, agent: ConfigAgent, removal: ConfigRemoval) =>
+    invoke<void>("remove_agent_config", { cwd, agent, removal }),
   createMemoryFile: (path: string) => invoke<void>("create_memory_file", { path }),
   mcpDescribe: (cwd: string, id: string) => invoke<McpDescription>("mcp_describe", { cwd, id }),
   mcpCall: (cwd: string, id: string, tool: string, args: unknown) =>

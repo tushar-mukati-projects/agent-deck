@@ -7,6 +7,7 @@ import {
   MessageSquare,
   Pencil,
   Play,
+  Power,
   SquareTerminal,
   Trash2,
 } from "lucide-react";
@@ -15,6 +16,7 @@ import { format, isValid } from "date-fns";
 import { openTypedPath } from "@/actions/files";
 import { deleteSessionWithConfirm, renameSession, resumeWorkspace } from "@/actions/sessions";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/feedback";
 import { IconButton } from "@/components/ui/icon-button";
 import { Kbd } from "@/components/ui/kbd";
 import { Alert, SearchInput } from "@/components/ui/panel";
@@ -82,6 +84,22 @@ const resumeLabel = (workspace: Workspace) => {
   return agent.id === CLAUDE ? "Resume session" : `Resume in ${agent.name}`;
 };
 
+const TakeOverButton = ({ workspaceId }: { workspaceId: string }) => {
+  const [closing, setClosing] = useState(false);
+  return (
+    <Button
+      size="xs"
+      disabled={closing}
+      onClick={() => {
+        setClosing(true);
+        void resumeWorkspace(workspaceId, { takeOver: true }).finally(() => setClosing(false));
+      }}
+    >
+      {closing ? <Spinner className="size-3.5" /> : <Power />} Close there, resume here
+    </Button>
+  );
+};
+
 const PreviewHeader = ({
   workspace,
   session,
@@ -128,10 +146,13 @@ const PreviewHeader = ({
         </Alert>
       )}
       {external && (
-        <Alert tone="warning" className="mt-3">
-          This session is already open in another terminal (PID {external.pid}). Resuming it here
-          too makes both copies write to the same conversation.
-          {agent.canFork ? " Fork it instead for a separate branch." : ""}
+        <Alert
+          tone="warning"
+          className="mt-3"
+          action={<TakeOverButton workspaceId={workspace.id} />}
+        >
+          This session is already open in another terminal (PID {external.pid}). Close it there to
+          continue here{agent.canFork ? ", or fork it to keep both" : ""}.
         </Alert>
       )}
 

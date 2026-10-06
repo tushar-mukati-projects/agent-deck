@@ -18,7 +18,7 @@ use tokio::net::TcpStream;
 use tokio_postgres::{config::Host, tls::MakeTlsConnect, CancelToken, Client, Config, SimpleQueryMessage};
 
 use crate::{
-    claude_config::{self, Launch, ResolvedServer},
+    agent_config::{self, Launch, ResolvedServer},
     pool::{server_key, Pool},
     process::Managed,
     util::hidden,
@@ -164,7 +164,7 @@ pub fn detect(launch: &Launch, hinted: bool) -> Option<anyhow::Result<Target>> {
 }
 
 fn target_for(server: &ResolvedServer) -> anyhow::Result<Target> {
-    detect(&claude_config::launch(server), true).unwrap_or_else(|| Err(anyhow!("Couldn't find database credentials in this server's config")))
+    detect(&agent_config::launch(server), true).unwrap_or_else(|| Err(anyhow!("Couldn't find database credentials in this server's config")))
 }
 
 const RELAY: &str = r#"import socket, sys, threading
@@ -409,7 +409,7 @@ pub struct PgManager {
 impl PgManager {
     fn connection(&self, cwd: &str, id: &str) -> anyhow::Result<Arc<Connection>> {
         self.connections.get(&server_key(cwd, id), Connection::alive, || {
-            let server = claude_config::resolve_server(cwd, id)?;
+            let server = agent_config::resolve_server(cwd, id)?;
             tauri::async_runtime::block_on(Connection::open(&server))
         })
     }
@@ -419,7 +419,7 @@ impl PgManager {
     }
 
     pub fn info(&self, cwd: &str, id: &str) -> anyhow::Result<ConnectionInfo> {
-        let target = target_for(&claude_config::resolve_server(cwd, id)?)?;
+        let target = target_for(&agent_config::resolve_server(cwd, id)?)?;
         Ok(ConnectionInfo {
             host: target.host,
             port: target.port,
@@ -480,7 +480,7 @@ mod tests {
 
     fn launch(args: &[&str], env: &[(&str, &str)]) -> Launch {
         Launch {
-            transport: claude_config::Transport::Stdio,
+            transport: agent_config::Transport::Stdio,
             command: Some("npx".into()),
             args: args.iter().map(|a| a.to_string()).collect(),
             env: env.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(),

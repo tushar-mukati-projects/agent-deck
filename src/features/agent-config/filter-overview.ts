@@ -1,4 +1,4 @@
-import type { ClaudeOverview, ConfigItem, ConfigScope, McpServer, SettingsFile } from "@/types";
+import type { AgentOverview, ConfigItem, ConfigScope, McpServer, SettingsFile } from "@/types";
 
 export type RuleKind = "allow" | "ask" | "deny";
 
@@ -8,8 +8,13 @@ export interface PermissionRule {
   file: SettingsFile;
 }
 
+const SCOPE_LABELS: Partial<Record<ConfigScope, string>> = {
+  auto: "auto memory",
+  system: "built-in",
+};
+
 export const scopeLabel = (scope: ConfigScope, plugin?: string | null) =>
-  plugin ?? (scope === "auto" ? "auto memory" : scope);
+  plugin ?? SCOPE_LABELS[scope] ?? scope;
 
 export const serverDetail = (server: McpServer) =>
   server.url ?? [server.command, ...server.args].filter(Boolean).join(" ");
@@ -27,7 +32,7 @@ export const modeLabel = (file: SettingsFile) =>
 const matches = (query: string, ...fields: (string | null | undefined)[]) =>
   !query || fields.some((f) => f?.toLowerCase().includes(query));
 
-export const filterOverview = (overview: ClaudeOverview, query: string) => {
+export const filterOverview = (overview: AgentOverview, query: string) => {
   const items = (list: ConfigItem[]) =>
     list.filter((i) => matches(query, i.name, i.description, i.plugin));
   const permissions: PermissionRule[] = overview.settings.flatMap((file) =>

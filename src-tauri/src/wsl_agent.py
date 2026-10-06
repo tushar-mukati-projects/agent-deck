@@ -4,8 +4,10 @@ import os
 import pwd
 import re
 import shutil
+import signal
 import subprocess
 import sys
+import time
 
 PROMPT_CHARS = 4000
 TEXT_CHARS = 24001
@@ -387,6 +389,56 @@ def live_sessions():
     return result
 
 
+def process_alive(pid):
+    try:
+        with open("/proc/%d/cmdline" % pid, "rb") as handle:
+            return bool(handle.read())
+    except OSError:
+        return False
+
+
+def process_start(pid):
+    try:
+        with open("/proc/%d/stat" % pid) as handle:
+            return handle.read().rsplit(")", 1)[1].split()[19]
+    except (OSError, IndexError):
+        return None
+
+
+def live_record(pid):
+    for home in claude_homes():
+        try:
+            with open(os.path.join(home, "sessions", "%d.json" % pid)) as handle:
+                return json.load(handle)
+        except (OSError, ValueError):
+            continue
+    return None
+
+
+def terminate(session_id, pid):
+    pid = int(pid)
+    record = live_record(pid)
+    if not isinstance(record, dict) or not process_alive(pid):
+        return {}
+    if record.get("sessionId") != session_id:
+        raise ValueError("PID %d is running a different session" % pid)
+    if not record.get("procStart") or str(record["procStart"]) != process_start(pid):
+        raise ValueError("Couldn't confirm PID %d is that Claude session, so it was left running" % pid)
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except ProcessLookupError:
+        return {}
+    for _ in range(50):
+        if not process_alive(pid):
+            return {}
+        time.sleep(0.1)
+    try:
+        os.kill(pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    return {}
+
+
 def login_shell():
     try:
         return pwd.getpwuid(os.getuid()).pw_shell or "/bin/bash"
@@ -753,6 +805,7 @@ def main():
         "transcript": lambda: transcript(args[0], int(args[1]) if len(args) > 1 else 0),
         "tasks": lambda: tasks(args[0], int(args[1]) if len(args) > 1 else 0),
         "delete": lambda: delete(args[0]),
+        "terminate": lambda: terminate(args[0], args[1]),
         "files": lambda: list_files(args[0]),
         "changes": lambda: changes(args[0]),
         "exists": lambda: exists(read_stdin_json() or []),

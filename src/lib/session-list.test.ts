@@ -90,4 +90,12 @@ describe("groupByFolder", () => {
       ["C:\\old\\API", "old"],
     ]);
   });
+
+  it("shows the whole parent path when parent names collide too", () => {
+    const groups = groupByFolder([session("a", "C:\\a\\work\\app"), session("b", "D:\\work\\app")]);
+    expect([...folderHints(groups)]).toEqual([
+      ["C:\\a\\work\\app", "C:\\a\\work"],
+      ["D:\\work\\app", "D:\\work"],
+    ]);
+  });
 });

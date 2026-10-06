@@ -1,7 +1,7 @@
 import { parseArgs } from "@/lib/args";
 import { findTheme } from "@/lib/themes";
 import { useSettingsStore } from "@/stores/settings-store";
-import type { AgentId, CustomAgent } from "@/types";
+import type { AgentId, ConfigAgent, CustomAgent } from "@/types";
 
 export interface LaunchContext {
   subagent?: string;
@@ -14,6 +14,7 @@ export interface AgentDefinition {
   history: boolean;
   assignsSessionIds: boolean;
   canFork: boolean;
+  config: ConfigAgent | null;
   newArgs: (sessionId: string, context: LaunchContext) => string[];
   resumeArgs: (sessionId: string) => string[];
   forkArgs: (sessionId: string, newSessionId: string) => string[];
@@ -38,6 +39,7 @@ const claude: AgentDefinition = {
   history: true,
   assignsSessionIds: true,
   canFork: true,
+  config: "claude",
   newArgs: (sessionId, { subagent }) => [
     "--session-id",
     sessionId,
@@ -64,6 +66,7 @@ const codex: AgentDefinition = {
   history: true,
   assignsSessionIds: false,
   canFork: true,
+  config: "codex",
   newArgs: () => [],
   resumeArgs: (sessionId) => ["resume", sessionId],
   forkArgs: (sessionId) => ["fork", sessionId],
@@ -77,6 +80,7 @@ const fromCustom = (agent: CustomAgent): AgentDefinition => ({
   history: false,
   assignsSessionIds: false,
   canFork: false,
+  config: null,
   newArgs: () => [],
   resumeArgs: () => [],
   forkArgs: () => [],

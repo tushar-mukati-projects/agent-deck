@@ -20,6 +20,10 @@ pub fn hidden(command: &mut Command) -> &mut Command {
     command
 }
 
+pub fn sh_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\'', r"'\''"))
+}
+
 pub fn mtime_ms(meta: &fs::Metadata) -> u64 {
     meta.modified()
         .ok()

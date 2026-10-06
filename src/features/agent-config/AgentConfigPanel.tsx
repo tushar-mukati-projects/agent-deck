@@ -4,31 +4,36 @@ import { BrainCircuit, RefreshCw } from "lucide-react";
 import { EmptyState, LoadingState } from "@/components/ui/feedback";
 import { IconButton } from "@/components/ui/icon-button";
 import { Alert, CollapsibleSection, PanelHeader, SearchInput } from "@/components/ui/panel";
-import { filterOverview } from "@/features/claude/filter-overview";
-import { useOverview } from "@/features/claude/overview-store";
-import { SECTIONS, type SectionKey } from "@/features/claude/sections";
+import { filterOverview } from "@/features/agent-config/filter-overview";
+import { useOverview } from "@/features/agent-config/overview-store";
+import { PROFILES, type SectionKey } from "@/features/agent-config/profiles";
+import { SECTIONS } from "@/features/agent-config/sections";
 import { StartDistroButton } from "@/features/sidebar/WslStatus";
+import { agentName, getAgent } from "@/lib/agents/registry";
 import { basename, cn } from "@/lib/utils";
 import { parseWslPath } from "@/lib/wsl";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useActiveWorkspace } from "@/stores/workspace-store";
-import type { ClaudeOverview, Workspace } from "@/types";
+import type { AgentOverview, ConfigAgent, Workspace } from "@/types";
 
 const DEFAULT_OPEN: SectionKey[] = ["memory", "mcp"];
 
 const Sections = ({
   workspace,
+  agent,
   overview,
   query,
   reload,
 }: {
   workspace: Workspace;
-  overview: ClaudeOverview;
+  agent: ConfigAgent;
+  overview: AgentOverview;
   query: string;
   reload: () => void;
 }) => {
   const [open, setOpen] = useState<Set<SectionKey>>(() => new Set(DEFAULT_OPEN));
   const data = useMemo(() => filterOverview(overview, query), [overview, query]);
+  const profile = PROFILES[agent];
   const toggle = (key: SectionKey) =>
     setOpen((current) => {
       const next = new Set(current);
@@ -38,18 +43,27 @@ const Sections = ({
 
   return (
     <>
-      {SECTIONS.map(({ key, title, icon, count, Body }) => (
-        <CollapsibleSection
-          key={key}
-          title={title}
-          icon={icon}
-          count={count(data)}
-          open={!!query || open.has(key)}
-          onToggle={() => toggle(key)}
-        >
-          <Body workspace={workspace} data={data} reload={reload} />
-        </CollapsibleSection>
-      ))}
+      {profile.sections.map((key) => {
+        const { title, icon, count, Body } = SECTIONS[key];
+        return (
+          <CollapsibleSection
+            key={key}
+            title={profile.titles[key] ?? title}
+            icon={icon}
+            count={count(data)}
+            open={!!query || open.has(key)}
+            onToggle={() => toggle(key)}
+          >
+            <Body
+              workspace={workspace}
+              agent={agent}
+              profile={profile}
+              data={data}
+              reload={reload}
+            />
+          </CollapsibleSection>
+        );
+      })}
     </>
   );
 };
@@ -67,11 +81,12 @@ const useDistroStopped = (cwd: string, error: string | null) => {
     : null;
 };
 
-const WorkspaceConfig = ({ workspace }: { workspace: Workspace }) => {
-  const { overview, error, loading, reload } = useOverview(workspace.cwd);
+const WorkspaceConfig = ({ workspace, agent }: { workspace: Workspace; agent: ConfigAgent }) => {
+  const { overview, error, loading, reload } = useOverview(workspace.cwd, agent);
   const stoppedDistro = useDistroStopped(workspace.cwd, error);
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query.trim().toLowerCase());
+  const name = PROFILES[agent].name;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -85,7 +100,7 @@ const WorkspaceConfig = ({ workspace }: { workspace: Workspace }) => {
           value={query}
           onChange={setQuery}
           placeholder="Filter memory, servers, skills…"
-          aria-label="Filter Claude config"
+          aria-label={`Filter ${name} config`}
         />
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto pb-3">
@@ -95,7 +110,7 @@ const WorkspaceConfig = ({ workspace }: { workspace: Workspace }) => {
             className="mx-2"
             action={<StartDistroButton distro={stoppedDistro} onStarted={() => void reload()} />}
           >
-            WSL {stoppedDistro} is stopped. Start it to see the Claude config inside it.
+            WSL {stoppedDistro} is stopped. Start it to see the {name} config inside it.
           </Alert>
         ) : (
           <>
@@ -107,6 +122,7 @@ const WorkspaceConfig = ({ workspace }: { workspace: Workspace }) => {
             {overview ? (
               <Sections
                 workspace={workspace}
+                agent={agent}
                 overview={overview}
                 query={deferredQuery}
                 reload={() => void reload()}
@@ -121,7 +137,7 @@ const WorkspaceConfig = ({ workspace }: { workspace: Workspace }) => {
   );
 };
 
-export const ClaudePanel = () => {
+export const AgentConfigPanel = () => {
   const workspace = useActiveWorkspace();
   if (!workspace)
     return (
@@ -129,8 +145,18 @@ export const ClaudePanel = () => {
         className="h-full"
         icon={<BrainCircuit />}
         title="No session open"
-        description="Open a session to see the memory, MCP servers, skills and agents Claude uses there."
+        description="Open a session to see the memory, MCP servers, skills and settings its agent uses there."
       />
     );
-  return <WorkspaceConfig key={workspace.id} workspace={workspace} />;
+  const agent = getAgent(workspace.agent)?.config ?? null;
+  if (!agent)
+    return (
+      <EmptyState
+        className="h-full"
+        icon={<BrainCircuit />}
+        title={`No config view for ${agentName(workspace.agent)}`}
+        description="Deck can show memory, MCP servers and skills for Claude and Codex sessions."
+      />
+    );
+  return <WorkspaceConfig key={`${workspace.id}:${agent}`} workspace={workspace} agent={agent} />;
 };

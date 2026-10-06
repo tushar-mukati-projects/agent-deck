@@ -32,7 +32,7 @@ const handlers: Record<ShortcutAction, () => void> = {
   },
   showExplorer: () => ui().toggleContextView("explorer"),
   showChanges: () => ui().toggleContextView("changes"),
-  showClaude: () => ui().toggleContextView("claude"),
+  showAgentConfig: () => ui().toggleContextView("agent"),
   toggleShell: toggleShellPanel,
   newShell: () => {
     const workspace = getActiveWorkspace();

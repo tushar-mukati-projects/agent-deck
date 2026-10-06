@@ -50,14 +50,21 @@ export const groupByFolder = (sessions: SessionInfo[]) => {
   return [...groups.values()];
 };
 
-export const folderHints = (groups: SessionGroup[]) => {
-  const nameOf = (cwd: string) => basename(cwd).toLowerCase();
+const countBy = (values: string[]) => {
   const counts = new Map<string, number>();
-  for (const { cwd } of groups) counts.set(nameOf(cwd), (counts.get(nameOf(cwd)) ?? 0) + 1);
+  for (const value of values) counts.set(value, (counts.get(value) ?? 0) + 1);
+  return counts;
+};
+
+export const folderHints = (groups: SessionGroup[]) => {
+  const names = countBy(groups.map(({ cwd }) => basename(cwd).toLowerCase()));
+  const shared = groups.filter(({ cwd }) => (names.get(basename(cwd).toLowerCase()) ?? 0) > 1);
+  const parents = countBy(shared.map(({ cwd }) => basename(dirname(cwd)).toLowerCase()));
   return new Map(
-    groups
-      .filter(({ cwd }) => (counts.get(nameOf(cwd)) ?? 0) > 1)
-      .map(({ cwd }) => [cwd, basename(dirname(cwd))]),
+    shared.map(({ cwd }) => {
+      const parent = basename(dirname(cwd));
+      return [cwd, (parents.get(parent.toLowerCase()) ?? 0) > 1 ? dirname(cwd) : parent];
+    }),
   );
 };
 

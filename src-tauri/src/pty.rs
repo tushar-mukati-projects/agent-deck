@@ -178,7 +178,7 @@ fn program_stem(program: &str) -> String {
         .unwrap_or_default()
 }
 
-fn resolve_program(program: &str) -> anyhow::Result<PathBuf> {
+pub fn resolve_program(program: &str) -> anyhow::Result<PathBuf> {
     anyhow::ensure!(
         ALLOWED_PROGRAMS.contains(&program_stem(program).as_str()),
         "`{program}` is not an allowed terminal program"

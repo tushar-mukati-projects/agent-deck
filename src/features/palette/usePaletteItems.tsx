@@ -148,9 +148,17 @@ const buildCommands = (workspace: Workspace | null): CommandDef[] => {
     shortcut("showSessions", "Show sessions", <MessagesSquare />),
     shortcut("showExplorer", "Show explorer", <FolderOpen />),
     shortcut("showChanges", "Show what changed", <GitCompare />),
-    shortcut("showClaude", "Show Claude memory, MCP servers, skills and agents", <BrainCircuit />),
+    shortcut(
+      "showAgentConfig",
+      "Show the agent's memory, MCP servers and skills",
+      <BrainCircuit />,
+    ),
     shortcut("toggleSessions", "Toggle sessions list", <PanelLeft />),
-    shortcut("toggleContext", "Toggle session panel (files, changes, Claude)", <PanelRight />),
+    shortcut(
+      "toggleContext",
+      "Toggle session panel (files, changes, agent config)",
+      <PanelRight />,
+    ),
     {
       id: "refresh",
       title: "Refresh session list",

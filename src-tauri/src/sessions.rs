@@ -3,11 +3,12 @@ use std::{
     fs,
     io::{self, BufRead, BufReader, Read, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
+    process::Command,
     sync::{
         atomic::{AtomicU64, Ordering},
         LazyLock,
     },
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use aho_corasick::AhoCorasick;
@@ -19,7 +20,7 @@ use serde_json::value::RawValue;
 
 use crate::{
     codex,
-    util::{canonical, is_session_id, lenient, lenient_bool, lenient_u64, mtime_ms},
+    util::{canonical, is_session_id, lenient, lenient_bool, lenient_u64, mtime_ms, run_with_timeout},
 };
 
 const PROMPT_PREVIEW_CHARS: usize = 280;
@@ -597,6 +598,8 @@ struct LiveFile {
     name: Option<String>,
     #[serde(default, deserialize_with = "lenient_u64")]
     started_at: Option<u64>,
+    #[serde(default, deserialize_with = "lenient")]
+    proc_start: Option<String>,
 }
 
 pub fn live_sessions() -> Vec<LiveSession> {
@@ -620,6 +623,61 @@ pub fn live_sessions() -> Vec<LiveSession> {
             })
         })
         .collect()
+}
+
+#[cfg(windows)]
+fn process_start(pid: u32) -> Option<u64> {
+    use windows_sys::Win32::{
+        Foundation::{CloseHandle, FILETIME},
+        System::Threading::{GetProcessTimes, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION},
+    };
+    unsafe {
+        let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
+        if handle.is_null() {
+            return None;
+        }
+        let zero = FILETIME { dwLowDateTime: 0, dwHighDateTime: 0 };
+        let (mut created, mut exited, mut kernel, mut user) = (zero, zero, zero, zero);
+        let ok = GetProcessTimes(handle, &mut created, &mut exited, &mut kernel, &mut user) != 0;
+        CloseHandle(handle);
+        ok.then(|| (u64::from(created.dwHighDateTime) << 32) | u64::from(created.dwLowDateTime))
+    }
+}
+
+#[cfg(not(windows))]
+fn process_start(pid: u32) -> Option<u64> {
+    let stat = fs::read_to_string(format!("/proc/{pid}/stat")).ok()?;
+    stat.rsplit(')').next()?.split_whitespace().nth(19)?.parse().ok()
+}
+
+fn end_process_tree(pid: u32) -> anyhow::Result<()> {
+    let pid_text = pid.to_string();
+    let mut command = if cfg!(windows) { Command::new("taskkill") } else { Command::new("kill") };
+    let args: &[&str] = if cfg!(windows) { &["/PID", &pid_text, "/T", "/F"] } else { &["-TERM", &pid_text] };
+    let output = run_with_timeout(command.args(args), None, Duration::from_secs(10))?;
+    if output.status.success() || !is_agent_process(pid) {
+        return Ok(());
+    }
+    let reason = String::from_utf8_lossy(&output.stderr);
+    anyhow::bail!("Couldn't close Claude (PID {pid}): {}", reason.trim())
+}
+
+pub fn terminate_live(session_id: &str, pid: u32) -> anyhow::Result<()> {
+    let record = fs::read_to_string(live_dir().join(format!("{pid}.json"))).ok();
+    let Some(record) = record.and_then(|text| serde_json::from_str::<LiveFile>(&text).ok()) else { return Ok(()) };
+    if !is_agent_process(pid) {
+        return Ok(());
+    }
+    anyhow::ensure!(record.session_id.as_deref() == Some(session_id), "PID {pid} is running a different session");
+    let recorded = record.proc_start.and_then(|start| start.parse::<u64>().ok());
+    anyhow::ensure!(recorded.is_some() && recorded == process_start(pid), "Couldn't confirm PID {pid} is that Claude session, so it was left running");
+    end_process_tree(pid)?;
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while is_agent_process(pid) {
+        anyhow::ensure!(Instant::now() < deadline, "Claude (PID {pid}) is still running");
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    Ok(())
 }
 
 fn summarize_tool(name: &str, input: Option<&RawValue>) -> String {

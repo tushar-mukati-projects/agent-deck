@@ -4,24 +4,26 @@ import { IconButton } from "@/components/ui/icon-button";
 import { Tab, TabStrip } from "@/components/ui/tabs";
 import { Tooltip } from "@/components/ui/tooltip";
 import { ChangesPanel } from "@/features/changes/ChangesPanel";
-import { ClaudePanel } from "@/features/claude/ClaudePanel";
+import { AgentConfigPanel } from "@/features/agent-config/AgentConfigPanel";
 import { ExplorerPanel } from "@/features/explorer/ExplorerPanel";
 import { SessionsPanel } from "@/features/sidebar/SessionsPanel";
+import { agentName } from "@/lib/agents/registry";
 import { shortcutLabel, type ShortcutAction } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
+import { useWorkspaceStore } from "@/stores/workspace-store";
 import type { ContextView } from "@/types";
 
 const TABS: { view: ContextView; label: string; icon: typeof Files; shortcut: ShortcutAction }[] = [
   { view: "explorer", label: "Files", icon: Files, shortcut: "showExplorer" },
   { view: "changes", label: "Changes", icon: GitCompare, shortcut: "showChanges" },
-  { view: "claude", label: "Claude", icon: BrainCircuit, shortcut: "showClaude" },
+  { view: "agent", label: "Agent", icon: BrainCircuit, shortcut: "showAgentConfig" },
 ];
 
 const PANELS: Record<ContextView, { render: () => React.ReactNode; keepMounted?: boolean }> = {
   explorer: { render: () => <ExplorerPanel />, keepMounted: true },
   changes: { render: () => <ChangesPanel /> },
-  claude: { render: () => <ClaudePanel /> },
+  agent: { render: () => <AgentConfigPanel /> },
 };
 
 export const SessionsSidebar = () => (
@@ -32,32 +34,36 @@ export const SessionsSidebar = () => (
 
 export const ContextPanel = () => {
   const view = useUiStore((s) => s.contextView);
+  const agent = useWorkspaceStore((s) => s.workspaces.find((w) => w.id === s.activeId)?.agent);
   const { showContext, setContextOpen } = useUiStore.getState();
 
   return (
     <aside className="flex h-full min-h-0 flex-col border-l border-border bg-panel">
       <div className="flex h-9 shrink-0 items-stretch border-b border-border px-1.5">
         <TabStrip label="Session panel" className="items-stretch gap-0.5">
-          {TABS.map(({ view: tab, label, icon: Icon, shortcut }) => (
-            <Tooltip key={tab} content={`${label} (${shortcutLabel(shortcut)})`}>
-              <Tab
-                selected={view === tab}
-                onSelect={() => showContext(tab)}
-                tabId={`context-tab-${tab}`}
-                controls={`context-panel-${tab}`}
-                className={cn(
-                  "px-2.5 text-[12px] transition-colors",
-                  view === tab ? "text-fg" : "text-faint hover:text-fg",
-                )}
-              >
-                <Icon className="size-3.5" strokeWidth={1.75} />
-                {label}
-                {view === tab && (
-                  <span className="absolute inset-x-1.5 bottom-0 h-[2px] rounded-full bg-accent" />
-                )}
-              </Tab>
-            </Tooltip>
-          ))}
+          {TABS.map(({ view: tab, label: fallback, icon: Icon, shortcut }) => {
+            const label = tab === "agent" && agent ? agentName(agent) : fallback;
+            return (
+              <Tooltip key={tab} content={`${label} (${shortcutLabel(shortcut)})`}>
+                <Tab
+                  selected={view === tab}
+                  onSelect={() => showContext(tab)}
+                  tabId={`context-tab-${tab}`}
+                  controls={`context-panel-${tab}`}
+                  className={cn(
+                    "px-2.5 text-[12px] transition-colors",
+                    view === tab ? "text-fg" : "text-faint hover:text-fg",
+                  )}
+                >
+                  <Icon className="size-3.5" strokeWidth={1.75} />
+                  {label}
+                  {view === tab && (
+                    <span className="absolute inset-x-1.5 bottom-0 h-[2px] rounded-full bg-accent" />
+                  )}
+                </Tab>
+              </Tooltip>
+            );
+          })}
         </TabStrip>
         <div className="flex-1" />
         <div className="flex items-center">

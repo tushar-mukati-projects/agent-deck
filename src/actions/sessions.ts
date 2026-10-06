@@ -12,7 +12,7 @@ import { useUiStore } from "@/stores/ui-store";
 import { useViewerStore } from "@/stores/viewer-store";
 import { workspaceFromSession } from "@/stores/workspace-factory";
 import { findWorkspace, findWorkspaceBySession, useWorkspaceStore } from "@/stores/workspace-store";
-import type { AgentId, SessionInfo } from "@/types";
+import type { AgentId, LiveSession, SessionInfo } from "@/types";
 
 const promptLabel = (count: number) => `${count} ${count === 1 ? "prompt" : "prompts"}`;
 
@@ -25,28 +25,43 @@ const openElsewhere = (sessionId: string) => {
   );
 };
 
-const confirmOpenElsewhere = async (sessionId: string) => {
-  const live = openElsewhere(sessionId);
-  if (!live) return true;
-  return useUiStore.getState().askConfirm({
+const confirmTakeOver = (live: LiveSession) =>
+  useUiStore.getState().askConfirm({
     title: "This session is already open elsewhere",
-    description: `It's running in another terminal${live.distro ? ` in WSL ${live.distro}` : ""} (PID ${live.pid}). Resuming here too means two copies writing to the same conversation. Fork it instead to branch off safely.`,
-    confirmLabel: "Resume anyway",
+    description: `It's running in another terminal${live.distro ? ` in WSL ${live.distro}` : ""} (PID ${live.pid}). Close it there and resume it here, so only one copy writes to the conversation. Fork it instead to keep both.`,
+    confirmLabel: "Close it there and resume here",
     destructive: true,
   });
+
+const closeElsewhere = async (live: LiveSession) => {
+  try {
+    await api.terminateLiveSession(live);
+    await useSessionsStore.getState().refreshLive();
+    return true;
+  } catch (error) {
+    toast.error(`Couldn't close the other copy: ${errorMessage(error)}`);
+    return false;
+  }
 };
 
 export const previewSession = (session: SessionInfo) =>
   useWorkspaceStore.getState().openSession(session);
 
-export const resumeWorkspace = async (workspaceId: string, options: { fork?: boolean } = {}) => {
+export const resumeWorkspace = async (
+  workspaceId: string,
+  options: { fork?: boolean; takeOver?: boolean } = {},
+) => {
   const workspace = findWorkspace(workspaceId);
   if (!workspace) return;
   if (options.fork) {
     useWorkspaceStore.getState().fork(workspace);
     return;
   }
-  if (workspace.mode !== "live" && !(await confirmOpenElsewhere(workspace.sessionId))) return;
+  const live = workspace.mode === "live" ? null : openElsewhere(workspace.sessionId);
+  if (live) {
+    if (!options.takeOver && !(await confirmTakeOver(live))) return;
+    if (!(await closeElsewhere(live))) return;
+  }
   useWorkspaceStore.getState().launch(workspaceId);
 };
 

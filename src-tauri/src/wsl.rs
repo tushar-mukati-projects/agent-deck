@@ -485,6 +485,14 @@ pub fn delete_session(distro: &str, path: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
+pub fn terminate_session(distro: &str, session_id: &str, pid: u32) -> anyhow::Result<()> {
+    let _: Value = run_agent(distro, &["terminate", session_id, &pid.to_string()], None)?;
+    if let Some(state) = CACHE.lock().distros.get_mut(distro) {
+        state.live.retain(|l| l.pid != pid);
+    }
+    Ok(())
+}
+
 pub fn list_files(distro: &str, linux_root: &str) -> anyhow::Result<Vec<String>> {
     #[derive(Deserialize)]
     struct Files {
@@ -602,6 +610,12 @@ pub fn home_for(distro: &str, linux_cwd: &str) -> anyhow::Result<String> {
     anyhow::ensure!(home.starts_with('/'), "Couldn't find the home folder in WSL {distro}");
     HOMES.lock().insert(distro.to_string(), home.clone());
     Ok(home)
+}
+
+pub fn login_command(distro: &str, linux_cwd: &str, script: &str) -> Command {
+    let mut command = Command::new("wsl.exe");
+    command.args(["-d", distro, "--cd", linux_cwd, "-e", &login_shell(distro), "-lic"]).arg(format!("exec {script}"));
+    command
 }
 
 pub fn login_shell(distro: &str) -> String {

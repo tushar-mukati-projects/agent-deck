@@ -2,7 +2,7 @@ use serde::Serialize;
 use tauri::{ipc::Channel, AppHandle, Manager};
 
 use crate::{
-    changes, claude_config, fsx, git,
+    agent_config, changes, fsx, git,
     mcp::{self, McpManager},
     pg::{self, PgManager},
     pty::{self, PtyEvent, PtyInfo, PtyManager, SpawnRequest},
@@ -98,6 +98,15 @@ pub async fn delete_session(file_path: String, distro: Option<String>) -> CmdRes
 }
 
 #[tauri::command]
+pub async fn terminate_live_session(session_id: String, pid: u32, distro: Option<String>) -> CmdResult<()> {
+    blocking(move || match distro {
+        Some(distro) => wsl::terminate_session(&distro, &session_id, pid),
+        None => sessions::terminate_live(&session_id, pid),
+    })
+    .await
+}
+
+#[tauri::command]
 pub async fn rename_session(file_path: String, distro: Option<String>, title: String) -> CmdResult<()> {
     blocking(move || match distro {
         Some(distro) => wsl::rename_session(&distro, &file_path, &title),
@@ -150,13 +159,29 @@ pub async fn git_head_file(path: String) -> CmdResult<String> {
 }
 
 #[tauri::command]
-pub async fn claude_overview(cwd: String) -> CmdResult<claude_config::Overview> {
-    blocking(move || claude_config::overview(&cwd)).await
+pub async fn agent_overview(cwd: String, agent: agent_config::Agent) -> CmdResult<agent_config::Overview> {
+    blocking(move || agent_config::overview(&cwd, agent)).await
+}
+
+#[tauri::command]
+pub async fn remove_agent_config(app: AppHandle, cwd: String, agent: agent_config::Agent, removal: agent_config::Removal) -> CmdResult<()> {
+    let server = match &removal {
+        agent_config::Removal::McpServer { id } => Some(id.clone()),
+        _ => None,
+    };
+    blocking(move || {
+        agent_config::remove(&cwd, agent, removal)?;
+        if let Some(id) = server {
+            disconnect_server(&app, &cwd, &id);
+        }
+        Ok(())
+    })
+    .await
 }
 
 #[tauri::command]
 pub async fn create_memory_file(path: String) -> CmdResult<()> {
-    blocking(move || claude_config::create_memory_file(&path)).await
+    blocking(move || agent_config::create_memory_file(&path)).await
 }
 
 #[tauri::command]
@@ -174,11 +199,15 @@ pub async fn mcp_read_resource(app: AppHandle, cwd: String, id: String, uri: Str
     blocking(move || app.state::<McpManager>().read_resource(&cwd, &id, &uri)).await
 }
 
+fn disconnect_server(app: &AppHandle, cwd: &str, id: &str) {
+    app.state::<McpManager>().disconnect(cwd, id);
+    app.state::<PgManager>().disconnect(cwd, id);
+}
+
 #[tauri::command]
 pub async fn mcp_disconnect(app: AppHandle, cwd: String, id: String) -> CmdResult<()> {
     blocking(move || {
-        app.state::<McpManager>().disconnect(&cwd, &id);
-        app.state::<PgManager>().disconnect(&cwd, &id);
+        disconnect_server(&app, &cwd, &id);
         Ok(())
     })
     .await

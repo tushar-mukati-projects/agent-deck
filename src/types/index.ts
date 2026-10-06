@@ -1,5 +1,7 @@
 export type AgentId = string;
 
+export type ConfigAgent = "claude" | "codex";
+
 export interface CustomAgent {
   id: string;
   name: string;
@@ -146,7 +148,7 @@ export interface SearchHit {
   timestamp: string | null;
 }
 
-export type ConfigScope = "user" | "project" | "local" | "plugin" | "auto";
+export type ConfigScope = "user" | "project" | "local" | "plugin" | "auto" | "system";
 
 export interface MemoryFile {
   scope: ConfigScope;
@@ -189,6 +191,8 @@ export interface ConfigHook {
   scope: ConfigScope;
   plugin: string | null;
   source: string;
+  group: number;
+  index: number;
 }
 
 export interface SettingsFile {
@@ -213,8 +217,8 @@ export interface ConfigPlugin {
   path: string;
 }
 
-export interface ClaudeOverview {
-  claudeHome: string;
+export interface AgentOverview {
+  home: string;
   distro: string | null;
   memory: MemoryFile[];
   mcp: McpServer[];
@@ -225,6 +229,15 @@ export interface ClaudeOverview {
   settings: SettingsFile[];
   plugins: ConfigPlugin[];
 }
+
+export type ConfigRemoval =
+  | { kind: "memory"; path: string }
+  | { kind: "skill"; path: string }
+  | { kind: "file"; path: string }
+  | { kind: "mcpServer"; id: string }
+  | { kind: "hook"; source: string; event: string; group: number; index: number; command: string }
+  | { kind: "rule"; path: string; list: "allow" | "ask" | "deny"; rule: string }
+  | { kind: "plugin"; name: string };
 
 export interface McpTool {
   name: string;
@@ -332,4 +345,4 @@ export interface Workspace {
   activeFile: string | null;
 }
 
-export type ContextView = "explorer" | "changes" | "claude";
+export type ContextView = "explorer" | "changes" | "agent";

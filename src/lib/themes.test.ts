@@ -11,6 +11,8 @@ const report = () =>
       kind: theme.kind,
       fg: contrast(v("fg"), v("panel")),
       muted: contrast(v("muted"), v("panel")),
+      fgOnChrome: contrast(v("fg"), v("chrome")),
+      mutedOnChrome: contrast(v("muted"), v("chrome")),
       faint: contrast(v("faint"), v("panel")),
       border: contrast(v("border"), v("bg")),
       borderStrong: contrast(v("border-strong"), v("bg")),
@@ -29,6 +31,8 @@ describe("theme contrast", () => {
   it.each(report())("$id keeps text and UI readable", (row) => {
     expect(row.fg).toBeGreaterThanOrEqual(7);
     expect(row.muted).toBeGreaterThanOrEqual(4.5);
+    expect(row.fgOnChrome).toBeGreaterThanOrEqual(7);
+    expect(row.mutedOnChrome).toBeGreaterThanOrEqual(4.5);
     expect(row.faint).toBeGreaterThanOrEqual(3.2);
     expect(row.accent).toBeGreaterThanOrEqual(3);
     expect(row.onAccent).toBeGreaterThanOrEqual(3);

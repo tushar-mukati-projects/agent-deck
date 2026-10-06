@@ -1,5 +1,5 @@
+mod agent_config;
 mod changes;
-mod claude_config;
 mod codex;
 mod commands;
 mod file_protocol;
@@ -66,13 +66,15 @@ pub fn run() {
             commands::live_sessions,
             commands::session_transcript,
             commands::delete_session,
+            commands::terminate_live_session,
             commands::rename_session,
             commands::search_sessions,
             commands::session_changes,
             commands::session_backup,
             commands::git_status,
             commands::git_head_file,
-            commands::claude_overview,
+            commands::agent_overview,
+            commands::remove_agent_config,
             commands::create_memory_file,
             commands::mcp_describe,
             commands::mcp_call,

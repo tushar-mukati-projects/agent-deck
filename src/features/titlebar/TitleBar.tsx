@@ -88,7 +88,7 @@ export const TitleBar = () => {
     useUiStore.getState();
 
   return (
-    <header className="relative flex h-[38px] shrink-0 items-stretch border-b border-border bg-panel">
+    <header className="relative flex h-[38px] shrink-0 items-stretch border-b border-border bg-chrome">
       <div data-tauri-drag-region className="flex shrink-0 items-center gap-1 pr-1 pl-3">
         <img src="/app-icon.svg" alt="" className="pointer-events-none size-[18px]" />
         <IconButton

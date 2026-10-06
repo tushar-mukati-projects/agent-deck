@@ -50,6 +50,11 @@ impl Ctx {
             None => std::env::var(name).ok(),
         }
     }
+
+    pub fn codex_home(&self) -> PathBuf {
+        let custom = self.var("CODEX_HOME").filter(|dir| self.distro.is_none() || dir.starts_with('/'));
+        custom.map(|dir| self.host(&dir)).unwrap_or_else(|| self.home.join(".codex"))
+    }
 }
 
 pub fn same_path(a: &Path, b: &Path) -> bool {

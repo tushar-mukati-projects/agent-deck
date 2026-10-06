@@ -1,12 +1,9 @@
-use std::{
-    collections::{HashMap, HashSet},
-    path::{Path, PathBuf},
-};
+use std::{collections::HashMap, path::PathBuf};
 
 use serde::Serialize;
 use serde_json::{Map, Value};
 
-use super::{ctx::same_path, json_file, keys, redact, strings, Scope, Snapshot};
+use super::{files::keys, files::strings, redact, Scope};
 use crate::wsl;
 
 #[derive(Serialize)]
@@ -35,14 +32,14 @@ pub struct ResolvedServer {
 }
 
 pub struct RawServer {
-    id: String,
-    name: String,
-    scope: Scope,
-    plugin: Option<String>,
-    source: PathBuf,
-    config: Map<String, Value>,
-    plugin_root: Option<String>,
-    disabled: bool,
+    pub id: String,
+    pub name: String,
+    pub scope: Scope,
+    pub plugin: Option<String>,
+    pub source: PathBuf,
+    pub config: Map<String, Value>,
+    pub plugin_root: Option<String>,
+    pub disabled: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -132,83 +129,8 @@ pub fn launch(server: &ResolvedServer) -> Launch {
     }
 }
 
-fn server_map(value: &Value) -> Option<&Map<String, Value>> {
-    value.get("mcpServers").and_then(Value::as_object).or_else(|| {
-        value.as_object().filter(|m| m.values().all(|v| v.get("command").is_some() || v.get("url").is_some()))
-    })
-}
-
-fn claude_json_project<'a>(snapshot: &Snapshot, root: &'a Value, dir: &Path) -> Option<&'a Value> {
-    root.get("projects")?.as_object()?.iter().find(|(key, _)| same_path(&snapshot.ctx.host(key), dir)).map(|(_, v)| v)
-}
-
-fn short_plugin_name(name: &str) -> String {
-    name.split('@').next().unwrap_or(name).to_string()
-}
-
-pub fn raw_servers(snapshot: &Snapshot) -> Vec<RawServer> {
-    let mut servers = Vec::new();
-    let mut push = |scope: Scope, plugin: Option<(String, String)>, source: &Path, map: &Map<String, Value>, disabled: &HashSet<String>| {
-        for (name, config) in map {
-            let Some(config) = config.as_object() else { continue };
-            let (plugin_name, plugin_root) = plugin.clone().unzip();
-            let id = match &plugin_name {
-                Some(p) => format!("plugin:{p}:{name}"),
-                None => format!("{}:{name}", scope.as_str()),
-            };
-            servers.push(RawServer {
-                id,
-                name: name.clone(),
-                scope,
-                plugin: plugin_name,
-                source: source.to_path_buf(),
-                config: config.clone(),
-                plugin_root,
-                disabled: disabled.contains(name),
-            });
-        }
-    };
-
-    let none = HashSet::new();
-    let claude_json = snapshot.claude_json.value.as_ref().unwrap_or(&Value::Null);
-    if let Some(map) = claude_json.get("mcpServers").and_then(Value::as_object) {
-        push(Scope::User, None, &snapshot.claude_json_path, map, &none);
-    }
-    let local = snapshot.dirs.iter().find_map(|d| claude_json_project(snapshot, claude_json, d));
-    if let Some(map) = local.and_then(|p| p.get("mcpServers")).and_then(Value::as_object) {
-        push(Scope::Local, None, &snapshot.claude_json_path, map, &none);
-    }
-    let disabled: HashSet<String> = strings(local.and_then(|p| p.get("disabledMcpjsonServers"))).into_iter().collect();
-    let project = snapshot.dirs.iter().map(|d| d.join(".mcp.json")).find_map(|p| json_file(&p).value.clone().map(|v| (p, v)));
-    if let Some((path, value)) = project {
-        if let Some(map) = server_map(&value) {
-            push(Scope::Project, None, &path, map, &disabled);
-        }
-    }
-    for plugin in snapshot.plugins.iter().filter(|p| p.enabled) {
-        let manifest = plugin.root.join(".mcp.json");
-        let from_plugin_json = || {
-            let path = plugin.root.join(".claude-plugin").join("plugin.json");
-            json_file(&path).value.clone().filter(|v| v.get("mcpServers").is_some_and(Value::is_object)).map(|v| (path, v))
-        };
-        let found = json_file(&manifest).value.clone().map(|v| (manifest.clone(), v)).or_else(from_plugin_json);
-        if let Some((path, value)) = found {
-            if let Some(map) = server_map(&value) {
-                let root = snapshot.ctx.native(&plugin.root);
-                push(Scope::Plugin, Some((short_plugin_name(&plugin.name), root)), &path, map, &none);
-            }
-        }
-    }
-    servers
-}
-
-fn resolved(snapshot: &Snapshot, raw: &RawServer) -> ResolvedServer {
-    ResolvedServer {
-        config: raw.config.clone(),
-        plugin_root: raw.plugin_root.clone(),
-        cwd: snapshot.ctx.native(&snapshot.cwd),
-        distro: snapshot.ctx.distro.clone(),
-    }
+fn resolved(raw: &RawServer, cwd: String, distro: Option<String>) -> ResolvedServer {
+    ResolvedServer { config: raw.config.clone(), plugin_root: raw.plugin_root.clone(), cwd, distro }
 }
 
 pub fn mentions_postgres(name: &str, config: &Map<String, Value>) -> bool {
@@ -217,9 +139,9 @@ pub fn mentions_postgres(name: &str, config: &Map<String, Value>) -> bool {
     haystack.contains("postgres") || haystack.contains("pgsql")
 }
 
-pub fn describe_server(snapshot: &Snapshot, raw: &RawServer) -> McpServer {
+fn describe_server(raw: &RawServer, server: &ResolvedServer) -> McpServer {
     let config = &raw.config;
-    let postgres = mentions_postgres(&raw.name, config) || crate::pg::detect(&launch(&resolved(snapshot, raw)), false).is_some();
+    let postgres = mentions_postgres(&raw.name, config) || crate::pg::detect(&launch(server), false).is_some();
     McpServer {
         id: raw.id.clone(),
         name: raw.name.clone(),
@@ -237,17 +159,13 @@ pub fn describe_server(snapshot: &Snapshot, raw: &RawServer) -> McpServer {
     }
 }
 
-fn find(snapshot: &Snapshot, id: &str) -> anyhow::Result<RawServer> {
-    raw_servers(snapshot)
-        .into_iter()
-        .find(|s| s.id == id)
-        .ok_or_else(|| anyhow::anyhow!("MCP server {id} is no longer configured"))
+pub fn describe_all(servers: &[RawServer], cwd: &str, distro: Option<&str>) -> Vec<McpServer> {
+    servers.iter().map(|raw| describe_server(raw, &resolved(raw, cwd.to_string(), distro.map(str::to_string)))).collect()
 }
 
-pub fn resolve_server(cwd: &str, id: &str) -> anyhow::Result<ResolvedServer> {
-    let snapshot = Snapshot::load(cwd)?;
-    let raw = find(&snapshot, id)?;
-    Ok(resolved(&snapshot, &raw))
+pub fn resolve(servers: Vec<RawServer>, id: &str, cwd: String, distro: Option<String>) -> anyhow::Result<ResolvedServer> {
+    let raw = servers.into_iter().find(|s| s.id == id).ok_or_else(|| anyhow::anyhow!("MCP server {id} is no longer configured"))?;
+    Ok(resolved(&raw, cwd, distro))
 }
 
 #[cfg(test)]
