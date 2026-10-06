@@ -1,4 +1,4 @@
-import { isWithin, normalizePath, samePath } from "@/lib/utils";
+import { basename, dirname, isWithin, normalizePath, samePath } from "@/lib/utils";
 import type { AgentId, SessionInfo } from "@/types";
 
 export interface SessionFilter {
@@ -48,6 +48,17 @@ export const groupByFolder = (sessions: SessionInfo[]) => {
     groups.set(key, group);
   }
   return [...groups.values()];
+};
+
+export const folderHints = (groups: SessionGroup[]) => {
+  const nameOf = (cwd: string) => basename(cwd).toLowerCase();
+  const counts = new Map<string, number>();
+  for (const { cwd } of groups) counts.set(nameOf(cwd), (counts.get(nameOf(cwd)) ?? 0) + 1);
+  return new Map(
+    groups
+      .filter(({ cwd }) => (counts.get(nameOf(cwd)) ?? 0) > 1)
+      .map(({ cwd }) => [cwd, basename(dirname(cwd))]),
+  );
 };
 
 export const partitionSessions = (sessions: SessionInfo[], filter: SessionFilter) => {

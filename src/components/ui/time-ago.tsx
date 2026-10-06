@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 
-import { timeAgo } from "@/lib/utils";
+import { shortTimeAgo, timeAgo } from "@/lib/utils";
 
 const TICK_MS = 30_000;
 const listeners = new Set<() => void>();
@@ -23,7 +23,19 @@ const subscribe = (listener: () => void) => {
 
 const useClock = () => useSyncExternalStore(subscribe, () => now);
 
-export const TimeAgo = ({ ms, className }: { ms: number; className?: string }) => {
+export const TimeAgo = ({
+  ms,
+  compact,
+  className,
+}: {
+  ms: number;
+  compact?: boolean;
+  className?: string;
+}) => {
   useClock();
-  return <span className={className}>{timeAgo(ms)}</span>;
+  return (
+    <span title={new Date(ms).toLocaleString()} className={className}>
+      {compact ? shortTimeAgo(ms) : timeAgo(ms)}
+    </span>
+  );
 };

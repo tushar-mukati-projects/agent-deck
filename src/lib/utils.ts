@@ -94,6 +94,23 @@ export const timeAgo = (ms: number) => {
     .replace(/ years?/, "y");
 };
 
+const MINUTE = 60_000;
+const DAY = 24 * 60 * MINUTE;
+const SHORT_UNITS: [number, string][] = [
+  [365 * DAY, "y"],
+  [30 * DAY, "mo"],
+  [7 * DAY, "w"],
+  [DAY, "d"],
+  [60 * MINUTE, "h"],
+  [MINUTE, "m"],
+];
+
+export const shortTimeAgo = (ms: number, now = Date.now()) => {
+  const elapsed = Math.max(0, now - ms);
+  const unit = SHORT_UNITS.find(([size]) => elapsed >= size);
+  return unit ? `${Math.floor(elapsed / unit[0])}${unit[1]}` : "now";
+};
+
 export const newId = () => crypto.randomUUID();
 
 export const omitKey = <T>(record: Record<string, T>, key: string): Record<string, T> => {

@@ -5,9 +5,7 @@ import {
   Copy,
   Eye,
   FolderOpen,
-  GitBranch,
   GitFork,
-  MessageSquare,
   Pencil,
   Pin,
   PinOff,
@@ -44,6 +42,7 @@ import type { SessionInfo } from "@/types";
 
 interface SessionItemProps {
   session: SessionInfo;
+  number: number;
   tone: DotTone | null;
   isActive: boolean;
   isOpen: boolean;
@@ -128,10 +127,10 @@ const SessionMenu = ({
   );
 };
 
-export const SessionItem = memo(({ session, tone, isActive, isOpen }: SessionItemProps) => {
+export const SessionItem = memo(({ session, number, tone, isActive, isOpen }: SessionItemProps) => {
   const pinned = useSettingsStore((s) => s.pinnedSessions.includes(session.id));
   const archived = useSettingsStore((s) => s.archivedSessions.includes(session.id));
-  const secondary = session.lastPrompt ?? session.firstPrompt;
+  const title = session.title ?? "Untitled session";
 
   return (
     <ContextMenu>
@@ -146,48 +145,44 @@ export const SessionItem = memo(({ session, tone, isActive, isOpen }: SessionIte
             e.preventDefault();
             void resumeSession(session);
           }}
-          style={{ contentVisibility: "auto", containIntrinsicSize: "auto 52px" }}
+          style={{ contentVisibility: "auto", containIntrinsicSize: "auto 28px" }}
           className={cn(
-            "group relative flex w-full flex-col gap-px rounded-md px-2 py-1.5 text-left transition-colors duration-75",
-            isActive ? "bg-active" : "hover:bg-hover",
+            "group relative flex min-h-7 w-full shrink-0 items-start gap-2 rounded-md py-[5px] pr-2 pl-1.5 text-left",
+            "after:absolute after:inset-x-2 after:bottom-0 after:h-px after:bg-fg/[0.07] last:after:hidden",
+            isActive ? "bg-active after:hidden" : "hover:bg-hover hover:after:opacity-0",
             archived && "opacity-60",
           )}
         >
           {isActive && (
-            <span className="absolute top-1.5 bottom-1.5 -left-[7px] w-[2px] rounded-full bg-muted/70" />
+            <span className="absolute inset-y-1.5 -left-[7px] w-[2px] rounded-full bg-accent" />
           )}
-          <div className="flex w-full items-center gap-2">
-            {tone && <StatusDot tone={tone} />}
-            <span
-              className={cn(
-                "min-w-0 flex-1 truncate text-[12px]",
-                isActive || isOpen ? "text-fg" : "text-fg/80",
-              )}
-            >
-              {session.title ?? "Untitled session"}
-            </span>
-            {session.agent !== CLAUDE && <AgentBadge agent={session.agent} />}
-            {pinned && <Pin className="size-3 shrink-0 fill-current text-faint" />}
-            <TimeAgo
-              ms={session.modifiedMs}
-              className="shrink-0 text-[10.5px] text-faint tabular-nums"
-            />
-          </div>
-          {secondary && secondary !== session.title && (
-            <p className="line-clamp-1 text-[11px] leading-snug text-faint">{secondary}</p>
-          )}
-          <div className="flex items-center gap-2.5 text-[10px] text-faint">
-            <span className="flex items-center gap-1">
-              <MessageSquare className="size-3" />
-              {session.promptCount}
-            </span>
-            {session.gitBranch && session.gitBranch !== "HEAD" && (
-              <span className="flex min-w-0 items-center gap-1">
-                <GitBranch className="size-3 shrink-0" />
-                <span className="truncate">{session.gitBranch}</span>
-              </span>
+          <span className="min-w-[2ch] shrink-0 text-right text-[10.5px] leading-[18px] text-faint tabular-nums">
+            {number}
+          </span>
+          <span
+            className={cn(
+              "min-w-0 flex-1 text-[12px] leading-[18px] wrap-anywhere",
+              !session.title && "italic",
+              isActive
+                ? "font-medium text-fg"
+                : isOpen
+                  ? "text-fg"
+                  : "text-fg/75 group-hover:text-fg",
             )}
-          </div>
+          >
+            {title}
+          </span>
+          {session.agent !== CLAUDE && <AgentBadge agent={session.agent} className="mt-0.5" />}
+          {tone && (
+            <span className="flex h-[18px] shrink-0 items-center">
+              <StatusDot tone={tone} />
+            </span>
+          )}
+          <TimeAgo
+            ms={session.modifiedMs}
+            compact
+            className="shrink-0 text-[10.5px] leading-[18px] text-faint tabular-nums"
+          />
         </button>
       </ContextMenuTrigger>
       <SessionMenu

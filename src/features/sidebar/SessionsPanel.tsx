@@ -1,10 +1,10 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, Archive, FolderOpen, Pin, Plus, RefreshCw, Sparkles } from "lucide-react";
+import { AlertTriangle, Archive, Pin, Plus, RefreshCw, Sparkles } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 
 import { startNewSession, startSessionInPickedFolder } from "@/actions/sessions";
 import { Button } from "@/components/ui/button";
-import { EmptyState, LoadingState } from "@/components/ui/feedback";
+import { EmptyState, LoadingState, StatusDot, type DotTone } from "@/components/ui/feedback";
 import { IconButton } from "@/components/ui/icon-button";
 import { Chevron, PanelHeader, SearchInput, Segmented } from "@/components/ui/panel";
 import { FolderFilter } from "@/features/sidebar/FolderFilter";
@@ -12,14 +12,16 @@ import { SessionItem } from "@/features/sidebar/SessionItem";
 import { useSessionTones } from "@/features/sidebar/useSessionTones";
 import { WslStatus } from "@/features/sidebar/WslStatus";
 import { agentName } from "@/lib/agents/registry";
+import { folderIcon } from "@/lib/file-icons";
 import {
   agentsIn,
   effectiveAgent,
+  folderHints,
   groupByFolder,
   partitionSessions,
   type SessionGroup,
 } from "@/lib/session-list";
-import { basename, cn, normalizePath, samePath, shortenHome } from "@/lib/utils";
+import { basename, cn, normalizePath, samePath } from "@/lib/utils";
 import { parseWslPath } from "@/lib/wsl";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -31,18 +33,28 @@ const NAV_KEYS = new Set(["ArrowDown", "ArrowUp", "Home", "End"]);
 const sectionClass =
   "flex h-7 w-full items-center gap-1.5 px-2 text-[11px] font-semibold tracking-wide text-faint";
 const nestedListClass = "mb-1 ml-[13px] flex flex-col gap-px border-l border-border pl-[6px]";
+const TONE_PRIORITY: DotTone[] = ["attention", "busy", "running", "external"];
+
+const groupTone = (sessions: SessionInfo[], tones: Map<string, DotTone>) => {
+  const present = new Set(sessions.map((s) => tones.get(s.id)));
+  return TONE_PRIORITY.find((tone) => present.has(tone)) ?? null;
+};
 
 const FolderHeader = ({
   group,
   collapsed,
+  hint,
+  tone,
   onToggle,
 }: {
   group: SessionGroup;
   collapsed: boolean;
+  hint: string | null;
+  tone: DotTone | null;
   onToggle: () => void;
 }) => {
-  const home = useSessionsStore((s) => s.environment?.home ?? "");
-  const wsl = parseWslPath(group.cwd);
+  const name = basename(group.cwd);
+  const { icon: Icon, color } = folderIcon(name, !collapsed);
   return (
     <div className="group sticky top-0 z-10 flex h-8 items-center gap-1 bg-panel/95 pr-1 pl-1 backdrop-blur-sm">
       <button
@@ -51,25 +63,28 @@ const FolderHeader = ({
         title={group.cwd}
         data-session-row
         aria-expanded={!collapsed}
-        className="flex min-w-0 flex-1 items-center gap-1.5 rounded px-1 py-0.5 text-left text-[12.5px] font-medium text-fg"
+        className="flex min-w-0 flex-1 items-center gap-1.5 rounded px-1 py-0.5 text-left text-[12.5px] font-medium text-fg/90 hover:text-fg"
       >
-        <Chevron open={!collapsed} />
-        <FolderOpen className="size-3.5 shrink-0 text-folder" />
-        <span className="max-w-[70%] shrink-0 truncate">{basename(group.cwd)}</span>
-        {wsl && (
+        <Chevron open={!collapsed} className="text-faint" />
+        <Icon className={cn("size-3.5 shrink-0", color)} />
+        <span className="min-w-0 truncate">{name}</span>
+        {parseWslPath(group.cwd) && (
           <span className="shrink-0 rounded border border-badge/30 bg-badge/10 px-1 text-[9px] leading-[14px] font-bold tracking-wider text-badge">
             WSL
           </span>
         )}
-        <span className="min-w-0 truncate text-[11px] font-normal text-faint">
-          {shortenHome(group.cwd, home)}
-        </span>
+        {hint && (
+          <span className="min-w-0 shrink-[2] truncate text-[11px] font-normal text-faint">
+            {hint}
+          </span>
+        )}
       </button>
-      <span className="text-[10.5px] text-faint tabular-nums group-focus-within:hidden group-hover:hidden">
+      {collapsed && tone && <StatusDot tone={tone} className="mr-1" />}
+      <span className="pr-1 text-[10.5px] text-faint tabular-nums group-focus-within:hidden group-hover:hidden">
         {group.sessions.length}
       </span>
       <IconButton
-        label={`New session in ${basename(group.cwd)}`}
+        label={`New session in ${name}`}
         className="hidden group-focus-within:inline-flex group-hover:inline-flex"
         onClick={() => startNewSession(group.cwd)}
       >
@@ -180,6 +195,7 @@ export const SessionsPanel = () => {
   const grouped = !folderFilter || includeSubfolders;
   const groups = useMemo(() => (grouped ? groupByFolder(rest) : []), [grouped, rest]);
   const expansion = useExpandedGroups(!!deferredQuery, groups);
+  const hints = useMemo(() => folderHints(groups), [groups]);
   const openIds = useMemo(() => new Set(openSessionIds), [openSessionIds]);
 
   const moveFocus = (event: React.KeyboardEvent) => {
@@ -204,10 +220,11 @@ export const SessionsPanel = () => {
     budget -= list.length;
     return shown;
   };
-  const renderItem = (session: SessionInfo) => (
+  const renderItem = (session: SessionInfo, index: number) => (
     <SessionItem
       key={session.id}
       session={session}
+      number={index + 1}
       tone={tones.get(session.id) ?? null}
       isActive={session.id === activeSessionId}
       isOpen={openIds.has(session.id)}
@@ -223,6 +240,8 @@ export const SessionsPanel = () => {
           <FolderHeader
             group={group}
             collapsed={collapsed}
+            hint={hints.get(group.cwd) ?? null}
+            tone={groupTone(group.sessions, tones)}
             onToggle={() => expansion.toggle(group.cwd)}
           />
           {shown.length > 0 && <div className={nestedListClass}>{shown.map(renderItem)}</div>}
@@ -323,7 +342,7 @@ export const SessionsPanel = () => {
             e.preventDefault();
             listRef.current?.querySelector<HTMLElement>("[data-session-row]")?.focus();
           }}
-          placeholder="Search title, prompt, branch…"
+          placeholder="Search sessions…"
           aria-label="Search sessions"
         />
         {agentsPresent.length > 1 && (

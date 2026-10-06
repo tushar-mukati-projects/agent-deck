@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import { parseArgs } from "@/lib/args";
-import { isWithin, normalizePath, relativePath, resolvePath, samePath } from "@/lib/utils";
+import {
+  isWithin,
+  normalizePath,
+  relativePath,
+  resolvePath,
+  samePath,
+  shortTimeAgo,
+} from "@/lib/utils";
 import { parseWslPath, shellQuote } from "@/lib/wsl";
 
 describe("normalizePath", () => {
@@ -44,6 +51,21 @@ describe("path helpers", () => {
         "\\\\wsl$\\Ubuntu\\home\\me\\proj",
       ),
     ).toBe("src\\a.ts");
+  });
+});
+
+describe("shortTimeAgo", () => {
+  it("uses one compact unit", () => {
+    const now = Date.parse("2026-10-05T12:00:00Z");
+    const ago = (ms: number) => shortTimeAgo(now - ms, now);
+    expect(ago(20_000)).toBe("now");
+    expect(ago(5 * 60_000)).toBe("5m");
+    expect(ago(3 * 3_600_000)).toBe("3h");
+    expect(ago(2 * 86_400_000)).toBe("2d");
+    expect(ago(21 * 86_400_000)).toBe("3w");
+    expect(ago(65 * 86_400_000)).toBe("2mo");
+    expect(ago(800 * 86_400_000)).toBe("2y");
+    expect(shortTimeAgo(now + 5_000, now)).toBe("now");
   });
 });
 

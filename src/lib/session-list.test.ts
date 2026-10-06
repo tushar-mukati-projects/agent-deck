@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   effectiveAgent,
+  folderHints,
   groupByFolder,
   partitionSessions,
   type SessionFilter,
@@ -75,6 +76,18 @@ describe("groupByFolder", () => {
     expect(groups.map((g) => [g.cwd, g.sessions.map((s) => s.id)])).toEqual([
       ["C:\\Repo", ["a", "c"]],
       ["C:\\x", ["b"]],
+    ]);
+  });
+
+  it("hints the parent folder only for folders that share a name", () => {
+    const groups = groupByFolder([
+      session("a", "C:\\dev\\api"),
+      session("b", "C:\\old\\API"),
+      session("c", "C:\\dev\\web"),
+    ]);
+    expect([...folderHints(groups)]).toEqual([
+      ["C:\\dev\\api", "dev"],
+      ["C:\\old\\API", "old"],
     ]);
   });
 });
