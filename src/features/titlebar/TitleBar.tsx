@@ -5,6 +5,7 @@ import {
   Minus,
   PanelLeft,
   PanelRight,
+  PencilLine,
   Plus,
   Search,
   Settings,
@@ -14,6 +15,7 @@ import {
 
 import { useShallow } from "zustand/react/shallow";
 
+import { toggleNotes } from "@/actions/notes";
 import { AppLogo } from "@/components/AppLogo";
 import { IconButton } from "@/components/ui/icon-button";
 import { Kbd } from "@/components/ui/kbd";
@@ -85,6 +87,7 @@ export const TitleBar = () => {
   const openPalette = useUiStore((s) => s.openPalette);
   const sessionsOpen = useUiStore((s) => s.sessionsOpen);
   const contextOpen = useUiStore((s) => s.contextOpen);
+  const notesOpen = useUiStore((s) => s.notesOpen);
   const hidden = useSettingsStore((s) => s.hideMode);
   const hasWorkspace = useWorkspaceStore((s) => s.workspaces.some((w) => w.id === s.activeId));
   const { toggleSessions, toggleContext, setShortcutsOpen, setSettingsOpen } =
@@ -151,21 +154,31 @@ export const TitleBar = () => {
           </IconButton>
         )}
         {!hidden && (
-          <IconButton
-            label="Keyboard shortcuts"
-            shortcut={shortcutLabel("shortcuts")}
-            onClick={() => setShortcutsOpen(true)}
-          >
-            <Keyboard />
-          </IconButton>
+          <>
+            <IconButton
+              label="Notes"
+              shortcut={shortcutLabel("notes")}
+              active={notesOpen}
+              onClick={toggleNotes}
+            >
+              <PencilLine />
+            </IconButton>
+            <IconButton
+              label="Keyboard shortcuts"
+              shortcut={shortcutLabel("shortcuts")}
+              onClick={() => setShortcutsOpen(true)}
+            >
+              <Keyboard />
+            </IconButton>
+            <IconButton
+              label="Settings"
+              shortcut={shortcutLabel("settings")}
+              onClick={() => setSettingsOpen(true)}
+            >
+              <Settings />
+            </IconButton>
+          </>
         )}
-        <IconButton
-          label="Settings"
-          shortcut={shortcutLabel("settings")}
-          onClick={() => setSettingsOpen(true)}
-        >
-          <Settings />
-        </IconButton>
       </div>
 
       <WindowControls />

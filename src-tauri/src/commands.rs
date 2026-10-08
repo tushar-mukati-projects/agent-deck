@@ -1,9 +1,11 @@
+use anyhow::Context;
 use serde::Serialize;
 use tauri::{ipc::Channel, AppHandle, Manager};
 
 use crate::{
     agent_config, changes, fsx, git, hide_mode,
     mcp::{self, McpManager},
+    notes,
     pg::{self, PgManager},
     pty::{self, PtyEvent, PtyInfo, PtyManager, SpawnRequest},
     sessions::{self, LiveSession, Needle, SearchHit, SessionInfo, TranscriptPage},
@@ -347,6 +349,32 @@ pub fn set_attention_badge(window: tauri::WebviewWindow, active: bool) -> CmdRes
 #[tauri::command]
 pub fn apply_hide_mode(window: tauri::WebviewWindow, enabled: bool) -> CmdResult<Option<String>> {
     hide_mode::apply(&window, enabled).map_err(|e| format!("{e:#}"))
+}
+
+fn notes_dir(app: &AppHandle) -> anyhow::Result<std::path::PathBuf> {
+    let dir = app.path().app_data_dir()?.join("notes");
+    std::fs::create_dir_all(&dir).context("Couldn't create the notes folder")?;
+    Ok(dir)
+}
+
+#[tauri::command]
+pub async fn list_notes(app: AppHandle) -> CmdResult<Vec<notes::Note>> {
+    blocking(move || notes::list(&notes_dir(&app)?)).await
+}
+
+#[tauri::command]
+pub async fn save_note(app: AppHandle, id: String, text: String) -> CmdResult<u64> {
+    blocking(move || notes::save(&notes_dir(&app)?, &id, &text)).await
+}
+
+#[tauri::command]
+pub async fn delete_note(app: AppHandle, id: String) -> CmdResult<()> {
+    blocking(move || notes::delete(&notes_dir(&app)?, &id)).await
+}
+
+#[tauri::command]
+pub async fn notes_folder(app: AppHandle) -> CmdResult<String> {
+    blocking(move || Ok(notes_dir(&app)?.to_string_lossy().into_owned())).await
 }
 
 #[cfg(windows)]

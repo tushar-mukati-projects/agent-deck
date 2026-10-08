@@ -84,6 +84,8 @@ const EDIT_SETUP = {
   searchKeymap: true,
 };
 const VIEW_SETUP = { ...EDIT_SETUP, highlightActiveLine: false, highlightActiveLineGutter: false };
+const PLAIN_SETUP = { ...VIEW_SETUP, lineNumbers: false, foldGutter: false };
+const PLAIN_PADDING = EditorView.theme({ ".cm-content": { padding: "18px 24px" } });
 
 const scrollPositions = new Map<string, number>();
 
@@ -91,6 +93,8 @@ interface CodeViewProps {
   path: string;
   value: string;
   editable: boolean;
+  plain?: boolean;
+  placeholder?: string;
   line?: number | null;
   onLineShown?: () => void;
   onChange: (value: string) => void;
@@ -101,6 +105,8 @@ export const CodeView = ({
   path,
   value,
   editable,
+  plain,
+  placeholder,
   line,
   onLineShown,
   onChange,
@@ -121,8 +127,9 @@ export const CodeView = ({
       EditorState.tabSize.of(2),
       keymap.of([{ key: "Mod-s", preventDefault: true, run: () => (saveRef.current(), true) }]),
       ...(language ? [language] : []),
+      ...(plain ? [PLAIN_PADDING] : []),
     ],
-    [language],
+    [language, plain],
   );
   const handleChange = useCallback((next: string) => changeRef.current(next), []);
 
@@ -156,7 +163,9 @@ export const CodeView = ({
       readOnly={!editable}
       extensions={extensions}
       onChange={handleChange}
-      basicSetup={editable ? EDIT_SETUP : VIEW_SETUP}
+      basicSetup={plain ? PLAIN_SETUP : editable ? EDIT_SETUP : VIEW_SETUP}
+      autoFocus={plain}
+      placeholder={placeholder}
       onCreateEditor={(view) => {
         viewRef.current = view;
         const saved = scrollPositions.get(key);

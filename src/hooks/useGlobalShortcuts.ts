@@ -2,6 +2,7 @@ import { useEffect } from "react";
 
 import { closeFileWithConfirm } from "@/actions/files";
 import { toggleHideMode } from "@/actions/hide-mode";
+import { toggleNotes } from "@/actions/notes";
 import { startNewSession, startSessionInPickedFolder } from "@/actions/sessions";
 import {
   activateWorkspaceAt,
@@ -57,6 +58,7 @@ const handlers: Record<ShortcutAction, () => void> = {
   fontReset: () => setFontSize(() => DEFAULT_FONT_SIZE),
   settings: () => ui().setSettingsOpen(true),
   shortcuts: () => ui().setShortcutsOpen(true),
+  notes: toggleNotes,
   toggleHideMode,
 };
 
@@ -66,8 +68,9 @@ const PALETTE_ACTIONS = new Set<ShortcutAction>(["palette", "quickOpen", "search
 
 const blockedByModal = (action: ShortcutAction | null) => {
   if (action === "toggleHideMode") return false;
-  const { confirm, renameTarget, settingsOpen, shortcutsOpen, paletteMode } = ui();
+  const { confirm, renameTarget, settingsOpen, shortcutsOpen, notesOpen, paletteMode } = ui();
   if (confirm || renameTarget || settingsOpen || shortcutsOpen) return true;
+  if (notesOpen) return action !== "notes";
   return !!paletteMode && !(action && PALETTE_ACTIONS.has(action));
 };
 

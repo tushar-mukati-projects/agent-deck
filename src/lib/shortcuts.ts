@@ -20,6 +20,7 @@ export type ShortcutAction =
   | "fontSmaller"
   | "fontReset"
   | "settings"
+  | "notes"
   | "toggleHideMode"
   | "shortcuts";
 
@@ -72,6 +73,15 @@ export const SHORTCUTS: Shortcut[] = [
     ctrl: true,
     label: "Ctrl ,",
     description: "Settings",
+    group: "General",
+  },
+  {
+    action: "notes",
+    key: "n",
+    ctrl: true,
+    alt: true,
+    label: "Ctrl Alt N",
+    description: "Notes",
     group: "General",
   },
   {

@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 
+import { flushNotes } from "@/actions/notes";
 import { confirmQuit } from "@/actions/workspaces";
 import { publishFileChange, watchedRoots } from "@/lib/file-events";
 import { api } from "@/lib/tauri/commands";
@@ -39,7 +40,9 @@ export const useAppEvents = () => {
       }),
       appWindow.onCloseRequested(async (event) => {
         event.preventDefault();
-        if (await confirmQuit()) await appWindow.destroy();
+        if (!(await confirmQuit())) return;
+        await flushNotes();
+        await appWindow.destroy();
       }),
       appWindow.onFocusChanged(({ payload: focused }) => {
         if (!focused) return;

@@ -4,6 +4,7 @@ import { Toaster } from "sonner";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { NotesDialog } from "@/features/notes/NotesDialog";
 import { CommandPalette } from "@/features/palette/CommandPalette";
 import { ConfirmDialog } from "@/features/settings/ConfirmDialog";
 import { SettingsDialog } from "@/features/settings/SettingsDialog";
@@ -136,6 +137,7 @@ export const App = () => {
       <ConfirmDialog />
       <RenameDialog />
       <ShortcutsDialog />
+      <NotesDialog />
       <Toaster
         theme={themeKind}
         position="bottom-right"

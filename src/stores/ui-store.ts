@@ -25,6 +25,7 @@ interface UiState {
   paletteMode: PaletteMode | null;
   settingsOpen: boolean;
   shortcutsOpen: boolean;
+  notesOpen: boolean;
   confirm: ConfirmRequest | null;
   renameTarget: SessionInfo | null;
   setSessionsOpen: (open: boolean) => void;
@@ -37,6 +38,7 @@ interface UiState {
   closePalette: () => void;
   setSettingsOpen: (open: boolean) => void;
   setShortcutsOpen: (open: boolean) => void;
+  setNotesOpen: (open: boolean) => void;
   setRenameTarget: (session: SessionInfo | null) => void;
   askConfirm: (request: Omit<ConfirmRequest, "resolve">) => Promise<boolean>;
   resolveConfirm: (confirmed: boolean) => void;
@@ -55,6 +57,7 @@ export const useUiStore = create<UiState>()(
       paletteMode: null,
       settingsOpen: false,
       shortcutsOpen: false,
+      notesOpen: false,
       confirm: null,
       renameTarget: null,
       setSessionsOpen: (open) => set({ sessionsOpen: open }),
@@ -72,6 +75,7 @@ export const useUiStore = create<UiState>()(
       closePalette: () => set({ paletteMode: null }),
       setSettingsOpen: (open) => set({ settingsOpen: open }),
       setShortcutsOpen: (open) => set({ shortcutsOpen: open }),
+      setNotesOpen: (open) => set({ notesOpen: open }),
       setRenameTarget: (session) => set({ renameTarget: session }),
       askConfirm: (request) =>
         new Promise<boolean>((resolve) => {

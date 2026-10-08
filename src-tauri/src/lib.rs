@@ -7,6 +7,7 @@ mod fsx;
 mod git;
 mod hide_mode;
 mod mcp;
+mod notes;
 mod pg;
 mod pool;
 mod process;
@@ -104,6 +105,10 @@ pub fn run() {
             commands::unwatch_dir,
             commands::set_attention_badge,
             commands::apply_hide_mode,
+            commands::list_notes,
+            commands::save_note,
+            commands::delete_note,
+            commands::notes_folder,
         ])
         .build(tauri::generate_context!())
         .expect("error while building Claude Deck");

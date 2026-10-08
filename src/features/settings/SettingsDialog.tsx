@@ -139,7 +139,7 @@ const AppearanceSection = () => (
     </Field>
     <Field
       label="Hide mode"
-      hint={`Looks like Warp: Warp's name and icon, the One Dark theme, no search bar or extra status items, and no sounds or notifications. Turning it off brings your theme back. Also ${shortcutLabel("toggleHideMode")}.`}
+      hint={`Looks like Warp: Warp's name and icon, the One Dark theme, no search bar, title bar buttons or extra status items, and no sounds or notifications. Notes and settings stay on ${shortcutLabel("notes")} and ${shortcutLabel("settings")}. Turning it off brings your theme back. Also ${shortcutLabel("toggleHideMode")}.`}
     >
       <HideModeToggle />
     </Field>

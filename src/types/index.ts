@@ -346,3 +346,9 @@ export interface Workspace {
 }
 
 export type ContextView = "explorer" | "changes" | "agent";
+
+export interface Note {
+  id: string;
+  text: string;
+  modifiedMs: number;
+}

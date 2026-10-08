@@ -15,6 +15,7 @@ import {
   Palette,
   PanelLeft,
   PanelRight,
+  PencilLine,
   Play,
   RefreshCw,
   RotateCcw,
@@ -176,6 +177,7 @@ const buildCommands = (workspace: Workspace | null): CommandDef[] => {
     shortcut("fontSmaller", "Terminal: smaller font", <ZoomOut />),
     shortcut("shortcuts", "Keyboard shortcuts", <Keyboard />),
     shortcut("settings", "Settings", <Settings />),
+    shortcut("notes", "Notes", <PencilLine />),
     shortcut("toggleHideMode", "Toggle hide mode", <EyeOff />),
     ...THEMES.map((theme) => ({
       id: `theme-${theme.id}`,

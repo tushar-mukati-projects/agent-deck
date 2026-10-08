@@ -14,6 +14,7 @@ import type {
   FileTail,
   LiveSession,
   McpDescription,
+  Note,
   PathStat,
   PgInfo,
   PgOutput,
@@ -76,6 +77,10 @@ export const api = {
   pgCancel: (cwd: string, id: string) => invoke<void>("pg_cancel", { cwd, id }),
   setAttentionBadge: (active: boolean) => invoke<void>("set_attention_badge", { active }),
   applyHideMode: (enabled: boolean) => invoke<string | null>("apply_hide_mode", { enabled }),
+  listNotes: () => invoke<Note[]>("list_notes"),
+  saveNote: (id: string, text: string) => invoke<number>("save_note", { id, text }),
+  deleteNote: (id: string) => invoke<void>("delete_note", { id }),
+  notesFolder: () => invoke<string>("notes_folder"),
   listWslSessions: () => invoke<WslIndex>("list_wsl_sessions"),
   wslStart: (distro: string) => invoke<void>("wsl_start", { distro }),
 
