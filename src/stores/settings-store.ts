@@ -27,6 +27,8 @@ export interface SettingsData {
   includeWsl: boolean;
   notifications: boolean;
   sound: boolean;
+  hideMode: boolean;
+  themeBeforeHide: string | null;
   pinnedSessions: string[];
   archivedSessions: string[];
   showArchived: boolean;
@@ -58,6 +60,8 @@ const DEFAULTS: SettingsData = {
   includeWsl: true,
   notifications: true,
   sound: true,
+  hideMode: false,
+  themeBeforeHide: null,
   pinnedSessions: [],
   archivedSessions: [],
   showArchived: false,

@@ -4,6 +4,7 @@ import {
   Bell,
   BrainCircuit,
   Copy,
+  EyeOff,
   FolderOpen,
   FolderPlus,
   GitCompare,
@@ -175,6 +176,7 @@ const buildCommands = (workspace: Workspace | null): CommandDef[] => {
     shortcut("fontSmaller", "Terminal: smaller font", <ZoomOut />),
     shortcut("shortcuts", "Keyboard shortcuts", <Keyboard />),
     shortcut("settings", "Settings", <Settings />),
+    shortcut("toggleHideMode", "Toggle hide mode", <EyeOff />),
     ...THEMES.map((theme) => ({
       id: `theme-${theme.id}`,
       title: `Theme: ${theme.name}`,

@@ -1,6 +1,7 @@
 import { useId, useState } from "react";
 import { Bell, Bot, MessagesSquare, Palette, SquareTerminal } from "lucide-react";
 
+import { toggleHideMode } from "@/actions/hide-mode";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -8,6 +9,7 @@ import { Segmented } from "@/components/ui/panel";
 import { CustomAgentsEditor, DefaultAgentPicker } from "@/features/settings/AgentSettings";
 import { ThemePicker } from "@/features/settings/ThemePicker";
 import { playChime } from "@/lib/chime";
+import { shortcutLabel } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore, type ClickBehavior, type SettingsData } from "@/stores/settings-store";
@@ -87,6 +89,22 @@ const Toggle = ({ field, on, off }: { field: ToggleKey; on: string; off: string 
   );
 };
 
+const HideModeToggle = () => {
+  const hidden = useSettingsStore((s) => s.hideMode);
+  return (
+    <Segmented<"on" | "off">
+      value={hidden ? "on" : "off"}
+      onChange={(next) => {
+        if ((next === "on") !== hidden) toggleHideMode();
+      }}
+      options={[
+        { value: "on", label: "On" },
+        { value: "off", label: "Off" },
+      ]}
+    />
+  );
+};
+
 const FontSize = () => {
   const id = useId();
   const fontSize = useSettingsStore((s) => s.fontSize);
@@ -118,6 +136,12 @@ const AppearanceSection = () => (
       hint="Claude draws with the Deck theme's own colors, so prompts, code and diffs follow the theme you pick. Switching between a light and a dark theme resumes open Claude sessions with the new colors once each one is idle, so nothing in progress is interrupted."
     >
       <Toggle field="matchAgentTheme" on="Match Deck" off="Use Claude's own setting" />
+    </Field>
+    <Field
+      label="Hide mode"
+      hint={`Looks like Warp: Warp's name and icon, the One Dark theme, no search bar or extra status items, and no sounds or notifications. Turning it off brings your theme back. Also ${shortcutLabel("toggleHideMode")}.`}
+    >
+      <HideModeToggle />
     </Field>
   </>
 );

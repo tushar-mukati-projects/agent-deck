@@ -6,6 +6,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import { openPathFromTerminal } from "@/actions/files";
+import { syncHideMode } from "@/actions/hide-mode";
 import { App } from "@/App";
 import { CrashScreen, ErrorBoundary } from "@/components/ErrorBoundary";
 import { suppressBrowserChrome } from "@/lib/browser-chrome";
@@ -21,6 +22,7 @@ suppressBrowserChrome();
 applyTheme(findTheme(useSettingsStore.getState().themeId));
 useSettingsStore.subscribe((state, previous) => {
   if (state.themeId !== previous.themeId) applyTheme(findTheme(state.themeId));
+  if (state.hideMode !== previous.hideMode) void syncHideMode(state.hideMode);
 });
 setPathLinkHandler((workspaceId, target) => void openPathFromTerminal(workspaceId, target));
 
@@ -57,6 +59,7 @@ const bootstrap = async () => {
       reattachTerminals(),
       sessions.loadEnvironment().catch(() => undefined),
       loadFonts(),
+      syncHideMode(useSettingsStore.getState().hideMode),
     ]);
   } finally {
     render();

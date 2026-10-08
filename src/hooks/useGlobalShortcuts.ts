@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 
 import { closeFileWithConfirm } from "@/actions/files";
+import { toggleHideMode } from "@/actions/hide-mode";
 import { startNewSession, startSessionInPickedFolder } from "@/actions/sessions";
 import {
   activateWorkspaceAt,
@@ -56,6 +57,7 @@ const handlers: Record<ShortcutAction, () => void> = {
   fontReset: () => setFontSize(() => DEFAULT_FONT_SIZE),
   settings: () => ui().setSettingsOpen(true),
   shortcuts: () => ui().setShortcutsOpen(true),
+  toggleHideMode,
 };
 
 export const runShortcut = (action: ShortcutAction) => handlers[action]();
@@ -63,6 +65,7 @@ export const runShortcut = (action: ShortcutAction) => handlers[action]();
 const PALETTE_ACTIONS = new Set<ShortcutAction>(["palette", "quickOpen", "searchChats"]);
 
 const blockedByModal = (action: ShortcutAction | null) => {
+  if (action === "toggleHideMode") return false;
   const { confirm, renameTarget, settingsOpen, shortcutsOpen, paletteMode } = ui();
   if (confirm || renameTarget || settingsOpen || shortcutsOpen) return true;
   return !!paletteMode && !(action && PALETTE_ACTIONS.has(action));

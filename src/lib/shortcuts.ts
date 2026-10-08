@@ -20,6 +20,7 @@ export type ShortcutAction =
   | "fontSmaller"
   | "fontReset"
   | "settings"
+  | "toggleHideMode"
   | "shortcuts";
 
 export type ShortcutGroup = "General" | "Sessions & tabs" | "Views" | "Terminal & files";
@@ -81,6 +82,15 @@ export const SHORTCUTS: Shortcut[] = [
     description: "Keyboard shortcuts",
     group: "General",
     passToEditor: true,
+  },
+  {
+    action: "toggleHideMode",
+    key: "h",
+    ctrl: true,
+    shift: true,
+    label: "Ctrl Shift H",
+    description: "Hide mode: look like Warp",
+    group: "General",
   },
   {
     action: "newSession",

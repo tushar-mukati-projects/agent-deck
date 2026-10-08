@@ -1,10 +1,12 @@
 import { toast } from "sonner";
 
 import { processStart, shownTasks } from "@/lib/agent-tasks";
+import { appName } from "@/lib/hide-mode";
 import { samePath } from "@/lib/utils";
 import { useAgentTasksStore } from "@/stores/agent-tasks-store";
 import { useExplorerStore } from "@/stores/explorer-store";
 import { useSessionsStore } from "@/stores/sessions-store";
+import { useSettingsStore } from "@/stores/settings-store";
 import { aliveTerminals, isTerminalAlive, useTerminalStore } from "@/stores/terminal-store";
 import { useUiStore } from "@/stores/ui-store";
 import { dirtyPaths, useViewerStore } from "@/stores/viewer-store";
@@ -62,7 +64,7 @@ export const closeWorkspaces = async (ids: string[]) => {
 export const confirmQuit = () => {
   const { workspaces } = useWorkspaceStore.getState();
   return confirmLoss(
-    "Quit Claude Deck?",
+    `Quit ${appName(useSettingsStore.getState().hideMode)}?`,
     workspaces,
     workspaces.flatMap((w) => w.openFiles),
   );

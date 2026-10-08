@@ -8,6 +8,7 @@ import { shortcutLabel } from "@/lib/shortcuts";
 import { copyText } from "@/lib/tauri/system";
 import { shortenHome } from "@/lib/utils";
 import { useSessionsStore } from "@/stores/sessions-store";
+import { useSettingsStore } from "@/stores/settings-store";
 import { useTerminalStore } from "@/stores/terminal-store";
 import { useActiveWorkspace } from "@/stores/workspace-store";
 import { useAgentShells } from "@/hooks/useAgentShells";
@@ -62,6 +63,7 @@ export const StatusBar = () => {
   const workspace = useActiveWorkspace();
   const session = useSessionsStore((s) => (workspace ? s.byId[workspace.sessionId] : undefined));
   const home = useSessionsStore((s) => s.environment?.home ?? "");
+  const hidden = useSettingsStore((s) => s.hideMode);
   const [agentsRunning, agentsBusy, waiting] = useTerminalStore(
     useShallow((s) => agentCounts(s.terminals)),
   );
@@ -78,27 +80,29 @@ export const StatusBar = () => {
               <FolderOpen />
               <span className="truncate">{shortenHome(workspace.cwd, home)}</span>
             </Item>
-            {session?.gitBranch && session.gitBranch !== "HEAD" && (
+            {!hidden && session?.gitBranch && session.gitBranch !== "HEAD" && (
               <Item title={session.gitBranch}>
                 <GitBranch />
                 <span className="max-w-[220px] truncate">{session.gitBranch}</span>
               </Item>
             )}
-            <Item
-              title="Copy session ID"
-              onClick={() =>
-                void copyText(workspace.sessionId).then(() => toast.success("Session ID copied"))
-              }
-            >
-              <Hash />
-              <span className="font-mono">{workspace.sessionId.slice(0, 8)}</span>
-            </Item>
+            {!hidden && (
+              <Item
+                title="Copy session ID"
+                onClick={() =>
+                  void copyText(workspace.sessionId).then(() => toast.success("Session ID copied"))
+                }
+              >
+                <Hash />
+                <span className="font-mono">{workspace.sessionId.slice(0, 8)}</span>
+              </Item>
+            )}
             <ShellItem workspace={workspace} />
           </>
         )}
       </div>
       <div className="flex shrink-0 items-stretch">
-        {waiting > 0 && (
+        {!hidden && waiting > 0 && (
           <Item
             title={`Jump to the session waiting for you (${shortcutLabel("nextAttention")})`}
             onClick={focusNextAttention}
@@ -107,7 +111,7 @@ export const StatusBar = () => {
             <span className="text-fg">{waiting} waiting for you</span>
           </Item>
         )}
-        {agentsRunning > 0 && (
+        {!hidden && agentsRunning > 0 && (
           <Item title="Agent sessions running in Deck">
             <StatusDot tone={agentsBusy > 0 ? "busy" : "running"} className="size-1.5" />
             {agentsRunning} running{agentsBusy > 0 ? ` · ${agentsBusy} working` : ""}

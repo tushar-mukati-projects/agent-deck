@@ -75,6 +75,7 @@ export const api = {
   pgQuery: (cwd: string, id: string, sql: string) => invoke<PgOutput>("pg_query", { cwd, id, sql }),
   pgCancel: (cwd: string, id: string) => invoke<void>("pg_cancel", { cwd, id }),
   setAttentionBadge: (active: boolean) => invoke<void>("set_attention_badge", { active }),
+  applyHideMode: (enabled: boolean) => invoke<string | null>("apply_hide_mode", { enabled }),
   listWslSessions: () => invoke<WslIndex>("list_wsl_sessions"),
   wslStart: (distro: string) => invoke<void>("wsl_start", { distro }),
 

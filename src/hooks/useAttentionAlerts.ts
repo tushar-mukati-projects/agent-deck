@@ -27,7 +27,8 @@ const notificationsAllowed = () => {
 };
 
 const handleIdle = async (event: IdleEvent) => {
-  const { sound, notifications } = useSettingsStore.getState();
+  const { sound, notifications, hideMode } = useSettingsStore.getState();
+  if (hideMode) return;
   if (sound) void playChime(event.needsInput ? "input" : "done");
   if (event.visible || !notifications) return;
   const workspace = findWorkspace(event.workspaceId);
@@ -62,12 +63,16 @@ export const useAttentionAlerts = () => {
     );
 
     let badge = false;
-    const unsubscribeTerminals = useTerminalStore.subscribe((state) => {
-      const waiting = Object.values(state.terminals).some((t) => t.attention);
+    const syncBadge = () => {
+      const waiting =
+        !useSettingsStore.getState().hideMode &&
+        Object.values(useTerminalStore.getState().terminals).some((t) => t.attention);
       if (waiting === badge) return;
       badge = waiting;
       void api.setAttentionBadge(waiting).catch(() => undefined);
-    });
+    };
+    const unsubscribeTerminals = useTerminalStore.subscribe(syncBadge);
+    const unsubscribeSettings = useSettingsStore.subscribe(syncBadge);
     const unsubscribeWorkspaces = useWorkspaceStore.subscribe((state, previous) => {
       if (state.activeId !== previous.activeId) clearVisibleAttention();
     });
@@ -75,6 +80,7 @@ export const useAttentionAlerts = () => {
     return () => {
       unsubscribeIdle();
       unsubscribeTerminals();
+      unsubscribeSettings();
       unsubscribeWorkspaces();
       void unlistenFocus.then((fn) => fn());
     };

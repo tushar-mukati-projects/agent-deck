@@ -14,6 +14,7 @@ import {
 
 import { useShallow } from "zustand/react/shallow";
 
+import { AppLogo } from "@/components/AppLogo";
 import { IconButton } from "@/components/ui/icon-button";
 import { Kbd } from "@/components/ui/kbd";
 import { TabStrip } from "@/components/ui/tabs";
@@ -21,6 +22,7 @@ import { NewSessionMenu } from "@/features/titlebar/NewSessionMenu";
 import { WorkspaceTab } from "@/features/titlebar/WorkspaceTab";
 import { shortcutLabel } from "@/lib/shortcuts";
 import { appWindow } from "@/lib/tauri/system";
+import { useSettingsStore } from "@/stores/settings-store";
 import { useUiStore } from "@/stores/ui-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
@@ -83,6 +85,7 @@ export const TitleBar = () => {
   const openPalette = useUiStore((s) => s.openPalette);
   const sessionsOpen = useUiStore((s) => s.sessionsOpen);
   const contextOpen = useUiStore((s) => s.contextOpen);
+  const hidden = useSettingsStore((s) => s.hideMode);
   const hasWorkspace = useWorkspaceStore((s) => s.workspaces.some((w) => w.id === s.activeId));
   const { toggleSessions, toggleContext, setShortcutsOpen, setSettingsOpen } =
     useUiStore.getState();
@@ -90,7 +93,7 @@ export const TitleBar = () => {
   return (
     <header className="relative flex h-[38px] shrink-0 items-stretch border-b border-border bg-chrome">
       <div data-tauri-drag-region className="flex shrink-0 items-center gap-1 pr-1 pl-3">
-        <img src="/app-icon.svg" alt="" className="pointer-events-none size-[18px]" />
+        <AppLogo className="pointer-events-none size-[18px]" />
         <IconButton
           label={sessionsOpen ? "Hide sessions list" : "Show sessions list"}
           shortcut={shortcutLabel("toggleSessions")}
@@ -116,19 +119,21 @@ export const TitleBar = () => {
         </div>
       </div>
 
-      <div data-tauri-drag-region className="flex min-w-0 shrink items-center px-2">
-        <button
-          type="button"
-          onClick={() => openPalette("all")}
-          className="flex h-[26px] w-[300px] max-w-[30vw] min-w-[120px] items-center gap-2 rounded-md border border-border bg-bg/60 px-2.5 text-xs text-faint transition-colors hover:border-border-strong hover:text-muted"
-        >
-          <Search className="size-3.5" />
-          <span className="flex-1 truncate text-left whitespace-nowrap">
-            Search sessions, files, actions
-          </span>
-          <Kbd keys={shortcutLabel("palette")} />
-        </button>
-      </div>
+      {!hidden && (
+        <div data-tauri-drag-region className="flex min-w-0 shrink items-center px-2">
+          <button
+            type="button"
+            onClick={() => openPalette("all")}
+            className="flex h-[26px] w-[300px] max-w-[30vw] min-w-[120px] items-center gap-2 rounded-md border border-border bg-bg/60 px-2.5 text-xs text-faint transition-colors hover:border-border-strong hover:text-muted"
+          >
+            <Search className="size-3.5" />
+            <span className="flex-1 truncate text-left whitespace-nowrap">
+              Search sessions, files, actions
+            </span>
+            <Kbd keys={shortcutLabel("palette")} />
+          </button>
+        </div>
+      )}
 
       <div className="flex shrink-0 items-center gap-0.5 pr-2">
         {hasWorkspace && (
@@ -145,13 +150,15 @@ export const TitleBar = () => {
             <PanelRight />
           </IconButton>
         )}
-        <IconButton
-          label="Keyboard shortcuts"
-          shortcut={shortcutLabel("shortcuts")}
-          onClick={() => setShortcutsOpen(true)}
-        >
-          <Keyboard />
-        </IconButton>
+        {!hidden && (
+          <IconButton
+            label="Keyboard shortcuts"
+            shortcut={shortcutLabel("shortcuts")}
+            onClick={() => setShortcutsOpen(true)}
+          >
+            <Keyboard />
+          </IconButton>
+        )}
         <IconButton
           label="Settings"
           shortcut={shortcutLabel("settings")}

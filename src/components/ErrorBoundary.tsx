@@ -46,7 +46,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
 export const CrashScreen = ({ error }: { error: Error }) => (
   <div className="flex h-full flex-col items-center justify-center gap-3 bg-bg p-8 text-center">
-    <p className="text-[14px] font-medium text-fg">Claude Deck hit an unexpected error</p>
+    <p className="text-[14px] font-medium text-fg">Something went wrong</p>
     <p className="max-w-[560px] font-mono text-[11px] break-words text-faint select-text">
       {error.message}
     </p>

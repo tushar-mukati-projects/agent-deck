@@ -2,12 +2,14 @@ import { useMemo } from "react";
 import { FolderPlus, MessageSquare, Play, Search } from "lucide-react";
 
 import { openSessionByClick, resumeSession, startSessionInPickedFolder } from "@/actions/sessions";
+import { AppLogo } from "@/components/AppLogo";
 import { AgentBadge } from "@/components/ui/agent-badge";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
 import { Alert } from "@/components/ui/panel";
 import { TimeAgo } from "@/components/ui/time-ago";
 import { CLAUDE, CODEX } from "@/lib/agents/registry";
+import { appName } from "@/lib/hide-mode";
 import { shortcutLabel, type ShortcutAction } from "@/lib/shortcuts";
 import { basename } from "@/lib/utils";
 import { useSessionsStore } from "@/stores/sessions-store";
@@ -86,6 +88,7 @@ export const Welcome = () => {
   const loaded = useSessionsStore((s) => s.loaded);
   const archived = useSettingsStore((s) => s.archivedSessions);
   const openPalette = useUiStore((s) => s.openPalette);
+  const hideMode = useSettingsStore((s) => s.hideMode);
   const recent = useMemo(() => {
     const hidden = new Set(archived);
     return sessions.filter((s) => !hidden.has(s.id)).slice(0, RECENT_COUNT);
@@ -95,9 +98,9 @@ export const Welcome = () => {
     <div className="flex h-full items-center justify-center overflow-y-auto bg-bg">
       <div className="w-full max-w-[720px] px-10 py-12">
         <div className="flex items-center gap-3">
-          <img src="/app-icon.svg" alt="" className="size-10" />
+          <AppLogo className="size-10" />
           <div>
-            <h1 className="text-[20px] font-semibold tracking-tight">Claude Deck</h1>
+            <h1 className="text-[20px] font-semibold tracking-tight">{appName(hideMode)}</h1>
             <p className="text-[12.5px] text-faint">
               {!loaded
                 ? "Loading your sessions…"

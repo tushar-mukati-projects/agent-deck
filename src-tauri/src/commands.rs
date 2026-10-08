@@ -2,7 +2,7 @@ use serde::Serialize;
 use tauri::{ipc::Channel, AppHandle, Manager};
 
 use crate::{
-    agent_config, changes, fsx, git,
+    agent_config, changes, fsx, git, hide_mode,
     mcp::{self, McpManager},
     pg::{self, PgManager},
     pty::{self, PtyEvent, PtyInfo, PtyManager, SpawnRequest},
@@ -342,6 +342,11 @@ pub fn set_attention_badge(window: tauri::WebviewWindow, active: bool) -> CmdRes
     #[cfg(not(windows))]
     let _ = (window, active);
     Ok(())
+}
+
+#[tauri::command]
+pub fn apply_hide_mode(window: tauri::WebviewWindow, enabled: bool) -> CmdResult<Option<String>> {
+    hide_mode::apply(&window, enabled).map_err(|e| format!("{e:#}"))
 }
 
 #[cfg(windows)]
