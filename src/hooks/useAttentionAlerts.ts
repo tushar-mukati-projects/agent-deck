@@ -8,7 +8,9 @@ import {
 import { toast } from "sonner";
 
 import { agentName } from "@/lib/agents/registry";
+import { announcement } from "@/lib/announce";
 import { playChime, unlockAudio } from "@/lib/chime";
+import { speak } from "@/lib/speech";
 import { onAgentIdle, type IdleEvent } from "@/lib/terminal/activity";
 import { api } from "@/lib/tauri/commands";
 import { appWindow } from "@/lib/tauri/system";
@@ -27,16 +29,22 @@ const notificationsAllowed = () => {
 };
 
 const handleIdle = async (event: IdleEvent) => {
-  const { sound, notifications, hideMode } = useSettingsStore.getState();
+  const { sound, notifications, speech, voice, phonePing, phoneTopic, hideMode } =
+    useSettingsStore.getState();
   if (hideMode) return;
   if (sound) void playChime(event.needsInput ? "input" : "done");
-  if (event.visible || !notifications) return;
   const workspace = findWorkspace(event.workspaceId);
   const name = agentName(workspace?.agent);
   const title = event.needsInput ? `${name} needs your approval` : `${name} finished`;
   const body = workspace ? `${workspace.title} · ${basename(workspace.cwd)}` : basename(event.cwd);
+  const focused = await appWindow.isFocused().catch(() => false);
+  if (phonePing && phoneTopic && !focused)
+    void api.phonePing(phoneTopic, title, body, event.needsInput).catch(() => undefined);
+  if (event.visible) return;
+  if (speech) speak(announcement(workspace?.title ?? basename(event.cwd), event.needsInput), voice);
+  if (!notifications) return;
 
-  if (!(await appWindow.isFocused().catch(() => false))) {
+  if (!focused) {
     void appWindow.requestUserAttention(UserAttentionType.Informational).catch(() => undefined);
     if (await notificationsAllowed()) sendNotification({ title, body });
     return;

@@ -5,7 +5,7 @@ use tauri::{ipc::Channel, AppHandle, Manager};
 use crate::{
     agent_config, changes, fsx, git, hide_mode,
     mcp::{self, McpManager},
-    notes,
+    notes, phone,
     pg::{self, PgManager},
     pty::{self, PtyEvent, PtyInfo, PtyManager, SpawnRequest},
     sessions::{self, LiveSession, Needle, SearchHit, SessionInfo, TranscriptPage},
@@ -385,6 +385,11 @@ pub async fn save_note(app: AppHandle, id: String, text: String) -> CmdResult<u6
 #[tauri::command]
 pub async fn delete_note(app: AppHandle, id: String) -> CmdResult<()> {
     blocking(move || notes::delete(&notes_dir(&app)?, &id)).await
+}
+
+#[tauri::command]
+pub async fn phone_ping(topic: String, title: String, message: String, urgent: bool) -> CmdResult<()> {
+    blocking(move || phone::ping(&topic, &title, &message, urgent)).await
 }
 
 #[tauri::command]

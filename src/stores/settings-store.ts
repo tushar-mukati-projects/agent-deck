@@ -27,6 +27,11 @@ export interface SettingsData {
   includeWsl: boolean;
   notifications: boolean;
   sound: boolean;
+  speech: boolean;
+  voice: string;
+  phonePing: boolean;
+  phoneTopic: string;
+  pet: boolean;
   hideMode: boolean;
   themeBeforeHide: string | null;
   pinnedSessions: string[];
@@ -60,6 +65,11 @@ const DEFAULTS: SettingsData = {
   includeWsl: true,
   notifications: true,
   sound: true,
+  speech: true,
+  voice: "",
+  phonePing: false,
+  phoneTopic: "",
+  pet: true,
   hideMode: false,
   themeBeforeHide: null,
   pinnedSessions: [],

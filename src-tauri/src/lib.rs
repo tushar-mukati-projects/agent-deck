@@ -8,6 +8,7 @@ mod git;
 mod hide_mode;
 mod mcp;
 mod notes;
+mod phone;
 mod pg;
 mod pool;
 mod process;
@@ -110,6 +111,7 @@ pub fn run() {
             commands::save_note,
             commands::delete_note,
             commands::notes_folder,
+            commands::phone_ping,
         ])
         .build(tauri::generate_context!())
         .expect("error while building Claude Deck");

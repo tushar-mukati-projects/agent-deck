@@ -306,3 +306,119 @@
 .hljs-strong {
   font-weight: 600;
 }
+
+.pet-body,
+.pet-look,
+.pet-z,
+.pet-spark {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+
+.pet-hop {
+  display: inline-flex;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .pet-sleeping {
+    animation: pet-breathe 3.2s ease-in-out infinite;
+  }
+
+  .pet-working {
+    animation: pet-bob 0.9s ease-in-out infinite;
+  }
+
+  .pet-working .pet-look {
+    animation: pet-look 2.4s ease-in-out infinite;
+  }
+
+  .pet-waiting {
+    animation: pet-bounce 1s ease-in-out infinite;
+  }
+
+  .pet-celebrating {
+    animation: pet-jump 1s ease-in-out infinite;
+  }
+
+  .pet-z {
+    opacity: 0;
+    animation: pet-float 2.4s ease-out infinite;
+  }
+
+  .pet-spark {
+    opacity: 0;
+    transform-origin: center;
+    animation: pet-twinkle 0.9s ease-in-out infinite;
+  }
+
+  .pet-hop {
+    animation: pet-hop 0.5s cubic-bezier(0.2, 0, 0, 1);
+  }
+}
+
+@keyframes pet-breathe {
+  50% {
+    transform: scaleY(0.93);
+  }
+}
+
+@keyframes pet-bob {
+  50% {
+    transform: translateY(-1.5px);
+  }
+}
+
+@keyframes pet-look {
+  0%,
+  35% {
+    transform: translateX(-0.8px);
+  }
+  50%,
+  85% {
+    transform: translateX(0.8px);
+  }
+}
+
+@keyframes pet-bounce {
+  30% {
+    transform: translateY(-3px);
+  }
+  60% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes pet-jump {
+  25% {
+    transform: translateY(-4px) rotate(-8deg);
+  }
+  50% {
+    transform: translateY(0);
+  }
+  75% {
+    transform: translateY(-3px) rotate(8deg);
+  }
+}
+
+@keyframes pet-float {
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(3px, -7px);
+  }
+}
+
+@keyframes pet-twinkle {
+  50% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+}
+
+@keyframes pet-hop {
+  40% {
+    transform: translateY(-5px) scaleY(1.08);
+  }
+}

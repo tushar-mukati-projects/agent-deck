@@ -1,5 +1,6 @@
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { Bell, Bot, MessagesSquare, Palette, SquareTerminal } from "lucide-react";
+import { toast } from "sonner";
 
 import { toggleHideMode } from "@/actions/hide-mode";
 import { Button } from "@/components/ui/button";
@@ -8,15 +9,18 @@ import { Input } from "@/components/ui/input";
 import { Segmented } from "@/components/ui/panel";
 import { CustomAgentsEditor, DefaultAgentPicker } from "@/features/settings/AgentSettings";
 import { ThemePicker } from "@/features/settings/ThemePicker";
+import { announcement, newPhoneTopic } from "@/lib/announce";
 import { playChime } from "@/lib/chime";
 import { shortcutLabel } from "@/lib/shortcuts";
-import { cn } from "@/lib/utils";
+import { englishVoices, pickVoice, speak, voiceLabel } from "@/lib/speech";
+import { api } from "@/lib/tauri/commands";
+import { cn, errorMessage } from "@/lib/utils";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore, type ClickBehavior, type SettingsData } from "@/stores/settings-store";
 import { useUiStore } from "@/stores/ui-store";
 
 type TextKey = "claudeArgs" | "codexArgs" | "shellProgram";
-type ToggleKey = "matchAgentTheme" | "notifications" | "sound" | "includeWsl";
+type ToggleKey = "matchAgentTheme" | "notifications" | "sound" | "speech" | "includeWsl" | "pet";
 type SectionId = "appearance" | "agents" | "sessions" | "terminal" | "notifications";
 
 const setSetting = (patch: Partial<SettingsData>) => useSettingsStore.getState().set(patch);
@@ -138,6 +142,12 @@ const AppearanceSection = () => (
       <Toggle field="matchAgentTheme" on="Match Deck" off="Use Claude's own setting" />
     </Field>
     <Field
+      label="Deck pet"
+      hint="Deckie lives in the bottom right corner: it naps when nothing runs, works along with Claude, waves when a session needs you and celebrates when one finishes."
+    >
+      <Toggle field="pet" on="On" off="Off" />
+    </Field>
+    <Field
       label="Hide mode"
       hint={`Looks like Warp: Warp's name and icon, the One Dark theme, no search bar, title bar buttons or extra status items, and no sounds or notifications. Notes and settings stay on ${shortcutLabel("notes")} and ${shortcutLabel("settings")}. Turning it off brings your theme back. Also ${shortcutLabel("toggleHideMode")}.`}
     >
@@ -232,6 +242,86 @@ const TerminalSection = () => {
   );
 };
 
+const PhonePing = () => {
+  const enabled = useSettingsStore((s) => s.phonePing);
+  const topic = useSettingsStore((s) => s.phoneTopic);
+  const [testing, setTesting] = useState(false);
+  const turn = (next: "on" | "off") =>
+    setSetting(
+      next === "on"
+        ? {
+            phonePing: true,
+            phoneTopic: topic || newPhoneTopic((n) => crypto.getRandomValues(new Uint8Array(n))),
+          }
+        : { phonePing: false },
+    );
+  const sendTest = async () => {
+    setTesting(true);
+    try {
+      await api.phonePing(topic, "Claude Deck", "Phone pings are working.", false);
+      toast.success("Test ping sent");
+    } catch (error) {
+      toast.error(errorMessage(error));
+    } finally {
+      setTesting(false);
+    }
+  };
+  return (
+    <div className="flex flex-col gap-2.5">
+      <Segmented<"on" | "off">
+        value={enabled ? "on" : "off"}
+        onChange={turn}
+        options={[
+          { value: "on", label: "On" },
+          { value: "off", label: "Off" },
+        ]}
+      />
+      {enabled && (
+        <div className="flex items-center gap-2">
+          <Input
+            aria-label="ntfy topic"
+            value={topic}
+            spellCheck={false}
+            onChange={(event) => setSetting({ phoneTopic: event.target.value.trim() })}
+            className="max-w-[280px] font-mono"
+          />
+          <Button size="sm" disabled={testing || !topic} onClick={() => void sendTest()}>
+            Send test
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const VoicePicker = () => {
+  const voice = useSettingsStore((s) => s.voice);
+  const [voices, setVoices] = useState(englishVoices);
+  useEffect(() => {
+    if (!("speechSynthesis" in window)) return;
+    const update = () => setVoices(englishVoices());
+    window.speechSynthesis.addEventListener("voiceschanged", update);
+    update();
+    return () => window.speechSynthesis.removeEventListener("voiceschanged", update);
+  }, []);
+  const automatic = pickVoice(voices, "");
+  return (
+    <select
+      aria-label="Voice"
+      value={voices.some((v) => v.name === voice) ? voice : ""}
+      onChange={(event) => setSetting({ voice: event.target.value })}
+      className="h-8 rounded-md border border-border-strong bg-bg px-2 text-xs text-fg outline-none focus:border-accent/70"
+    >
+      <option value="">Automatic{automatic ? ` (${voiceLabel(automatic.name)})` : ""}</option>
+      {voices.map((v) => (
+        <option key={v.name} value={v.name}>
+          {voiceLabel(v.name)}
+        </option>
+      ))}
+    </select>
+  );
+};
+
 const NotificationsSection = () => (
   <>
     <Field
@@ -247,6 +337,30 @@ const NotificationsSection = () => (
           Play sample
         </Button>
       </div>
+    </Field>
+    <Field
+      label="Spoken announcements"
+      hint="Says the session's name out loud when it finishes or needs your approval and you're not looking at it. Automatic picks a female voice when one is installed. For more voices, add them in Windows Settings › Time & language › Speech, for example English (India) with Heera."
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <Toggle field="speech" on="On" off="Off" />
+        <VoicePicker />
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() =>
+            speak(announcement("Your session", false), useSettingsStore.getState().voice)
+          }
+        >
+          Try it
+        </Button>
+      </div>
+    </Field>
+    <Field
+      label="Phone ping"
+      hint="Pings your phone when a session finishes or needs approval while Deck isn't focused. Install the free ntfy app, tap +, and subscribe to the topic below. Pings go through ntfy.sh, so anyone who knows the topic can read them; keep it hard to guess."
+    >
+      <PhonePing />
     </Field>
   </>
 );

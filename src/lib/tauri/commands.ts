@@ -83,6 +83,8 @@ export const api = {
   saveNote: (id: string, text: string) => invoke<number>("save_note", { id, text }),
   deleteNote: (id: string) => invoke<void>("delete_note", { id }),
   notesFolder: () => invoke<string>("notes_folder"),
+  phonePing: (topic: string, title: string, message: string, urgent: boolean) =>
+    invoke<void>("phone_ping", { topic, title, message, urgent }),
   listWslSessions: () => invoke<WslIndex>("list_wsl_sessions"),
   wslStart: (distro: string) => invoke<void>("wsl_start", { distro }),
 

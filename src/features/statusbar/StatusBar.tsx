@@ -4,6 +4,7 @@ import { useShallow } from "zustand/react/shallow";
 
 import { focusNextAttention, toggleShellPanel } from "@/actions/workspaces";
 import { StatusDot } from "@/components/ui/feedback";
+import { DeckPet } from "@/features/statusbar/DeckPet";
 import { shortcutLabel } from "@/lib/shortcuts";
 import { copyText } from "@/lib/tauri/system";
 import { shortenHome } from "@/lib/utils";
@@ -80,6 +81,7 @@ export const StatusBar = () => {
   const session = useSessionsStore((s) => (workspace ? s.byId[workspace.sessionId] : undefined));
   const home = useSessionsStore((s) => s.environment?.home ?? "");
   const hidden = useSettingsStore((s) => s.hideMode);
+  const pet = useSettingsStore((s) => s.pet);
   const [agentsRunning, agentsBusy, waiting] = useTerminalStore(
     useShallow((s) => agentCounts(s.terminals)),
   );
@@ -134,6 +136,7 @@ export const StatusBar = () => {
             {agentsRunning} running{agentsBusy > 0 ? ` · ${agentsBusy} working` : ""}
           </Item>
         )}
+        {!hidden && pet && <DeckPet busy={agentsBusy} waiting={waiting} />}
       </div>
     </footer>
   );
