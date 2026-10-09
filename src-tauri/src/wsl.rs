@@ -443,7 +443,7 @@ pub fn live_sessions() -> Vec<LiveSession> {
         .collect()
 }
 
-pub fn session_tasks(distro: &str, path: &str) -> anyhow::Result<Vec<tasks::AgentTask>> {
+pub fn session_tasks(distro: &str, path: &str) -> anyhow::Result<tasks::SessionTasks> {
     let key = format!("{distro}\n{path}");
     let mut log = tasks::take(&key);
     let reply: Lines = run_agent(distro, &["tasks", path, &log.offset.to_string()], None)?;
@@ -454,21 +454,33 @@ pub fn session_tasks(distro: &str, path: &str) -> anyhow::Result<Vec<tasks::Agen
         log.feed(line.get());
     }
     log.offset = reply.end;
-    let found = log.tasks();
+    let found = log.snapshot();
     tasks::put(&key, log);
-    Ok(found
-        .into_iter()
-        .map(|task| tasks::AgentTask { output_path: task.output_path.as_deref().map(|p| host_of(distro, p)), ..task })
-        .collect())
+    Ok(tasks::SessionTasks {
+        shells: found
+            .shells
+            .into_iter()
+            .map(|task| tasks::AgentTask { output_path: task.output_path.as_deref().map(|p| host_of(distro, p)), ..task })
+            .collect(),
+        agents: found.agents,
+    })
+}
+
+fn page(reply: Lines, sidechain: bool) -> TranscriptPage {
+    TranscriptPage {
+        items: sessions::transcript_from_lines(reply.lines.iter().map(|l| l.get()), sidechain),
+        offset: reply.end,
+        reset: reply.start == 0,
+    }
 }
 
 pub fn transcript(distro: &str, path: &str, from_offset: u64) -> anyhow::Result<TranscriptPage> {
-    let reply: Lines = run_agent(distro, &["transcript", path, &from_offset.to_string()], None)?;
-    Ok(TranscriptPage {
-        items: sessions::transcript_from_lines(reply.lines.iter().map(|l| l.get())),
-        offset: reply.end,
-        reset: reply.start == 0,
-    })
+    Ok(page(run_agent(distro, &["transcript", path, &from_offset.to_string()], None)?, false))
+}
+
+pub fn subagent_transcript(distro: &str, path: &str, id: &str, from_offset: u64) -> anyhow::Result<TranscriptPage> {
+    anyhow::ensure!(sessions::is_agent_id(id), "not a subagent id");
+    Ok(page(run_agent(distro, &["subagent", path, id, &from_offset.to_string()], None)?, true))
 }
 
 pub fn delete_session(distro: &str, path: &str) -> anyhow::Result<()> {

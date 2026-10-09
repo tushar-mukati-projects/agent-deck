@@ -1,4 +1,4 @@
-import { Bell, FolderOpen, GitBranch, Hash, SquareTerminal } from "lucide-react";
+import { Bell, Bot, FolderOpen, GitBranch, Hash, SquareTerminal } from "lucide-react";
 import { toast } from "sonner";
 import { useShallow } from "zustand/react/shallow";
 
@@ -10,8 +10,9 @@ import { shortenHome } from "@/lib/utils";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useTerminalStore } from "@/stores/terminal-store";
+import { useUiStore } from "@/stores/ui-store";
 import { useActiveWorkspace } from "@/stores/workspace-store";
-import { useAgentShells } from "@/hooks/useAgentShells";
+import { useAgentShells, useSubagents } from "@/hooks/useAgentShells";
 import type { TerminalState, Workspace } from "@/types";
 
 const Item = ({
@@ -59,6 +60,21 @@ const ShellItem = ({ workspace }: { workspace: Workspace }) => {
   );
 };
 
+const SubagentsItem = ({ workspace }: { workspace: Workspace }) => {
+  const running = useSubagents(workspace).length;
+  const open = useUiStore((s) => s.subagentsOpen);
+  if (running === 0) return null;
+  return (
+    <Item
+      title={open ? "Hide subagents" : "Show what the subagents are doing"}
+      onClick={() => useUiStore.getState().setSubagentsOpen(!open)}
+    >
+      <Bot className="text-info" />
+      {plural(running, "subagent")}
+    </Item>
+  );
+};
+
 export const StatusBar = () => {
   const workspace = useActiveWorkspace();
   const session = useSessionsStore((s) => (workspace ? s.byId[workspace.sessionId] : undefined));
@@ -98,6 +114,7 @@ export const StatusBar = () => {
               </Item>
             )}
             <ShellItem workspace={workspace} />
+            {!hidden && <SubagentsItem workspace={workspace} />}
           </>
         )}
       </div>

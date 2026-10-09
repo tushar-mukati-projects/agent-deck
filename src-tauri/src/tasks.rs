@@ -13,8 +13,14 @@ const MARKERS: &[&str] = &[
     "<task-notification>",
     "\"name\":\"TaskStop\"",
     "\"name\":\"KillShell\"",
+    "\"name\":\"Agent\"",
+    "\"name\":\"Task\"",
+    "\"name\":\"SendMessage\"",
+    "\"agentId\"",
+    "Async agent launched",
 ];
 const SHELL_TOOLS: &[&str] = &["Bash", "PowerShell"];
+const AGENT_TOOLS: &[&str] = &["Agent", "Task"];
 const STOP_TOOLS: &[&str] = &["TaskStop", "KillShell"];
 const MAX_LINE: usize = 256 * 1024;
 
@@ -42,6 +48,24 @@ pub struct AgentTask {
     pub summary: Option<String>,
 }
 
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Subagent {
+    pub id: String,
+    pub agent_id: Option<String>,
+    pub description: Option<String>,
+    pub agent_type: Option<String>,
+    pub started_at: Option<String>,
+    pub ended_at: Option<String>,
+    pub status: TaskStatus,
+}
+
+#[derive(Serialize, Clone, Debug, PartialEq)]
+pub struct SessionTasks {
+    pub shells: Vec<AgentTask>,
+    pub agents: Vec<Subagent>,
+}
+
 #[derive(Clone)]
 struct Started {
     tool: String,
@@ -55,6 +79,7 @@ pub struct TaskLog {
     pub offset: u64,
     started: HashMap<String, Started>,
     tasks: Vec<AgentTask>,
+    agents: Vec<Subagent>,
 }
 
 static LOGS: LazyLock<Mutex<HashMap<String, TaskLog>>> = LazyLock::new(Mutex::default);
@@ -80,10 +105,14 @@ fn output_path(result: &str) -> Option<String> {
     Some(rest[..end].trim().to_string())
 }
 
-fn task_id_from(result: &str) -> Option<String> {
-    let rest = &result[result.find("with ID: ")? + "with ID: ".len()..];
+fn id_after(result: &str, label: &str) -> Option<String> {
+    let rest = &result[result.find(label)? + label.len()..];
     let id: String = rest.chars().take_while(|c| c.is_ascii_alphanumeric() || *c == '_' || *c == '-').collect();
     (!id.is_empty()).then_some(id)
+}
+
+fn task_id_from(result: &str) -> Option<String> {
+    id_after(result, "with ID: ")
 }
 
 fn result_text(block: &Value) -> String {
@@ -108,8 +137,12 @@ impl TaskLog {
     fn finish(&mut self, id: &str, status: TaskStatus, at: Option<String>, summary: Option<String>) {
         if let Some(task) = self.tasks.iter_mut().find(|t| t.id == id) {
             task.status = status;
-            task.ended_at = at.or(task.ended_at.take());
+            task.ended_at = at.clone().or(task.ended_at.take());
             task.summary = summary.or(task.summary.take());
+        }
+        if let Some(agent) = self.agents.iter_mut().find(|a| a.id == id || a.agent_id.as_deref() == Some(id)) {
+            agent.status = status;
+            agent.ended_at = at.or(agent.ended_at.take());
         }
     }
 
@@ -123,16 +156,53 @@ impl TaskLog {
                     id,
                     Started { tool: name.to_string(), command, description: text(&input["description"]), at: at.clone() },
                 );
+            } else if AGENT_TOOLS.contains(&name) {
+                let Some(id) = text(&block["id"]) else { continue };
+                self.agents.retain(|a| a.id != id);
+                self.agents.push(Subagent {
+                    id,
+                    agent_id: None,
+                    description: text(&input["description"]),
+                    agent_type: text(&input["subagent_type"]),
+                    started_at: at.clone(),
+                    ended_at: None,
+                    status: TaskStatus::Running,
+                });
             } else if STOP_TOOLS.contains(&name) {
                 if let Some(id) = text(&input["task_id"]).or_else(|| text(&input["shell_id"])) {
                     self.finish(&id, TaskStatus::Killed, at.clone(), None);
+                }
+            } else if name == "SendMessage" {
+                let to = input["to"].as_str().filter(|to| !to.is_empty());
+                let resumed = self.agents.iter_mut().find(|a| a.status != TaskStatus::Running && to.is_some() && a.agent_id.as_deref() == to);
+                if let Some(agent) = resumed {
+                    agent.status = TaskStatus::Running;
+                    agent.started_at = at.clone();
+                    agent.ended_at = None;
                 }
             }
         }
     }
 
-    fn feed_results(&mut self, record: &Value, content: &[Value]) {
+    fn feed_agent_result(&mut self, record: &Value, block: &Value, at: &Option<String>) -> bool {
+        let Some(agent) = block["tool_use_id"].as_str().and_then(|id| self.agents.iter_mut().find(|a| a.id == id)) else {
+            return false;
+        };
+        let outcome = &record["toolUseResult"];
+        let result = result_text(block);
+        agent.agent_id = text(&outcome["agentId"]).or_else(|| id_after(&result, "agentId: ")).or(agent.agent_id.take());
+        if outcome["status"] != "async_launched" && !result.starts_with("Async agent launched") {
+            agent.status = if block["is_error"] == true { TaskStatus::Failed } else { TaskStatus::Completed };
+            agent.ended_at = at.clone();
+        }
+        true
+    }
+
+    fn feed_results(&mut self, record: &Value, content: &[Value], at: &Option<String>) {
         for block in content.iter().filter(|b| b["type"] == "tool_result") {
+            if self.feed_agent_result(record, block, at) {
+                continue;
+            }
             let Some(started) = block["tool_use_id"].as_str().and_then(|id| self.started.remove(id)) else { continue };
             let result = result_text(block);
             let Some(id) = text(&record["toolUseResult"]["backgroundTaskId"]).or_else(|| task_id_from(&result)) else {
@@ -157,6 +227,9 @@ impl TaskLog {
         for chunk in text.split("<task-notification>").skip(1) {
             let (Some(id), Some(status)) = (tag(chunk, "task-id"), tag(chunk, "status").and_then(status_of)) else { continue };
             self.finish(id, status, at.clone(), tag(chunk, "summary").map(str::to_string));
+            if let Some(call) = tag(chunk, "tool-use-id").filter(|call| *call != id) {
+                self.finish(call, status, at.clone(), None);
+            }
         }
     }
 
@@ -171,7 +244,7 @@ impl TaskLog {
             (Some("assistant"), Value::Array(blocks)) => self.feed_assistant(blocks, &at),
             (Some("user"), Value::String(text)) => self.feed_notifications(text, &at),
             (Some("user"), Value::Array(blocks)) => {
-                self.feed_results(&record, blocks);
+                self.feed_results(&record, blocks, &at);
                 for block in blocks.iter().filter(|b| b["type"] == "text") {
                     if let Some(text) = block["text"].as_str() {
                         self.feed_notifications(text, &at);
@@ -185,6 +258,10 @@ impl TaskLog {
     pub fn tasks(&self) -> Vec<AgentTask> {
         self.tasks.iter().rev().cloned().collect()
     }
+
+    pub fn snapshot(&self) -> SessionTasks {
+        SessionTasks { shells: self.tasks(), agents: self.agents.iter().rev().cloned().collect() }
+    }
 }
 
 pub fn take(key: &str) -> TaskLog {
@@ -195,7 +272,7 @@ pub fn put(key: &str, log: TaskLog) {
     LOGS.lock().insert(key.to_string(), log);
 }
 
-pub fn local(file_path: &str) -> anyhow::Result<Vec<AgentTask>> {
+pub fn local(file_path: &str) -> anyhow::Result<SessionTasks> {
     let (path, _) = sessions::session_file(file_path)?;
     let mut log = take(file_path);
     let mut file = fs::File::open(&path)?;
@@ -208,7 +285,7 @@ pub fn local(file_path: &str) -> anyhow::Result<Vec<AgentTask>> {
         }
         log.offset = end;
     })?;
-    let tasks = log.tasks();
+    let tasks = log.snapshot();
     put(file_path, log);
     Ok(tasks)
 }
@@ -217,14 +294,18 @@ pub fn local(file_path: &str) -> anyhow::Result<Vec<AgentTask>> {
 mod tests {
     use super::*;
 
-    fn feed(lines: &[&str]) -> Vec<AgentTask> {
+    fn log_of(lines: &[&str]) -> TaskLog {
         let mut log = TaskLog::default();
         for line in lines {
             if might_matter(line) {
                 log.feed(line);
             }
         }
-        log.tasks()
+        log
+    }
+
+    fn feed(lines: &[&str]) -> Vec<AgentTask> {
+        log_of(lines).tasks()
     }
 
     const START: &str = r#"{"type":"assistant","timestamp":"t1","message":{"content":[{"type":"tool_use","id":"tu1","name":"PowerShell","input":{"command":"npm run dev","description":"Start dev server","run_in_background":true}}]}}"#;
@@ -278,6 +359,83 @@ mod tests {
             r#"{"type":"attachment","timestamp":"t6","attachment":{"type":"queued_command","prompt":"<task-notification><task-id>bg1</task-id><status>killed</status></task-notification>"}}"#,
         ]);
         assert_eq!(attached[0].status, TaskStatus::Killed);
+    }
+
+    fn agents(lines: &[&str]) -> Vec<Subagent> {
+        log_of(lines).snapshot().agents
+    }
+
+    const AGENT_START: &str = r#"{"type":"assistant","timestamp":"t1","message":{"content":[{"type":"tool_use","id":"tu7","name":"Agent","input":{"description":"Research themes","subagent_type":"general-purpose","prompt":"go","run_in_background":"true"}}]}}"#;
+    const AGENT_LAUNCHED: &str = r#"{"type":"user","timestamp":"t2","toolUseResult":{"isAsync":true,"status":"async_launched","agentId":"a1b2"},"message":{"content":[{"type":"tool_result","tool_use_id":"tu7","content":[{"type":"text","text":"Async agent launched successfully.\nagentId: a1b2 (internal ID)"}]}]}}"#;
+
+    #[test]
+    fn tracks_background_agents_until_they_finish_or_are_stopped() {
+        let running = agents(&[AGENT_START, AGENT_LAUNCHED]);
+        assert_eq!(running.len(), 1);
+        assert_eq!(
+            (running[0].agent_id.as_deref(), running[0].status, running[0].description.as_deref(), running[0].agent_type.as_deref()),
+            (Some("a1b2"), TaskStatus::Running, Some("Research themes"), Some("general-purpose"))
+        );
+
+        let done = agents(&[
+            AGENT_START,
+            AGENT_LAUNCHED,
+            r#"{"type":"queue-operation","operation":"enqueue","timestamp":"t3","content":"<task-notification>\n<task-id>a1b2</task-id>\n<tool-use-id>tu7</tool-use-id>\n<status>completed</status>\n</task-notification>"}"#,
+        ]);
+        assert_eq!((done[0].status, done[0].ended_at.as_deref()), (TaskStatus::Completed, Some("t3")));
+
+        let stopped = agents(&[
+            AGENT_START,
+            AGENT_LAUNCHED,
+            r#"{"type":"assistant","timestamp":"t4","message":{"content":[{"type":"tool_use","id":"tu8","name":"TaskStop","input":{"task_id":"a1b2"}}]}}"#,
+        ]);
+        assert_eq!(stopped[0].status, TaskStatus::Killed);
+        assert!(feed(&[AGENT_START, AGENT_LAUNCHED]).is_empty());
+    }
+
+    #[test]
+    fn marks_a_finished_agent_running_again_when_it_is_messaged() {
+        const DONE: &str = r#"{"type":"queue-operation","timestamp":"t3","content":"<task-notification><task-id>a1b2</task-id><status>completed</status></task-notification>"}"#;
+        let resumed = agents(&[
+            AGENT_START,
+            AGENT_LAUNCHED,
+            DONE,
+            r#"{"type":"assistant","timestamp":"t6","message":{"content":[{"type":"tool_use","id":"tu9","name":"SendMessage","input":{"to":"a1b2","message":"one more"}}]}}"#,
+        ]);
+        assert_eq!(
+            (resumed[0].status, resumed[0].started_at.as_deref(), resumed[0].ended_at.as_deref()),
+            (TaskStatus::Running, Some("t6"), None)
+        );
+
+        let peer = agents(&[
+            AGENT_START,
+            AGENT_LAUNCHED,
+            DONE,
+            r#"{"type":"assistant","timestamp":"t6","message":{"content":[{"type":"tool_use","id":"tu9","name":"SendMessage","input":{"to":"my-files-bd","message":"hi"}}]}}"#,
+        ]);
+        assert_eq!(peer[0].status, TaskStatus::Completed);
+    }
+
+    #[test]
+    fn finishes_agents_by_tool_call_when_their_id_was_never_seen() {
+        let done = agents(&[
+            AGENT_START,
+            r#"{"type":"queue-operation","timestamp":"t3","content":"<task-notification><task-id>zz9</task-id><tool-use-id>tu7</tool-use-id><status>failed</status></task-notification>"}"#,
+        ]);
+        assert_eq!((done[0].status, done[0].ended_at.as_deref()), (TaskStatus::Failed, Some("t3")));
+    }
+
+    #[test]
+    fn finishes_foreground_agents_with_their_result() {
+        let launched = AGENT_LAUNCHED.replace(r#""toolUseResult":{"isAsync":true,"status":"async_launched","agentId":"a1b2"},"#, "");
+        let from_text = agents(&[AGENT_START, &launched]);
+        assert_eq!((from_text[0].agent_id.as_deref(), from_text[0].status), (Some("a1b2"), TaskStatus::Running));
+
+        let failed = agents(&[
+            AGENT_START,
+            r#"{"type":"user","timestamp":"t5","toolUseResult":{"status":"completed","agentId":"a9"},"message":{"content":[{"type":"tool_result","tool_use_id":"tu7","is_error":true,"content":"boom"}]}}"#,
+        ]);
+        assert_eq!((failed[0].agent_id.as_deref(), failed[0].status, failed[0].ended_at.as_deref()), (Some("a9"), TaskStatus::Failed, Some("t5")));
     }
 
     #[test]

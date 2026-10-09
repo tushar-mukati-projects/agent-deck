@@ -46,7 +46,13 @@ TASK_MARKERS = (
     b"<task-notification>",
     b'"name":"TaskStop"',
     b'"name":"KillShell"',
+    b'"name":"Agent"',
+    b'"name":"Task"',
+    b'"name":"SendMessage"',
+    b'"agentId"',
+    b"Async agent launched",
 )
+AGENT_ID_RE = re.compile(r"[A-Za-z0-9_-]{1,64}")
 
 
 def homes(variable, name, marker):
@@ -195,11 +201,11 @@ def claude_index_record(line):
     return record
 
 
-def claude_full_record(line):
+def claude_full_record(line, sidechain=False):
     if b'"type":"user"' not in line and b'"type":"assistant"' not in line:
         return None
     data = loads(line)
-    if data is None or data.get("type") not in ("user", "assistant") or data.get("isSidechain"):
+    if data is None or data.get("type") not in ("user", "assistant") or (data.get("isSidechain") and not sidechain):
         return None
     message = data.get("message")
     if not isinstance(message, dict):
@@ -465,6 +471,39 @@ def transcript(path, offset):
     session = resolve_session(path)
     reducer = (lambda line: codex_record(line, True)) if session["codex"] else claude_full_record
     records, start, end, _ = scan(session["path"], offset, reducer)
+    return {"lines": records, "start": start, "end": end}
+
+
+def subagent_file(folder, key):
+    direct = os.path.join(folder, "agent-" + key + ".jsonl")
+    if os.path.isfile(direct):
+        return direct
+    try:
+        names = os.listdir(folder)
+    except OSError:
+        return None
+    for name in names:
+        if not name.endswith(".meta.json"):
+            continue
+        try:
+            with open(os.path.join(folder, name), "rb") as handle:
+                meta = json.load(handle)
+        except (OSError, ValueError):
+            continue
+        real = os.path.join(folder, name[: -len(".meta.json")] + ".jsonl")
+        if isinstance(meta, dict) and meta.get("toolUseId") == key and os.path.isfile(real):
+            return real
+    return None
+
+
+def subagent(path, key, offset):
+    session = resolve_session(path)
+    if session["codex"] or not AGENT_ID_RE.fullmatch(key):
+        raise ValueError("not a subagent")
+    real = subagent_file(os.path.join(session["path"][: -len(".jsonl")], "subagents"), key)
+    if not real:
+        return {"lines": [], "start": 0, "end": 0}
+    records, start, end, _ = scan(real, offset, lambda line: claude_full_record(line, True))
     return {"lines": records, "start": start, "end": end}
 
 
@@ -804,6 +843,7 @@ def main():
         "index": lambda: index(read_stdin_json()),
         "transcript": lambda: transcript(args[0], int(args[1]) if len(args) > 1 else 0),
         "tasks": lambda: tasks(args[0], int(args[1]) if len(args) > 1 else 0),
+        "subagent": lambda: subagent(args[0], args[1], int(args[2]) if len(args) > 2 else 0),
         "delete": lambda: delete(args[0]),
         "terminate": lambda: terminate(args[0], args[1]),
         "files": lambda: list_files(args[0]),

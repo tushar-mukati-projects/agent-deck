@@ -4,12 +4,15 @@ import { Group, Panel, Separator, useDefaultLayout } from "react-resizable-panel
 import { AgentPane } from "@/features/workspace/AgentPane";
 import { SessionPreview } from "@/features/workspace/SessionPreview";
 import { ShellPanel } from "@/features/workspace/ShellPanel";
+import { SubagentsPanel } from "@/features/workspace/SubagentsPanel";
 import { FileViewer } from "@/features/viewer/FileViewer";
-import { useAgentShells, useAgentShellSync } from "@/hooks/useAgentShells";
+import { useAgentShells, useAgentShellSync, useSubagents } from "@/hooks/useAgentShells";
 import { releaseWatch, retainWatch } from "@/lib/file-events";
 import { api } from "@/lib/tauri/commands";
 import { cn } from "@/lib/utils";
 import { useExplorerStore } from "@/stores/explorer-store";
+import { useSettingsStore } from "@/stores/settings-store";
+import { useUiStore } from "@/stores/ui-store";
 import { useWorkspace } from "@/stores/workspace-store";
 import type { Workspace } from "@/types";
 
@@ -37,9 +40,16 @@ const WorkspaceLayout = ({ workspace }: { workspace: Workspace }) => {
   const agentShells = useAgentShells(workspace);
   const shellOpen =
     workspace.shellPanelOpen && (workspace.shells.length > 0 || agentShells.length > 0);
+  const subagents = useSubagents(workspace);
+  const hideMode = useSettingsStore((s) => s.hideMode);
+  const subagentsOpen = useUiStore((s) => s.subagentsOpen) && !hideMode && subagents.length > 0;
   useAgentShellSync(workspace);
   const columns = useSavedLayout("deck-columns", hasFiles ? ["main", "viewer"] : ["main"]);
-  const rows = useSavedLayout("deck-rows", shellOpen ? ["primary", "shell"] : ["primary"]);
+  const rows = useSavedLayout("deck-rows", [
+    "primary",
+    ...(shellOpen ? ["shell"] : []),
+    ...(subagentsOpen ? ["subagents"] : []),
+  ]);
   useWatchedRoot(workspace.cwd);
 
   return (
@@ -68,6 +78,14 @@ const WorkspaceLayout = ({ workspace }: { workspace: Workspace }) => {
               <ResizeHandle orientation="vertical" />
               <Panel id="shell" defaultSize="34%" minSize={100}>
                 <ShellPanel workspace={workspace} />
+              </Panel>
+            </>
+          )}
+          {subagentsOpen && (
+            <>
+              <ResizeHandle orientation="vertical" />
+              <Panel id="subagents" defaultSize="34%" minSize={100}>
+                <SubagentsPanel workspace={workspace} agents={subagents} />
               </Panel>
             </>
           )}

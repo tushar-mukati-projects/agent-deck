@@ -127,3 +127,9 @@ export const Tab = forwardRef<HTMLDivElement, TabProps>(
   ),
 );
 Tab.displayName = "Tab";
+
+export const panelTabClass = (active: boolean) =>
+  cn(
+    "h-full cursor-default rounded-md pr-0.5 pl-2 text-[11.5px]",
+    active ? "bg-active text-fg" : "text-muted hover:bg-hover hover:text-fg",
+  );

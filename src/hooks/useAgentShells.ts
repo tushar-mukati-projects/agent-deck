@@ -2,7 +2,7 @@ import { useEffect, useMemo } from "react";
 
 import { useSessionFile } from "@/hooks/useSessionFile";
 import { useExternalLive } from "@/hooks/useWorkspaceStatus";
-import { processStart, shownTasks } from "@/lib/agent-tasks";
+import { processStart, runningSubagents, shownTasks } from "@/lib/agent-tasks";
 import { CLAUDE } from "@/lib/agents/registry";
 import { api } from "@/lib/tauri/commands";
 import { useAgentTasksStore } from "@/stores/agent-tasks-store";
@@ -32,6 +32,12 @@ export const useAgentShells = (workspace: Workspace) => {
     () => shownTasks(tasks ?? [], started, Date.now(), dismissed),
     [tasks, started, dismissed],
   );
+};
+
+export const useSubagents = (workspace: Workspace) => {
+  const agents = useAgentTasksStore((s) => s.agentsBySession[workspace.sessionId]);
+  const started = useAgentStart(workspace);
+  return useMemo(() => runningSubagents(agents ?? [], started), [agents, started]);
 };
 
 export const useAgentShellSync = (workspace: Workspace) => {

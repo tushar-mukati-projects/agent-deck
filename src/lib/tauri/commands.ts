@@ -2,7 +2,6 @@ import { Channel, invoke } from "@tauri-apps/api/core";
 
 import type {
   AgentOverview,
-  AgentTask,
   AppEnvironment,
   ChangedFile,
   ConfigAgent,
@@ -22,6 +21,7 @@ import type {
   PtyEvent,
   PtyInfo,
   SessionInfo,
+  SessionTasks,
   SpawnRequest,
   TranscriptPage,
   WriteOutcome,
@@ -45,12 +45,14 @@ export const api = {
   liveSessions: () => invoke<LiveSession[]>("live_sessions"),
   sessionTranscript: (filePath: string, distro: string | null, fromOffset = 0) =>
     invoke<TranscriptPage>("session_transcript", { filePath, distro, fromOffset }),
+  subagentTranscript: (filePath: string, id: string, distro: string | null, fromOffset = 0) =>
+    invoke<TranscriptPage>("subagent_transcript", { filePath, id, distro, fromOffset }),
   deleteSession: (filePath: string, distro: string | null) =>
     invoke<void>("delete_session", { filePath, distro }),
   terminateLiveSession: ({ sessionId, pid, distro }: LiveSession) =>
     invoke<void>("terminate_live_session", { sessionId, pid, distro }),
   sessionTasks: (filePath: string, distro: string | null) =>
-    invoke<AgentTask[]>("session_tasks", { filePath, distro }),
+    invoke<SessionTasks>("session_tasks", { filePath, distro }),
   sessionChanges: (filePath: string, distro: string | null) =>
     invoke<ChangedFile[]>("session_changes", { filePath, distro }),
   sessionBackup: (filePath: string, backup: string, distro: string | null) =>

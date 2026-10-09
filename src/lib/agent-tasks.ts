@@ -1,4 +1,4 @@
-import type { AgentTask, AgentTaskStatus, LiveSession } from "@/types";
+import type { AgentTask, AgentTaskStatus, LiveSession, Subagent } from "@/types";
 
 export type TaskState = AgentTaskStatus | "ended";
 
@@ -12,7 +12,7 @@ const time = (value: string | null) => Date.parse(value ?? "");
 export const processStart = (live: LiveSession[], sessionId: string) =>
   Math.max(0, ...live.filter((l) => l.sessionId === sessionId).map((l) => l.startedAt ?? 0));
 
-const fromThisRun = (task: AgentTask, agentStartedMs: number) =>
+const fromThisRun = (task: { startedAt: string | null }, agentStartedMs: number) =>
   !(time(task.startedAt) < agentStartedMs - START_SLACK_MS);
 
 export const taskState = (task: AgentTask, agentStartedMs: number | null): TaskState => {
@@ -37,6 +37,14 @@ export const shownTasks = (
 };
 
 export const taskLabel = (task: AgentTask) => task.description?.trim() || task.command;
+
+export const runningSubagents = (agents: Subagent[], agentStartedMs: number | null) =>
+  agentStartedMs === null
+    ? []
+    : agents.filter((a) => a.status === "running" && fromThisRun(a, agentStartedMs)).reverse();
+
+export const subagentLabel = (agent: Subagent) =>
+  agent.description?.trim() || agent.agentType || "Subagent";
 
 export const cleanOutput = (text: string) =>
   text

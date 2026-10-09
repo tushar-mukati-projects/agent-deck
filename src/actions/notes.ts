@@ -46,7 +46,8 @@ const save = (id: string) => {
   const { text } = note;
   return enqueue(async () => {
     const modifiedMs = await api.saveNote(id, text);
-    patch(id, { stored: true, modifiedMs });
+    const current = useNotesStore.getState().notes.find((n) => n.id === id);
+    patch(id, { stored: true, modifiedMs, dirty: current?.text !== text });
   }, "Couldn't save the note");
 };
 
@@ -63,25 +64,33 @@ export const flushNotes = () => {
   return id ? save(id) : queue;
 };
 
+const showNotes = (available: NoteEntry[]) => {
+  const notes = available.length ? available : [draftNote()];
+  const { activeId } = useNotesStore.getState();
+  const keep = notes.some((note) => note.id === activeId) ? activeId : notes[0].id;
+  useNotesStore.setState({ notes, activeId: keep, loaded: true });
+};
+
 export const loadNotes = async () => {
   useNotesStore.setState({ loaded: false });
   await flushNotes();
   try {
     const stored = (await api.listNotes()).map((note) => ({ ...note, stored: true }));
-    const unsaved = useNotesStore.getState().notes.filter((note) => !note.stored && note.text);
-    const notes = unsaved.length || stored.length ? [...unsaved, ...stored] : [draftNote()];
-    const { activeId } = useNotesStore.getState();
-    const keep = notes.some((note) => note.id === activeId) ? activeId : notes[0].id;
-    useNotesStore.setState({ notes, activeId: keep, loaded: true });
+    const unsaved = useNotesStore
+      .getState()
+      .notes.filter((note) => note.dirty || (!note.stored && note.text));
+    const merged = [...unsaved, ...stored.filter((note) => !unsaved.some((u) => u.id === note.id))];
+    showNotes(merged);
   } catch (error) {
     toast.error(`Couldn't load notes: ${errorMessage(error)}`);
+    showNotes(useNotesStore.getState().notes);
   }
 };
 
 export const editNote = (text: string) => {
   const { activeId } = useNotesStore.getState();
   if (!activeId) return;
-  patch(activeId, { text, modifiedMs: Date.now() });
+  patch(activeId, { text, modifiedMs: Date.now(), dirty: true });
   if (pendingId !== activeId) void flushNotes();
   pendingId = activeId;
   window.clearTimeout(timer);

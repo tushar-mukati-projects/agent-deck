@@ -22,6 +22,8 @@ interface UiState {
   setPanelWidth: (panel: SidePanel, width: number) => void;
   contextOpen: boolean;
   contextView: ContextView;
+  subagentsOpen: boolean;
+  setSubagentsOpen: (open: boolean) => void;
   paletteMode: PaletteMode | null;
   settingsOpen: boolean;
   shortcutsOpen: boolean;
@@ -54,6 +56,8 @@ export const useUiStore = create<UiState>()(
         set(panel === "sessions" ? { sessionsWidth: width } : { contextWidth: width }),
       contextOpen: true,
       contextView: "explorer",
+      subagentsOpen: true,
+      setSubagentsOpen: (open) => set({ subagentsOpen: open }),
       paletteMode: null,
       settingsOpen: false,
       shortcutsOpen: false,
@@ -101,6 +105,7 @@ export const useUiStore = create<UiState>()(
         contextOpen: s.contextOpen,
         contextWidth: s.contextWidth,
         contextView: s.contextView,
+        subagentsOpen: s.subagentsOpen,
       }),
     },
   ),

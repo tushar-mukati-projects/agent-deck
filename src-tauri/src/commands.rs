@@ -91,6 +91,21 @@ pub async fn session_transcript(file_path: String, distro: Option<String>, from_
 }
 
 #[tauri::command]
+pub async fn subagent_transcript(
+    file_path: String,
+    id: String,
+    distro: Option<String>,
+    from_offset: Option<u64>,
+) -> CmdResult<TranscriptPage> {
+    let from = from_offset.unwrap_or(0);
+    blocking(move || match distro {
+        Some(distro) => wsl::subagent_transcript(&distro, &file_path, &id, from),
+        None => sessions::subagent_transcript(&file_path, &id, from),
+    })
+    .await
+}
+
+#[tauri::command]
 pub async fn delete_session(file_path: String, distro: Option<String>) -> CmdResult<()> {
     blocking(move || match distro {
         Some(distro) => wsl::delete_session(&distro, &file_path),
@@ -290,7 +305,7 @@ pub async fn read_tail(path: String, max_bytes: u64) -> CmdResult<fsx::FileTail>
 }
 
 #[tauri::command]
-pub async fn session_tasks(file_path: String, distro: Option<String>) -> CmdResult<Vec<tasks::AgentTask>> {
+pub async fn session_tasks(file_path: String, distro: Option<String>) -> CmdResult<tasks::SessionTasks> {
     blocking(move || match distro {
         Some(distro) => wsl::session_tasks(&distro, &file_path),
         None => tasks::local(&file_path),

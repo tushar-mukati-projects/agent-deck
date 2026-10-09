@@ -4,6 +4,7 @@ import type { Note } from "@/types";
 
 export interface NoteEntry extends Note {
   stored: boolean;
+  dirty?: boolean;
 }
 
 const LINE_MARKER = /^(?:#+\s*|[-*+>]\s+(?:\[[ xX]\]\s+)?|\d+[.)]\s+)/;

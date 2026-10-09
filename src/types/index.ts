@@ -75,6 +75,21 @@ export type WriteOutcome =
 
 export type AgentTaskStatus = "running" | "completed" | "failed" | "killed" | "stopped";
 
+export interface Subagent {
+  id: string;
+  agentId: string | null;
+  description: string | null;
+  agentType: string | null;
+  startedAt: string | null;
+  endedAt: string | null;
+  status: AgentTaskStatus;
+}
+
+export interface SessionTasks {
+  shells: AgentTask[];
+  agents: Subagent[];
+}
+
 export interface AgentTask {
   id: string;
   tool: string;

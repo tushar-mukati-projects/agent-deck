@@ -1036,7 +1036,7 @@ export const THEMES: Theme[] = [
   }),
 ];
 
-export const DEFAULT_THEME_ID = "aurora";
+export const DEFAULT_THEME_ID = THEMES[0].id;
 
 const ONE_DARK = defineTheme({
   id: "one-dark",

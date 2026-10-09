@@ -67,6 +67,7 @@ pub fn run() {
             commands::wsl_start,
             commands::live_sessions,
             commands::session_transcript,
+            commands::subagent_transcript,
             commands::delete_session,
             commands::terminate_live_session,
             commands::rename_session,

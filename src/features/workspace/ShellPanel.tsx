@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { StatusDot, type DotTone } from "@/components/ui/feedback";
 import { IconButton } from "@/components/ui/icon-button";
 import { Alert } from "@/components/ui/panel";
-import { Tab, TabStrip } from "@/components/ui/tabs";
+import { panelTabClass, Tab, TabStrip } from "@/components/ui/tabs";
 import { TerminalView } from "@/features/terminal/TerminalView";
 import { AgentShellView } from "@/features/workspace/AgentShellView";
 import { useAgentShells, useAgentStart } from "@/hooks/useAgentShells";
@@ -29,12 +29,6 @@ const TASK_TONE: Record<TaskState, DotTone> = {
   stopped: "exited",
   ended: "exited",
 };
-
-const tabClass = (active: boolean) =>
-  cn(
-    "h-full cursor-default rounded-md pr-0.5 pl-2 text-[11.5px]",
-    active ? "bg-active text-fg" : "text-muted hover:bg-hover hover:text-fg",
-  );
 
 const shellName = (shell: ShellTab, index: number) =>
   `${basename(shell.program).replace(/\.exe$/i, "")} ${index + 1}`;
@@ -82,7 +76,7 @@ const ShellTabButton = ({
       onClose={() => void killShellWithConfirm(workspace.id, shell, name)}
       closeLabel={`Kill ${name}`}
       title={shell.cwd}
-      className={tabClass(active)}
+      className={panelTabClass(active)}
     >
       {tone && <StatusDot tone={tone === "attention" ? "running" : tone} className="size-1.5" />}
       <span className="max-w-[160px] truncate">{name}</span>
@@ -112,7 +106,7 @@ const AgentShellTab = ({
     onClose={onClose}
     closeLabel="Close finished shell"
     title={`Started by ${agentName(workspace.agent)}: ${task.command}`}
-    className={cn(tabClass(active), !onClose && "pr-2")}
+    className={cn(panelTabClass(active), !onClose && "pr-2")}
   >
     <StatusDot tone={TASK_TONE[state]} className="size-1.5" />
     <Bot className="size-3 shrink-0 text-info" />

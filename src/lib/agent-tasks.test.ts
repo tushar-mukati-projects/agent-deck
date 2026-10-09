@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { cleanOutput, processStart, shownTasks, taskState } from "@/lib/agent-tasks";
-import type { AgentTask, LiveSession } from "@/types";
+import {
+  cleanOutput,
+  processStart,
+  runningSubagents,
+  shownTasks,
+  subagentLabel,
+  taskState,
+} from "@/lib/agent-tasks";
+import type { AgentTask, LiveSession, Subagent } from "@/types";
 
 const NOW = Date.parse("2026-09-29T12:00:00Z");
 const ago = (minutes: number) => new Date(NOW - minutes * 60_000).toISOString();
@@ -64,5 +71,35 @@ describe("agent shells", () => {
       "ok\nbuild 100%\n\n",
     );
     expect(cleanOutput("\x1b]0;title\x07plain")).toBe("plain");
+  });
+});
+
+const subagent = (id: string, status: Subagent["status"], startedMinutesAgo: number): Subagent => ({
+  id,
+  agentId: `agent-${id}`,
+  description: `Research ${id}`,
+  agentType: "general-purpose",
+  startedAt: ago(startedMinutesAgo),
+  endedAt: null,
+  status,
+});
+
+describe("subagents", () => {
+  it("lists only this run's running subagents, oldest first", () => {
+    const agents = [
+      subagent("new", "running", 5),
+      subagent("done", "completed", 8),
+      subagent("old", "running", 30),
+      subagent("stale", "running", 120),
+    ];
+    expect(runningSubagents(agents, START).map((a) => a.id)).toEqual(["old", "new"]);
+    expect(runningSubagents(agents, null)).toEqual([]);
+  });
+
+  it("labels subagents by description, then type", () => {
+    const base = subagent("a", "running", 1);
+    expect(subagentLabel(base)).toBe("Research a");
+    expect(subagentLabel({ ...base, description: " " })).toBe("general-purpose");
+    expect(subagentLabel({ ...base, description: null, agentType: null })).toBe("Subagent");
   });
 });
