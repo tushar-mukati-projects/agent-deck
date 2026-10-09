@@ -66,7 +66,7 @@ describe("restarting Claude for a new theme", () => {
   beforeEach(() => {
     useSettingsStore
       .getState()
-      .set({ claudeArgs: "", matchAgentTheme: true, themeId: "snow", customAgents: [] });
+      .set({ claudeArgs: "", matchAgentTheme: true, themeId: "sakura", customAgents: [] });
     useSessionsStore.setState({ byId: {} });
   });
 
@@ -78,7 +78,7 @@ describe("restarting Claude for a new theme", () => {
 
   it("flags live Claude sessions whose theme no longer matches Deck", () => {
     expect(themeOutdated(workspace())).toBe(true);
-    useSettingsStore.getState().set({ themeId: "deck" });
+    useSettingsStore.getState().set({ themeId: "aurora" });
     expect(themeOutdated(workspace())).toBe(false);
     expect(themeOutdated(workspace({ mode: "preview" }))).toBe(false);
     expect(themeOutdated(workspace({ agent: "codex" }))).toBe(false);

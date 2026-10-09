@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { contrast } from "@/lib/contrast";
-import { THEMES } from "@/lib/themes";
+import { ALL_THEMES } from "@/lib/themes";
 
 const report = () =>
-  THEMES.map((theme) => {
+  ALL_THEMES.map((theme) => {
     const v = (name: string) => theme.vars[`--color-${name}`];
     return {
       id: theme.id,
@@ -44,7 +44,7 @@ describe("theme contrast", () => {
     expect(row.borderStrong).toBeGreaterThanOrEqual(1.25);
   });
 
-  it.each(THEMES.filter((t) => t.kind === "light"))(
+  it.each(ALL_THEMES.filter((t) => t.kind === "light"))(
     "$id keeps ANSI white light so Claude's light prompt bars stay light",
     (theme) => {
       const { background, black, white, brightWhite } = theme.terminal;
@@ -54,7 +54,7 @@ describe("theme contrast", () => {
     },
   );
 
-  it.each(THEMES.filter((t) => t.kind === "dark"))(
+  it.each(ALL_THEMES.filter((t) => t.kind === "dark"))(
     "$id keeps ANSI bright black subtle so Claude's dark prompt bars stay subtle",
     (theme) => {
       const { background, brightBlack, brightWhite } = theme.terminal;
