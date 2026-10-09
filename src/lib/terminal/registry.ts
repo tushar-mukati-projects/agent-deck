@@ -21,6 +21,12 @@ import {
   createPasteHandler,
 } from "@/lib/terminal/input";
 import { registerPathLinks, type PathLinkTarget } from "@/lib/terminal/links";
+import {
+  captureAnchor,
+  locateAnchor,
+  type Rows,
+  type ScrollAnchor,
+} from "@/lib/terminal/scroll-anchor";
 import { ensureWebgl, releaseWebgl } from "@/lib/terminal/webgl";
 import { findTheme } from "@/lib/themes";
 import { errorMessage } from "@/lib/utils";
@@ -52,7 +58,23 @@ interface Entry {
   generation: number;
   focusOnMount: boolean;
   activity: Activity;
+  ptySize: { cols: number; rows: number } | null;
+  resizeTimer: number | undefined;
+  scrollHold: ScrollHold | null;
 }
+
+interface ScrollHold {
+  anchor: ScrollAnchor;
+  release: () => void;
+  timer?: number;
+  writes?: { dispose: () => void };
+}
+
+const PTY_RESIZE_DELAY_MS = 200;
+const FIRST_OUTPUT_MS = 1000;
+const QUIET_OUTPUT_MS = 300;
+const MAX_HOLD_MS = 3000;
+const USER_SCROLL_EVENTS = ["wheel", "mousedown", "keydown"] as const;
 
 const SEARCH_DECORATIONS = {
   matchBackground: "#88888855",
@@ -150,6 +172,9 @@ const createEntry = (spec: TerminalSpec): Entry => {
     generation: 0,
     focusOnMount: false,
     activity: createActivity(),
+    ptySize: null,
+    resizeTimer: undefined,
+    scrollHold: null,
   };
 
   const owner = {
@@ -206,6 +231,7 @@ const spawnPty = async (entry: Entry) => {
     }
     runningPtys.add(spec.id);
     store().update(spec.id, { status: "running", pid: info.pid, exitCode: null });
+    entry.ptySize = { cols: term.cols, rows: term.rows };
     void api.ptyResize(spec.id, term.cols, term.rows).catch(() => undefined);
   } catch (error) {
     if (!isCurrent(entry, generation)) return;
@@ -243,6 +269,67 @@ export const terminalInput = (id: string) => {
 
 let fitsHeldUntil = 0;
 
+const rowsOf = (term: Terminal): Rows => {
+  const buffer = term.buffer.active;
+  return {
+    count: buffer.length,
+    text: (row) => buffer.getLine(row)?.translateToString(true) ?? "",
+  };
+};
+
+const scrollToAnchor = (term: Terminal, anchor: ScrollAnchor) =>
+  term.scrollToLine(locateAnchor(rowsOf(term), anchor, term.buffer.active.baseY));
+
+const holdScroll = (entry: Entry) => {
+  const { viewportY, baseY } = entry.term.buffer.active;
+  if (entry.scrollHold || viewportY >= baseY) return;
+  const release = () => {
+    window.clearTimeout(hold.timer);
+    hold.writes?.dispose();
+    USER_SCROLL_EVENTS.forEach((type) => entry.element.removeEventListener(type, release, true));
+    if (entry.scrollHold === hold) entry.scrollHold = null;
+  };
+  const hold: ScrollHold = { anchor: captureAnchor(rowsOf(entry.term), viewportY, baseY), release };
+  USER_SCROLL_EVENTS.forEach((type) => entry.element.addEventListener(type, release, true));
+  entry.scrollHold = hold;
+};
+
+const restoreScrollAfterOutput = (entry: Entry, redrawing: boolean) => {
+  const hold = entry.scrollHold;
+  if (!hold) return;
+  window.clearTimeout(hold.timer);
+  hold.writes?.dispose();
+  hold.writes = undefined;
+  const finish = () => {
+    if (entry.scrollHold !== hold) return;
+    hold.release();
+    scrollToAnchor(entry.term, hold.anchor);
+  };
+  if (!redrawing) return finish();
+  const deadline = performance.now() + MAX_HOLD_MS;
+  const finishAfter = (ms: number) => {
+    window.clearTimeout(hold.timer);
+    hold.timer = window.setTimeout(finish, Math.min(ms, Math.max(0, deadline - performance.now())));
+  };
+  hold.writes = entry.term.onWriteParsed(() => finishAfter(QUIET_OUTPUT_MS));
+  finishAfter(FIRST_OUTPUT_MS);
+};
+
+const syncPtySize = (entry: Entry) => {
+  window.clearTimeout(entry.resizeTimer);
+  entry.resizeTimer = window.setTimeout(() => {
+    const { cols, rows } = entry.term;
+    const resized = entry.ptySize?.cols !== cols || entry.ptySize?.rows !== rows;
+    const sending = resized && runningPtys.has(entry.spec.id);
+    if (sending) {
+      entry.ptySize = { cols, rows };
+      noteResize(entry);
+      void api.ptyResize(entry.spec.id, cols, rows).catch(() => undefined);
+    }
+    restoreScrollAfterOutput(entry, sending);
+  }, PTY_RESIZE_DELAY_MS);
+};
+
 export const fitTerminal = (id: string) => {
   const entry = entries.get(id);
   if (!entry?.opened || !entry.element.isConnected || performance.now() < fitsHeldUntil) return;
@@ -250,10 +337,10 @@ export const fitTerminal = (id: string) => {
   const proposed = entry.fit.proposeDimensions();
   if (!proposed || Number.isNaN(proposed.cols) || Number.isNaN(proposed.rows)) return;
   if (proposed.cols === entry.term.cols && proposed.rows === entry.term.rows) return;
-  noteResize(entry);
+  holdScroll(entry);
   entry.fit.fit();
-  if (runningPtys.has(id))
-    void api.ptyResize(id, entry.term.cols, entry.term.rows).catch(() => undefined);
+  if (entry.scrollHold) scrollToAnchor(entry.term, entry.scrollHold.anchor);
+  syncPtySize(entry);
 };
 
 export const holdTerminalFits = (ms: number) => {
@@ -326,6 +413,7 @@ export const restartTerminal = async (id: string, spec: TerminalSpec) => {
   entry.generation += 1;
   resetActivity(entry);
   runningPtys.delete(id);
+  entry.ptySize = null;
   await api.ptyKill(id).catch(() => undefined);
   entry.spec = spec;
   entry.term.reset();
@@ -338,6 +426,8 @@ export const disposeTerminal = async (id: string) => {
   if (entry) {
     entry.generation += 1;
     window.clearTimeout(entry.activity.idleTimer);
+    window.clearTimeout(entry.resizeTimer);
+    entry.scrollHold?.release();
     releaseWebgl(entry);
     entry.term.dispose();
     entry.element.remove();
