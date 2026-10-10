@@ -20,19 +20,13 @@ export const taskState = (task: AgentTask, agentStartedMs: number | null): TaskS
   return agentStartedMs !== null && fromThisRun(task, agentStartedMs) ? "running" : "ended";
 };
 
-export const shownTasks = (
-  tasks: AgentTask[],
-  agentStartedMs: number | null,
-  now: number,
-  dismissed: readonly string[] = [],
-) => {
+export const shownTasks = (tasks: AgentTask[], agentStartedMs: number | null, now: number) => {
   if (agentStartedMs === null) return [];
   const current = tasks.filter((t) => fromThisRun(t, agentStartedMs));
   const running = current.filter((t) => t.status === "running");
   const finished = current
     .filter((t) => t.status !== "running" && now - time(t.endedAt ?? t.startedAt) < RECENT_MS)
-    .slice(0, MAX_FINISHED)
-    .filter((t) => !dismissed.includes(t.id));
+    .slice(0, MAX_FINISHED);
   return [...running, ...finished];
 };
 

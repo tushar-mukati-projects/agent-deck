@@ -98,7 +98,7 @@ export const StatusBar = () => {
               <FolderOpen />
               <span className="truncate">{shortenHome(workspace.cwd, home)}</span>
             </Item>
-            {!hidden && session?.gitBranch && session.gitBranch !== "HEAD" && (
+            {session?.gitBranch && session.gitBranch !== "HEAD" && (
               <Item title={session.gitBranch}>
                 <GitBranch />
                 <span className="max-w-[220px] truncate">{session.gitBranch}</span>

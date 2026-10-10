@@ -7,7 +7,9 @@ import {
 } from "@tauri-apps/plugin-notification";
 import { toast } from "sonner";
 
-import { agentName } from "@/lib/agents/registry";
+import { sessionFileNow } from "@/hooks/useSessionFile";
+import { processStart, runningSubagents } from "@/lib/agent-tasks";
+import { agentName, CLAUDE } from "@/lib/agents/registry";
 import { alertStatus, announcement } from "@/lib/announce";
 import { playChime, unlockAudio } from "@/lib/chime";
 import { speak } from "@/lib/speech";
@@ -15,9 +17,12 @@ import { onAgentIdle, type IdleEvent } from "@/lib/terminal/activity";
 import { api } from "@/lib/tauri/commands";
 import { appWindow } from "@/lib/tauri/system";
 import { basename } from "@/lib/utils";
+import { useAgentTasksStore } from "@/stores/agent-tasks-store";
+import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useTerminalStore } from "@/stores/terminal-store";
 import { findWorkspace, getActiveWorkspace, useWorkspaceStore } from "@/stores/workspace-store";
+import type { Workspace } from "@/types";
 
 let permission: Promise<boolean> | null = null;
 
@@ -28,11 +33,29 @@ const notificationsAllowed = () => {
   return permission;
 };
 
+const subagentsStillRunning = async (workspace: Workspace | null) => {
+  if (workspace?.agent !== CLAUDE) return false;
+  const { filePath, distro } = sessionFileNow(workspace);
+  if (!filePath) return false;
+  try {
+    const tasks = await api.sessionTasks(filePath, distro);
+    useAgentTasksStore.getState().setTasks(workspace.sessionId, tasks);
+    const started = processStart(useSessionsStore.getState().live, workspace.sessionId);
+    return runningSubagents(tasks.agents, started).length > 0;
+  } catch {
+    return false;
+  }
+};
+
 const handleIdle = async (event: IdleEvent) => {
+  const workspace = findWorkspace(event.workspaceId);
+  if (!event.needsInput && (await subagentsStillRunning(workspace))) {
+    useTerminalStore.getState().update(event.terminalId, { attention: false });
+    return;
+  }
   const { sound, notifications, speech, voice, phonePing, phoneTopic, hideMode } =
     useSettingsStore.getState();
   if (sound && !hideMode) void playChime(event.needsInput ? "input" : "done");
-  const workspace = findWorkspace(event.workspaceId);
   const name = agentName(workspace?.agent);
   const title = workspace?.title || basename(event.cwd);
   const body = alertStatus(name, event.needsInput);

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Group, Panel, Separator, useDefaultLayout } from "react-resizable-panels";
 
 import { AgentPane } from "@/features/workspace/AgentPane";
@@ -11,9 +11,8 @@ import { releaseWatch, retainWatch } from "@/lib/file-events";
 import { api } from "@/lib/tauri/commands";
 import { cn } from "@/lib/utils";
 import { useExplorerStore } from "@/stores/explorer-store";
-import { useSettingsStore } from "@/stores/settings-store";
 import { useUiStore } from "@/stores/ui-store";
-import { useWorkspace } from "@/stores/workspace-store";
+import { useWorkspace, useWorkspaceStore } from "@/stores/workspace-store";
 import type { Workspace } from "@/types";
 
 export const ResizeHandle = ({ orientation }: { orientation: "horizontal" | "vertical" }) => (
@@ -40,9 +39,18 @@ const WorkspaceLayout = ({ workspace }: { workspace: Workspace }) => {
   const agentShells = useAgentShells(workspace);
   const shellOpen =
     workspace.shellPanelOpen && (workspace.shells.length > 0 || agentShells.length > 0);
+  const shellEmptied = workspace.shellPanelOpen && !shellOpen;
+  useEffect(() => {
+    if (shellEmptied) useWorkspaceStore.getState().collapseShellPanel(workspace.id);
+  }, [shellEmptied, workspace.id]);
   const subagents = useSubagents(workspace);
-  const hideMode = useSettingsStore((s) => s.hideMode);
-  const subagentsOpen = useUiStore((s) => s.subagentsOpen) && !hideMode && subagents.length > 0;
+  const subagentsOpen = useUiStore((s) => s.subagentsOpen) && subagents.length > 0;
+  const runningBefore = useRef(subagents.length);
+  useEffect(() => {
+    if (runningBefore.current > 0 && subagents.length === 0)
+      useUiStore.getState().setSubagentsOpen(false);
+    runningBefore.current = subagents.length;
+  }, [subagents.length]);
   useAgentShellSync(workspace);
   const columns = useSavedLayout("deck-columns", hasFiles ? ["main", "viewer"] : ["main"]);
   const rows = useSavedLayout("deck-rows", [

@@ -123,16 +123,15 @@ export const focusNextAttention = () => {
 };
 
 const agentShellsNow = (workspace: Workspace) => {
+  if (useSettingsStore.getState().hideMode) return [];
   const { live } = useSessionsStore.getState();
   const alive =
     (workspace.mode === "live" && isTerminalAlive(workspace.agentTerminalId)) ||
     live.some((l) => l.sessionId === workspace.sessionId);
-  const { bySession, dismissed } = useAgentTasksStore.getState();
   return shownTasks(
-    bySession[workspace.sessionId] ?? [],
+    useAgentTasksStore.getState().bySession[workspace.sessionId] ?? [],
     alive ? processStart(live, workspace.sessionId) : null,
     Date.now(),
-    dismissed[workspace.sessionId],
   );
 };
 

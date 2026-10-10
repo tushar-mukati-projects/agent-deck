@@ -46,6 +46,7 @@ interface WorkspaceState {
   restartShell: (workspaceId: string, shellId: string) => void;
   setActiveShell: (workspaceId: string, shellId: string) => void;
   setShellPanel: (workspaceId: string, open: boolean, spawn?: boolean) => void;
+  collapseShellPanel: (workspaceId: string) => void;
   openFile: (workspaceId: string, path: string) => void;
   closeFile: (workspaceId: string, path: string) => void;
   setActiveFile: (workspaceId: string, path: string) => void;
@@ -316,6 +317,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           if (!open && workspace.agentTerminalId) requestFocus(workspace.agentTerminalId);
           patch(workspaceId, () => ({ shellPanelOpen: open }));
         },
+
+        collapseShellPanel: (workspaceId) => patch(workspaceId, () => ({ shellPanelOpen: false })),
 
         openFile: (workspaceId, path) =>
           patch(workspaceId, (w) => ({

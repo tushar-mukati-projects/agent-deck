@@ -7,6 +7,7 @@ import { CLAUDE } from "@/lib/agents/registry";
 import { api } from "@/lib/tauri/commands";
 import { useAgentTasksStore } from "@/stores/agent-tasks-store";
 import { useSessionsStore } from "@/stores/sessions-store";
+import { useSettingsStore } from "@/stores/settings-store";
 import { useTerminalStore } from "@/stores/terminal-store";
 import type { Workspace } from "@/types";
 
@@ -22,22 +23,24 @@ export const useAgentStart = (workspace: Workspace) => {
   return running || external ? started : null;
 };
 
-const EMPTY: string[] = [];
-
 export const useAgentShells = (workspace: Workspace) => {
   const tasks = useAgentTasksStore((s) => s.bySession[workspace.sessionId]);
-  const dismissed = useAgentTasksStore((s) => s.dismissed[workspace.sessionId] ?? EMPTY);
+  const hidden = useSettingsStore((s) => s.hideMode);
   const started = useAgentStart(workspace);
   return useMemo(
-    () => shownTasks(tasks ?? [], started, Date.now(), dismissed),
-    [tasks, started, dismissed],
+    () => (hidden ? [] : shownTasks(tasks ?? [], started, Date.now())),
+    [tasks, started, hidden],
   );
 };
 
 export const useSubagents = (workspace: Workspace) => {
   const agents = useAgentTasksStore((s) => s.agentsBySession[workspace.sessionId]);
+  const hidden = useSettingsStore((s) => s.hideMode);
   const started = useAgentStart(workspace);
-  return useMemo(() => runningSubagents(agents ?? [], started), [agents, started]);
+  return useMemo(
+    () => (hidden ? [] : runningSubagents(agents ?? [], started)),
+    [agents, started, hidden],
+  );
 };
 
 export const useAgentShellSync = (workspace: Workspace) => {

@@ -56,7 +56,7 @@ export const useUiStore = create<UiState>()(
         set(panel === "sessions" ? { sessionsWidth: width } : { contextWidth: width }),
       contextOpen: true,
       contextView: "explorer",
-      subagentsOpen: true,
+      subagentsOpen: false,
       setSubagentsOpen: (open) => set({ subagentsOpen: open }),
       paletteMode: null,
       settingsOpen: false,
@@ -93,11 +93,11 @@ export const useUiStore = create<UiState>()(
     }),
     {
       name: "claude-deck-ui",
-      version: 1,
+      version: 2,
       migrate: (persisted) => {
         const state = persisted as Omit<Partial<UiState>, "contextView"> & { contextView?: string };
         const contextView = state.contextView === "claude" ? "agent" : state.contextView;
-        return { ...state, contextView } as UiState;
+        return { ...state, contextView, subagentsOpen: false } as UiState;
       },
       partialize: (s) => ({
         sessionsOpen: s.sessionsOpen,
@@ -105,7 +105,6 @@ export const useUiStore = create<UiState>()(
         contextOpen: s.contextOpen,
         contextWidth: s.contextWidth,
         contextView: s.contextView,
-        subagentsOpen: s.subagentsOpen,
       }),
     },
   ),
