@@ -11,10 +11,11 @@ export const spokenTitle = (title: string) => {
   return short.length > MAX_CHARS ? short.slice(0, MAX_CHARS).replace(/\s+\S*$/, "") : short;
 };
 
-export const announcement = (title: string, needsInput: boolean) => {
-  const subject = spokenTitle(title) || "Your session";
-  return needsInput ? `${subject} needs your approval.` : `${subject} is done.`;
-};
+export const alertStatus = (agent: string, needsInput: boolean) =>
+  needsInput ? `${agent} needs your approval` : `${agent} finished`;
+
+export const announcement = (title: string, agent: string, needsInput: boolean) =>
+  `${spokenTitle(title) || "Your session"}. ${alertStatus(agent, needsInput)}.`;
 
 export const newPhoneTopic = (random: (count: number) => Uint8Array) =>
   `deck-${[...random(12)].map((n) => TOPIC_ALPHABET[n % TOPIC_ALPHABET.length]).join("")}`;

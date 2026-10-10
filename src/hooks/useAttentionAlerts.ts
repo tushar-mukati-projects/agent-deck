@@ -8,7 +8,7 @@ import {
 import { toast } from "sonner";
 
 import { agentName } from "@/lib/agents/registry";
-import { announcement } from "@/lib/announce";
+import { alertStatus, announcement } from "@/lib/announce";
 import { playChime, unlockAudio } from "@/lib/chime";
 import { speak } from "@/lib/speech";
 import { onAgentIdle, type IdleEvent } from "@/lib/terminal/activity";
@@ -31,17 +31,16 @@ const notificationsAllowed = () => {
 const handleIdle = async (event: IdleEvent) => {
   const { sound, notifications, speech, voice, phonePing, phoneTopic, hideMode } =
     useSettingsStore.getState();
-  if (hideMode) return;
-  if (sound) void playChime(event.needsInput ? "input" : "done");
+  if (sound && !hideMode) void playChime(event.needsInput ? "input" : "done");
   const workspace = findWorkspace(event.workspaceId);
   const name = agentName(workspace?.agent);
-  const title = event.needsInput ? `${name} needs your approval` : `${name} finished`;
-  const body = workspace ? `${workspace.title} · ${basename(workspace.cwd)}` : basename(event.cwd);
+  const title = workspace?.title || basename(event.cwd);
+  const body = alertStatus(name, event.needsInput);
   const focused = await appWindow.isFocused().catch(() => false);
   if (phonePing && phoneTopic && !focused)
     void api.phonePing(phoneTopic, title, body, event.needsInput).catch(() => undefined);
-  if (event.visible) return;
-  if (speech) speak(announcement(workspace?.title ?? basename(event.cwd), event.needsInput), voice);
+  if (hideMode || event.visible) return;
+  if (speech) speak(announcement(title, name, event.needsInput), voice);
   if (!notifications) return;
 
   if (!focused) {

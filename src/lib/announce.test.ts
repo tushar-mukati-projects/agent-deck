@@ -1,13 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { announcement, newPhoneTopic, spokenTitle } from "@/lib/announce";
+import { alertStatus, announcement, newPhoneTopic, spokenTitle } from "@/lib/announce";
 
 describe("spoken announcements", () => {
-  it("says the session name and what happened", () => {
-    expect(announcement("Over-ear headphones 2k-10k", false)).toBe(
-      "Over-ear headphones 2k-10k is done.",
+  it("says the session name, then the same status the notifications show", () => {
+    expect(announcement("Over-ear headphones 2k-10k", "Claude", false)).toBe(
+      "Over-ear headphones 2k-10k. Claude finished.",
     );
-    expect(announcement("Fix flaky tests", true)).toBe("Fix flaky tests needs your approval.");
+    expect(announcement("Fix flaky tests", "Codex", true)).toBe(
+      "Fix flaky tests. Codex needs your approval.",
+    );
+    expect(alertStatus("Claude", false)).toBe("Claude finished");
   });
 
   it("keeps long titles short and drops symbols that sound odd", () => {
@@ -18,7 +21,7 @@ describe("spoken announcements", () => {
   });
 
   it("falls back when the title has nothing speakable", () => {
-    expect(announcement("→ ✓", false)).toBe("Your session is done.");
+    expect(announcement("→ ✓", "Claude", false)).toBe("Your session. Claude finished.");
   });
 });
 

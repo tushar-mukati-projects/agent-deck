@@ -149,7 +149,7 @@ const AppearanceSection = () => (
     </Field>
     <Field
       label="Hide mode"
-      hint={`Looks like Warp: Warp's name and icon, the One Dark theme, no search bar, title bar buttons or extra status items, and no sounds or notifications. Notes and settings stay on ${shortcutLabel("notes")} and ${shortcutLabel("settings")}. Turning it off brings your theme back. Also ${shortcutLabel("toggleHideMode")}.`}
+      hint={`Looks like Warp: Warp's name and icon, the One Dark theme, no search bar, title bar buttons, extra status items or pet, and no sounds, voice or desktop notifications (phone pings still arrive). Notes and settings stay on ${shortcutLabel("notes")} and ${shortcutLabel("settings")}. Turning it off brings your theme back. Also ${shortcutLabel("toggleHideMode")}.`}
     >
       <HideModeToggle />
     </Field>
@@ -258,7 +258,7 @@ const PhonePing = () => {
   const sendTest = async () => {
     setTesting(true);
     try {
-      await api.phonePing(topic, "Claude Deck", "Phone pings are working.", false);
+      await api.phonePing(topic, "Test ping", "Phone pings are working.", false);
       toast.success("Test ping sent");
     } catch (error) {
       toast.error(errorMessage(error));
@@ -349,7 +349,7 @@ const NotificationsSection = () => (
           size="sm"
           variant="ghost"
           onClick={() =>
-            speak(announcement("Your session", false), useSettingsStore.getState().voice)
+            speak(announcement("Your session", "Claude", false), useSettingsStore.getState().voice)
           }
         >
           Try it
@@ -358,7 +358,7 @@ const NotificationsSection = () => (
     </Field>
     <Field
       label="Phone ping"
-      hint="Pings your phone when a session finishes or needs approval while Deck isn't focused. Install the free ntfy app, tap +, and subscribe to the topic below. Pings go through ntfy.sh, so anyone who knows the topic can read them; keep it hard to guess."
+      hint="Pings your phone when a session finishes or needs approval while Deck isn't focused, in hide mode too. Install the free ntfy app, tap +, and subscribe to the topic below. Pings go through ntfy.sh, so anyone who knows the topic can read them; keep it hard to guess."
     >
       <PhonePing />
     </Field>
