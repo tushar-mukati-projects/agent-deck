@@ -1,6 +1,7 @@
 import { forwardRef } from "react";
 import { X } from "lucide-react";
 
+import { useHorizontalWheel } from "@/hooks/useHorizontalWheel";
 import { cn } from "@/lib/utils";
 
 const NAV_KEYS = new Set(["ArrowLeft", "ArrowRight", "Home", "End"]);
@@ -27,19 +28,20 @@ interface TabStripProps {
   children: React.ReactNode;
 }
 
-export const TabStrip = ({ label, className, children }: TabStripProps) => (
-  <div
-    role="tablist"
-    aria-label={label}
-    onKeyDown={moveBetweenTabs}
-    onWheel={(e) => {
-      if (e.deltaY) e.currentTarget.scrollLeft += e.deltaY;
-    }}
-    className={cn("no-scrollbar flex overflow-x-auto", className)}
-  >
-    {children}
-  </div>
-);
+export const TabStrip = ({ label, className, children }: TabStripProps) => {
+  const ref = useHorizontalWheel<HTMLDivElement>();
+  return (
+    <div
+      ref={ref}
+      role="tablist"
+      aria-label={label}
+      onKeyDown={moveBetweenTabs}
+      className={cn("no-scrollbar flex overflow-x-auto", className)}
+    >
+      {children}
+    </div>
+  );
+};
 
 interface TabProps extends Omit<React.HTMLAttributes<HTMLDivElement>, "onSelect" | "title"> {
   selected: boolean;
