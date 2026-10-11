@@ -307,12 +307,8 @@
   font-weight: 600;
 }
 
-.pet-body,
-.pet-look,
-.pet-z,
-.pet-spark {
-  transform-box: fill-box;
-  transform-origin: 50% 100%;
+.pet-body {
+  transform-origin: 50% 87.5%;
 }
 
 .pet-hop {
@@ -347,7 +343,6 @@
 
   .pet-spark {
     opacity: 0;
-    transform-origin: center;
     animation: pet-twinkle 0.9s ease-in-out infinite;
   }
 
@@ -356,61 +351,87 @@
   }
 }
 
+:root[data-window="inactive"] :is(.pet-body, .pet-look, .pet-z, .pet-spark, .animate-pulse-dot) {
+  animation: none;
+}
+
 @keyframes pet-breathe {
+  0%,
+  100% {
+    transform: none;
+  }
   50% {
     transform: scaleY(0.93);
   }
 }
 
 @keyframes pet-bob {
+  0%,
+  100% {
+    transform: none;
+  }
   50% {
-    transform: translateY(-1.5px);
+    transform: translateY(-1.1px);
   }
 }
 
 @keyframes pet-look {
   0%,
-  35% {
-    transform: translateX(-0.8px);
+  35%,
+  100% {
+    transform: translateX(-0.6px);
   }
   50%,
   85% {
-    transform: translateX(0.8px);
+    transform: translateX(0.6px);
   }
 }
 
 @keyframes pet-bounce {
-  30% {
-    transform: translateY(-3px);
+  0%,
+  60%,
+  100% {
+    transform: none;
   }
-  60% {
-    transform: translateY(0);
+  30% {
+    transform: translateY(-2.25px);
   }
 }
 
 @keyframes pet-jump {
-  25% {
-    transform: translateY(-4px) rotate(-8deg);
+  0%,
+  50%,
+  100% {
+    transform: none;
   }
-  50% {
-    transform: translateY(0);
+  25% {
+    transform: translateY(-3px) rotate(-8deg);
   }
   75% {
-    transform: translateY(-3px) rotate(8deg);
+    transform: translateY(-2.25px) rotate(8deg);
   }
 }
 
 @keyframes pet-float {
+  0% {
+    opacity: 0;
+    transform: none;
+  }
   20% {
     opacity: 1;
   }
   100% {
     opacity: 0;
-    transform: translate(3px, -7px);
+    transform: translate(2.25px, -5.25px);
   }
 }
 
 @keyframes pet-twinkle {
+  0%,
+  100% {
+    opacity: 0;
+    transform: none;
+  }
   50% {
     opacity: 1;
     transform: scale(1.2);
@@ -418,6 +439,10 @@
 }
 
 @keyframes pet-hop {
+  0%,
+  100% {
+    transform: none;
+  }
   40% {
     transform: translateY(-5px) scaleY(1.08);
   }

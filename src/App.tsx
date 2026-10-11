@@ -19,6 +19,7 @@ import { useAgentThemeSync } from "@/hooks/useAgentThemeSync";
 import { useAppEvents } from "@/hooks/useAppEvents";
 import { useAttentionAlerts } from "@/hooks/useAttentionAlerts";
 import { useGlobalShortcuts } from "@/hooks/useGlobalShortcuts";
+import { useWindowActivity } from "@/hooks/useWindowActivity";
 import { holdTerminalFits } from "@/lib/terminal/registry";
 import { findTheme } from "@/lib/themes";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -89,6 +90,7 @@ export const App = () => {
   useAppEvents();
   useGlobalShortcuts();
   useAttentionAlerts();
+  useWindowActivity();
   useAgentThemeSync();
 
   return (
