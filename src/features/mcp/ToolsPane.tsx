@@ -6,6 +6,7 @@ import { EmptyState, LoadingState, Spinner } from "@/components/ui/feedback";
 import { IconButton } from "@/components/ui/icon-button";
 import { ListRow } from "@/components/ui/list-row";
 import { Alert, SearchInput, SectionLabel } from "@/components/ui/panel";
+import { matches } from "@/features/agent-config/filter-overview";
 import { resourceTexts, TextResult } from "@/features/mcp/CallResult";
 import { ToolRunner } from "@/features/mcp/ToolRunner";
 import { useAsync } from "@/hooks/useAsync";
@@ -67,9 +68,6 @@ const useDescription = (cwd: string, serverId: string) => {
   return { description, error, connecting, connect, restart };
 };
 
-const matchesFilter = (needle: string, ...fields: (string | undefined)[]) =>
-  !needle || fields.some((f) => f?.toLowerCase().includes(needle));
-
 export const ToolsPane = ({ cwd, server }: { cwd: string; server: McpServer }) => {
   const { description, error, connecting, connect, restart } = useDescription(cwd, server.id);
   const [filter, setFilter] = useState("");
@@ -100,9 +98,9 @@ export const ToolsPane = ({ cwd, server }: { cwd: string; server: McpServer }) =
 
   const selected = picked ?? firstSelection(description);
   const needle = filter.trim().toLowerCase();
-  const tools = description.tools.filter((t) => matchesFilter(needle, t.name, t.description));
+  const tools = description.tools.filter((t) => matches(needle, t.name, t.description));
   const resources = description.resources.filter((r) =>
-    matchesFilter(needle, r.name, r.uri, r.description),
+    matches(needle, r.name, r.uri, r.description),
   );
   const tool =
     selected?.kind === "tool" ? description.tools.find((t) => t.name === selected.name) : undefined;

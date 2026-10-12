@@ -340,7 +340,7 @@ def index_file(path, stat, known, reducer, budget):
 
 def index(request):
     offsets = request.get("offsets") or {}
-    budget = Budget(request.get("budget") or INDEX_BUDGET)
+    budget = Budget(INDEX_BUDGET)
     files, changes = [], []
     sources = [(path, "claude") for path in claude_files()] + [(path, "codex") for path in codex_files()]
     for path, kind in sources:
@@ -387,7 +387,7 @@ def live_sessions():
                         continue
             except (OSError, ValueError, TypeError, AttributeError):
                 continue
-            entry = {k: data.get(k) if isinstance(data.get(k), str) else None for k in ("cwd", "status", "kind", "name")}
+            entry = {k: data.get(k) if isinstance(data.get(k), str) else None for k in ("status",)}
             entry.update({"pid": pid, "sessionId": session_id})
             if isinstance(data.get("startedAt"), int):
                 entry["startedAt"] = data["startedAt"]
@@ -603,7 +603,7 @@ def claude_changes(session):
             if data.get("type") == "file-history-snapshot":
                 backups_map = (data.get("snapshot") or {}).get("trackedFileBackups") if isinstance(data.get("snapshot"), dict) else None
                 for target, backup in (backups_map or {}).items():
-                    entry = tracked.setdefault(target, {"hash": None, "edits": 0})
+                    entry = tracked.setdefault(target, {"hash": None})
                     name = backup.get("backupFileName") if isinstance(backup, dict) else None
                     if not entry["hash"] and isinstance(name, str):
                         entry["hash"] = name.split("@")[0]
@@ -614,12 +614,11 @@ def claude_changes(session):
                         tool_input = block.get("input") if isinstance(block.get("input"), dict) else {}
                         target = tool_input.get("file_path") or tool_input.get("notebook_path")
                         if isinstance(target, str) and target:
-                            tracked.setdefault(target, {"hash": None, "edits": 0})["edits"] += 1
+                            tracked.setdefault(target, {"hash": None})
     merged = {}
     for target, info in tracked.items():
         absolute = os.path.normpath(target if os.path.isabs(target) or not cwd else os.path.join(cwd, target))
-        entry = merged.setdefault(absolute, {"hash": None, "edits": 0})
-        entry["edits"] += info["edits"]
+        entry = merged.setdefault(absolute, {"hash": None})
         entry["hash"] = entry["hash"] or info["hash"]
     files = []
     for absolute, info in sorted(merged.items()):
@@ -638,7 +637,7 @@ def claude_changes(session):
         else:
             status = "unchanged" if before is not None and before == after else "modified"
         additions, deletions = line_stats(before or "", after or "")
-        files.append({"path": absolute, "status": status, "additions": additions, "deletions": deletions, "edits": info["edits"], "backup": backup})
+        files.append({"path": absolute, "status": status, "additions": additions, "deletions": deletions, "backup": backup})
     return {"files": files}
 
 
@@ -708,8 +707,6 @@ def rename(path, title):
 
     done = complete()
     if not done:
-        import time
-
         time.sleep(0.3)
         done = complete()
     with open(real, "a", encoding="utf-8") as handle:
@@ -761,17 +758,15 @@ def emit(message):
 
 def watch(root):
     import ctypes
-    import errno
     import select
     import struct
-    import time
 
     libc = ctypes.CDLL(None, use_errno=True)
     fd = libc.inotify_init1(os.O_NONBLOCK | 0o2000000)
     if fd < 0:
         raise OSError(ctypes.get_errno(), "inotify is not available")
     mask = 0x2 | 0x8 | 0x40 | 0x80 | 0x100 | 0x200 | 0x400 | 0x800 | 0x1000000 | 0x2000000 | 0x4000000
-    watches, warned = {}, [False]
+    watches = {}
 
     def noisy(path):
         return any(part in NOISY_DIRS for part in path.split("/")) or path.endswith(".claude-deck-tmp")
@@ -781,9 +776,6 @@ def watch(root):
             dirs[:] = [d for d in dirs if d not in NOISY_DIRS]
             wd = libc.inotify_add_watch(fd, os.fsencode(directory), mask)
             if wd < 0:
-                if ctypes.get_errno() == errno.ENOSPC and not warned[0]:
-                    warned[0] = True
-                    emit({"warning": "inotify watch limit reached; some folders aren't watched"})
                 continue
             watches[wd] = directory
 

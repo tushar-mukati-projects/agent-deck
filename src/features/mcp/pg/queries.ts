@@ -23,7 +23,7 @@ where c.relkind in ('r', 'p', 'v', 'm', 'f')
   and n.nspname not in ('pg_catalog', 'information_schema') and n.nspname not like 'pg_toast%'
 order by 1, 2`;
 
-export const qualified = (table: Pick<TableRef, "schema" | "name">) =>
+const qualified = (table: Pick<TableRef, "schema" | "name">) =>
   `${quoteIdent(table.schema)}.${quoteIdent(table.name)}`;
 
 export const tableKey = (table: Pick<TableRef, "schema" | "name">) =>

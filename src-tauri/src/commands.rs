@@ -34,7 +34,6 @@ fn on_host<T>(path: &str, wsl: impl FnOnce(&str, &str) -> T, local: impl FnOnce(
 #[serde(rename_all = "camelCase")]
 pub struct Environment {
     home: String,
-    claude_home: String,
     shell: String,
     claude_found: bool,
     codex_found: bool,
@@ -46,7 +45,6 @@ pub async fn environment() -> CmdResult<Environment> {
         let home = dirs::home_dir().unwrap_or_default();
         Ok(Environment {
             home: home.to_string_lossy().to_string(),
-            claude_home: sessions::claude_home().to_string_lossy().to_string(),
             shell: pty::default_shell(),
             claude_found: which::which("claude").is_ok() || home.join(".local").join("bin").join("claude.exe").is_file(),
             codex_found: which::which("codex").is_ok(),

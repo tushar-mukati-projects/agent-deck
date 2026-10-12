@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FolderOpen, Plus, TextCursorInput, Trash2, X } from "lucide-react";
 
 import {
@@ -17,14 +17,11 @@ import { Dialog } from "@/components/ui/dialog";
 import { LoadingState } from "@/components/ui/feedback";
 import { IconButton } from "@/components/ui/icon-button";
 import { TimeAgo } from "@/components/ui/time-ago";
+import { CodeView } from "@/features/viewer/CodeView";
 import { noteTitle } from "@/lib/notes";
 import { shortcutLabel } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
-
-const CodeView = lazy(() =>
-  import("@/features/viewer/CodeView").then((m) => ({ default: m.CodeView })),
-);
 
 const saveNow = () => void flushNotes();
 
@@ -150,18 +147,16 @@ export const NotesDialog = () => {
           </header>
           <div className="min-h-0 flex-1">
             {active ? (
-              <Suspense fallback={<LoadingState className="h-full" />}>
-                <CodeView
-                  key={active.id}
-                  path={`${active.id}.md`}
-                  value={active.text}
-                  editable
-                  plain
-                  placeholder="Write anything…"
-                  onChange={editNote}
-                  onSave={saveNow}
-                />
-              </Suspense>
+              <CodeView
+                key={active.id}
+                path={`${active.id}.md`}
+                value={active.text}
+                editable
+                plain
+                placeholder="Write anything…"
+                onChange={editNote}
+                onSave={saveNow}
+              />
             ) : (
               <LoadingState className="h-full" />
             )}

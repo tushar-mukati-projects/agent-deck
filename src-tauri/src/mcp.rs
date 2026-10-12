@@ -64,7 +64,6 @@ struct Client {
 #[serde(rename_all = "camelCase")]
 pub struct Description {
     server_info: Value,
-    instructions: Option<String>,
     tools: Vec<Value>,
     resources: Vec<Value>,
     prompts: Vec<Value>,
@@ -392,7 +391,6 @@ impl Client {
             tools: if caps.get("tools").is_some() || caps.is_null() { list("tools/list", "tools")? } else { Vec::new() },
             resources: optional("resources", "resources/list", "resources"),
             prompts: optional("prompts", "prompts/list", "prompts"),
-            instructions: info.get("instructions").and_then(Value::as_str).map(str::to_string),
             server_info: info.get("serverInfo").cloned().unwrap_or(Value::Null),
         })
     }

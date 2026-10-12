@@ -25,11 +25,7 @@ describe("parseTypedPath", () => {
       String.raw`\\wsl.localhost\Debian\home\me\work\app\src\app.py`,
     ],
     ["~/.bashrc", wsl, String.raw`\\wsl.localhost\Debian\home\me\.bashrc`],
-    [
-      "src/app.py#L10-L20",
-      wsl,
-      String.raw`\\wsl.localhost\Debian\home\me\work\app\src\app.py`,
-    ],
+    ["src/app.py#L10-L20", wsl, String.raw`\\wsl.localhost\Debian\home\me\work\app\src\app.py`],
     [
       String.raw`\\wsl.localhost\Debian\etc\hosts`,
       win,

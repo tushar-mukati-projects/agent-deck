@@ -1,9 +1,9 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronRight, Eye, EyeOff, GitCompare, RefreshCw } from "lucide-react";
+import { Eye, EyeOff, GitCompare, RefreshCw } from "lucide-react";
 
 import { EmptyState, Hint, LoadingState } from "@/components/ui/feedback";
 import { IconButton } from "@/components/ui/icon-button";
-import { CollapsibleSection, PanelHeader } from "@/components/ui/panel";
+import { Chevron, CollapsibleSection, PanelHeader } from "@/components/ui/panel";
 import { useAsync, useThrottledCallback } from "@/hooks/useAsync";
 import { useSessionFile } from "@/hooks/useSessionFile";
 import { agentName, CLAUDE } from "@/lib/agents/registry";
@@ -16,7 +16,7 @@ import { DECK_PATH_MIME } from "@/lib/terminal/input";
 import { basename, cn, errorMessage, isWithin, shortenHome } from "@/lib/utils";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useActiveWorkspace, useWorkspaceStore } from "@/stores/workspace-store";
-import type { ChangedFile, GitChange, Workspace } from "@/types";
+import type { ChangedFile, ChangeStatus, GitChange, Workspace } from "@/types";
 
 interface Badge {
   letter: string;
@@ -24,7 +24,7 @@ interface Badge {
   label: string;
 }
 
-const STATUS_BADGE: Record<string, Badge> = {
+const STATUS_BADGE: Record<ChangeStatus, Badge> = {
   added: { letter: "A", className: "text-add", label: "Added" },
   modified: { letter: "M", className: "text-mod", label: "Modified" },
   deleted: { letter: "D", className: "text-del", label: "Deleted" },
@@ -120,12 +120,7 @@ const FolderRow = ({
       className={cn(rowClass, "text-fg/85")}
     >
       <Guides depth={depth} />
-      <ChevronRight
-        className={cn(
-          "size-3 shrink-0 text-faint transition-transform duration-100",
-          open && "rotate-90",
-        )}
-      />
+      <Chevron open={open} className="text-faint" />
       <Icon className={cn("size-3.5 shrink-0", color)} />
       <span className="min-w-0 truncate">{shortenHome(folder.name, home)}</span>
     </button>
@@ -260,7 +255,7 @@ const SessionChanges = ({
           <Row
             path={file.path}
             depth={depth}
-            badge={STATUS_BADGE[file.status] ?? STATUS_BADGE.modified}
+            badge={STATUS_BADGE[file.status]}
             onOpen={() => openDiff(file)}
           >
             <span className="shrink-0 font-mono text-[10.5px]">

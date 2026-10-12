@@ -163,7 +163,6 @@ interface CollapsibleSectionProps {
   icon?: React.ReactNode;
   open: boolean;
   onToggle: () => void;
-  actions?: React.ReactNode;
   summary?: React.ReactNode;
   children: React.ReactNode;
 }
@@ -174,12 +173,11 @@ export const CollapsibleSection = ({
   icon,
   open,
   onToggle,
-  actions,
   summary,
   children,
 }: CollapsibleSectionProps) => (
   <section className="mb-1">
-    <div className="group/section flex h-7 items-center pr-1.5">
+    <div className="flex h-7 items-center pr-1.5">
       <button
         type="button"
         aria-expanded={open}
@@ -194,11 +192,6 @@ export const CollapsibleSection = ({
         )}
         {summary && <span className="ml-auto font-mono font-normal">{summary}</span>}
       </button>
-      {actions && (
-        <div className="flex items-center opacity-0 group-hover/section:opacity-100 focus-within:opacity-100">
-          {actions}
-        </div>
-      )}
     </div>
     {open && <div className="flex flex-col px-1.5">{children}</div>}
   </section>

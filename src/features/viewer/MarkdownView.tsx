@@ -19,7 +19,6 @@ interface MarkdownViewProps {
   source: string;
   baseDir?: string;
   onOpenPath?: (path: string) => void;
-  className?: string;
   compact?: boolean;
 }
 
@@ -107,35 +106,32 @@ const Frontmatter = ({ fields }: { fields: [string, string][] }) => (
   </dl>
 );
 
-export const MarkdownView = memo(
-  ({ source, baseDir, onOpenPath, className, compact }: MarkdownViewProps) => {
-    const components = useMemo(() => buildComponents(baseDir, onOpenPath), [baseDir, onOpenPath]);
-    const { fields, body } = useMemo(() => splitFrontmatter(source), [source]);
-    return (
-      <div
-        className={cn(
-          "markdown-body prose prose-invert max-w-none",
-          "prose-headings:font-semibold prose-headings:tracking-tight prose-a:text-info prose-a:no-underline hover:prose-a:underline",
-          "prose-pre:rounded-lg prose-pre:text-[12px] prose-code:text-[0.86em]",
-          "prose-blockquote:border-l-accent/60 prose-blockquote:text-muted prose-hr:border-border",
-          "prose-th:border prose-th:border-border prose-th:px-3 prose-th:py-1.5 prose-td:border prose-td:border-border prose-td:px-3 prose-td:py-1.5",
-          "prose-img:my-2",
-          compact
-            ? "prose-sm text-[12.5px] leading-[1.65] prose-p:my-1.5 prose-pre:my-2 prose-pre:text-[11.5px] prose-li:my-0.5 prose-ol:my-1.5 prose-ul:my-1.5"
-            : "text-[13px] leading-[1.7]",
-          className,
-        )}
+export const MarkdownView = memo(({ source, baseDir, onOpenPath, compact }: MarkdownViewProps) => {
+  const components = useMemo(() => buildComponents(baseDir, onOpenPath), [baseDir, onOpenPath]);
+  const { fields, body } = useMemo(() => splitFrontmatter(source), [source]);
+  return (
+    <div
+      className={cn(
+        "markdown-body prose prose-invert max-w-none",
+        "prose-headings:font-semibold prose-headings:tracking-tight prose-a:text-info prose-a:no-underline hover:prose-a:underline",
+        "prose-pre:rounded-lg prose-pre:text-[12px] prose-code:text-[0.86em]",
+        "prose-blockquote:border-l-accent/60 prose-blockquote:text-muted prose-hr:border-border",
+        "prose-th:border prose-th:border-border prose-th:px-3 prose-th:py-1.5 prose-td:border prose-td:border-border prose-td:px-3 prose-td:py-1.5",
+        "prose-img:my-2",
+        compact
+          ? "prose-sm text-[12.5px] leading-[1.65] prose-p:my-1.5 prose-pre:my-2 prose-pre:text-[11.5px] prose-li:my-0.5 prose-ol:my-1.5 prose-ul:my-1.5"
+          : "text-[13px] leading-[1.7]",
+      )}
+    >
+      {fields.length > 0 && <Frontmatter fields={fields} />}
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeRaw, [rehypeSanitize, schema], [rehypeHighlight, highlightOptions]]}
+        components={components}
       >
-        {fields.length > 0 && <Frontmatter fields={fields} />}
-        <ReactMarkdown
-          remarkPlugins={[remarkGfm]}
-          rehypePlugins={[rehypeRaw, [rehypeSanitize, schema], [rehypeHighlight, highlightOptions]]}
-          components={components}
-        >
-          {body}
-        </ReactMarkdown>
-      </div>
-    );
-  },
-);
+        {body}
+      </ReactMarkdown>
+    </div>
+  );
+});
 MarkdownView.displayName = "MarkdownView";

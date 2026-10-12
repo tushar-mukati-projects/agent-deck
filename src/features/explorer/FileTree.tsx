@@ -1,7 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   AtSign,
-  ChevronRight,
   Code2,
   Copy,
   ExternalLink,
@@ -21,6 +20,7 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/menu";
+import { Chevron } from "@/components/ui/panel";
 import { fileIcon, folderIcon } from "@/lib/file-icons";
 import { api } from "@/lib/tauri/commands";
 import { copyText, openExternal, revealInExplorer } from "@/lib/tauri/system";
@@ -292,12 +292,9 @@ export const FileTree = ({ workspace }: { workspace: Workspace }) => {
                   ))}
                 <span className="flex w-3 shrink-0 justify-center">
                   {entry.isDir && (
-                    <ChevronRight
-                      className={cn(
-                        "size-3 text-faint transition-transform duration-100",
-                        row.expanded && "rotate-90",
-                        isLoading && "animate-pulse",
-                      )}
+                    <Chevron
+                      open={row.expanded}
+                      className={cn("text-faint", isLoading && "animate-pulse")}
                     />
                   )}
                 </span>

@@ -28,7 +28,7 @@ import type {
   WslIndex,
 } from "@/types";
 
-export interface WriteOptions {
+interface WriteOptions {
   encoding?: FileEncoding;
   expectedModifiedMs?: number | null;
 }

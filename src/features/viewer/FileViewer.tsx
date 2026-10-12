@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { ExternalLink, FileQuestion, FileWarning } from "lucide-react";
 import { toast } from "sonner";
 
@@ -9,6 +9,7 @@ import { EmptyState, LoadingState } from "@/components/ui/feedback";
 import { Alert } from "@/components/ui/panel";
 import { DiffView } from "@/features/changes/DiffView";
 import { McpView } from "@/features/mcp/McpView";
+import { CodeView } from "@/features/viewer/CodeView";
 import { FileTabs } from "@/features/viewer/FileTabs";
 import { FileToolbar } from "@/features/viewer/FileToolbar";
 import { MarkdownView } from "@/features/viewer/MarkdownView";
@@ -22,10 +23,6 @@ import { useUiStore } from "@/stores/ui-store";
 import { useViewerStore } from "@/stores/viewer-store";
 import { findWorkspace, useWorkspaceStore } from "@/stores/workspace-store";
 import type { Workspace } from "@/types";
-
-const CodeView = lazy(() =>
-  import("@/features/viewer/CodeView").then((m) => ({ default: m.CodeView })),
-);
 
 type MediaKind = Exclude<ViewKind, "text" | "markdown">;
 
@@ -184,17 +181,15 @@ const DocumentBody = ({ workspace, path }: { workspace: Workspace; path: string 
         </div>
       );
     return (
-      <Suspense fallback={<LoadingState className="h-full" />}>
-        <CodeView
-          path={path}
-          value={draft ?? text}
-          editable={editing && !readOnly}
-          line={line}
-          onLineShown={clearLine}
-          onChange={handleChange}
-          onSave={() => void save()}
-        />
-      </Suspense>
+      <CodeView
+        path={path}
+        value={draft ?? text}
+        editable={editing && !readOnly}
+        line={line}
+        onLineShown={clearLine}
+        onChange={handleChange}
+        onSave={() => void save()}
+      />
     );
   };
 

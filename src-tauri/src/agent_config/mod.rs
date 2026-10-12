@@ -13,7 +13,7 @@ pub use redact::url_host;
 pub use remove::{remove, Removal};
 pub use servers::{launch, Launch, McpServer, ResolvedServer, Transport};
 
-#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Debug, Default)]
+#[derive(Serialize, Clone, Copy, PartialEq, Eq, Debug, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum Scope {
     #[default]
@@ -57,7 +57,6 @@ pub struct MemoryFile {
     pub path: String,
     pub exists: bool,
     pub description: Option<String>,
-    pub size: u64,
     pub modified_ms: u64,
 }
 
@@ -97,7 +96,6 @@ pub struct SettingsFile {
     pub allow: Vec<String>,
     pub deny: Vec<String>,
     pub ask: Vec<String>,
-    pub env_keys: Vec<String>,
 }
 
 #[derive(Serialize)]
@@ -114,7 +112,6 @@ pub struct Plugin {
 #[serde(rename_all = "camelCase")]
 pub struct Overview {
     pub home: String,
-    pub distro: Option<String>,
     pub memory: Vec<MemoryFile>,
     pub mcp: Vec<McpServer>,
     pub skills: Vec<Item>,

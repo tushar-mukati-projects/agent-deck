@@ -307,7 +307,7 @@ struct Connection {
     target: Target,
     distro: Option<String>,
     last_used: Mutex<Instant>,
-    _relay: Option<Relay>,
+    relay: Option<Relay>,
 }
 
 impl Connection {
@@ -342,12 +342,12 @@ impl Connection {
             target,
             distro: server.distro.clone(),
             last_used: Mutex::new(Instant::now()),
-            _relay: relay,
+            relay,
         })
     }
 
     fn alive(&self) -> bool {
-        !self.client.is_closed() && self._relay.as_ref().is_none_or(|r| r.process.running())
+        !self.client.is_closed() && self.relay.as_ref().is_none_or(|r| r.process.running())
     }
 
     async fn valid(&self) -> bool {
@@ -500,41 +500,6 @@ mod tests {
         assert!(detect(&launch(&[], &[("DB_HOST", "h")]), false).is_none());
         assert!(detect(&launch(&[], &[("DB_HOST", "h")]), true).is_some());
         assert!(detect(&launch(&[], &[("PG_HOST", "h"), ("PG_PORT", "x")]), false).unwrap().is_err());
-    }
-
-    fn probe(cwd: &str, id: &str) {
-        let pg = Arc::new(PgManager::default());
-        let info = pg.info(cwd, id).unwrap();
-        println!("{cwd} {}:{} db={} user={}", info.host, info.port, info.database, info.user);
-        let started = Instant::now();
-        let output = pg.query(cwd, id, "select 1 as one, 'x' as two; select 2").unwrap();
-        println!("first query {:?} results={}", started.elapsed(), output.results.len());
-        assert_eq!(output.results[0].rows, [[Some("1".to_string()), Some("x".to_string())]]);
-        assert_eq!(output.results[1].rows, [[Some("2".to_string())]]);
-        let started = Instant::now();
-        pg.query(cwd, id, "select 3").unwrap();
-        println!("warm query {:?}", started.elapsed());
-        let sleeper = {
-            let (pg, cwd, id) = (pg.clone(), cwd.to_string(), id.to_string());
-            std::thread::spawn(move || pg.query(&cwd, &id, "select pg_sleep(20)"))
-        };
-        std::thread::sleep(Duration::from_millis(1500));
-        let started = Instant::now();
-        pg.cancel(cwd, id).unwrap();
-        let cancelled = sleeper.join().unwrap();
-        println!("cancel took {:?}: {:?}", started.elapsed(), cancelled.as_ref().err().map(|e| e.to_string()));
-        assert!(cancelled.is_err() && started.elapsed() < Duration::from_secs(10));
-        assert!(pg.query(cwd, id, "select 4").is_ok());
-        assert!(pg.query(cwd, id, "select * from table_that_does_not_exist_deck").is_err());
-        assert!(pg.query(cwd, id, "select 5").is_ok());
-        pg.shutdown_all();
-    }
-
-    #[test]
-    #[ignore]
-    fn probe_real_servers() {
-        probe(&dirs::home_dir().unwrap().to_string_lossy(), "user:postgres");
-        probe(r"\\wsl.localhost\Debian\home\me\work\app", "local:postgres");
     }
 
     #[test]

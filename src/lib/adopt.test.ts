@@ -32,7 +32,6 @@ const codexSession = (id: string, started: number, cwd = "C:\\repo"): SessionInf
   lastPrompt: null,
   gitBranch: null,
   startedAt: new Date(started).toISOString(),
-  lastMessageAt: null,
   modifiedMs: started,
   promptCount: 1,
   size: 1,

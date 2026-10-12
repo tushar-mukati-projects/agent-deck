@@ -20,7 +20,6 @@ const session = (
   lastPrompt: null,
   gitBranch: null,
   startedAt: null,
-  lastMessageAt: null,
   modifiedMs,
   promptCount: 1,
   size: 10,

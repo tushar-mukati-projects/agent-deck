@@ -13,13 +13,11 @@ const settings = (extra: Partial<SettingsFile>): SettingsFile => ({
   allow: [],
   deny: [],
   ask: [],
-  envKeys: [],
   ...extra,
 });
 
 const overview: AgentOverview = {
   home: "C:\\u\\.claude",
-  distro: null,
   memory: [],
   mcp: [],
   skills: [{ name: "review", description: "Review a PR", path: "a", scope: "user", plugin: null }],

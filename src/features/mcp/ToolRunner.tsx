@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Play, Wrench } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -7,15 +7,12 @@ import { Kbd } from "@/components/ui/kbd";
 import { Alert, ScopeBadge } from "@/components/ui/panel";
 import { CallResult } from "@/features/mcp/CallResult";
 import { confirmReason, exampleArguments } from "@/features/mcp/schema";
+import { CodeView } from "@/features/viewer/CodeView";
 import { MarkdownView } from "@/features/viewer/MarkdownView";
 import { api } from "@/lib/tauri/commands";
 import { errorMessage } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
 import type { JsonSchema, McpTool } from "@/types";
-
-const CodeView = lazy(() =>
-  import("@/features/viewer/CodeView").then((m) => ({ default: m.CodeView })),
-);
 
 const typeLabel = (schema: JsonSchema) =>
   Array.isArray(schema.type) ? schema.type.join(" | ") : (schema.type ?? "any");
@@ -126,15 +123,13 @@ export const ToolRunner = ({
       )}
       <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-[1fr_280px]">
         <div className="h-[180px] overflow-hidden rounded-md border border-border bg-code-bg">
-          <Suspense fallback={<Spinner className="m-3" />}>
-            <CodeView
-              path="arguments.json"
-              value={args}
-              editable
-              onChange={setArgs}
-              onSave={() => void run()}
-            />
-          </Suspense>
+          <CodeView
+            path="arguments.json"
+            value={args}
+            editable
+            onChange={setArgs}
+            onSave={() => void run()}
+          />
         </div>
         <div className="max-h-[180px] overflow-y-auto">
           <Parameters schema={tool.inputSchema} />

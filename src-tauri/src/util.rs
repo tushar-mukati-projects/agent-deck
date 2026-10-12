@@ -247,14 +247,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
-    fn probe_wsl_canonical_form() {
-        let resolved = guarded(Path::new(r"\\wsl.localhost\Debian\etc\hostname")).unwrap();
-        println!("resolved={} host={:?}", resolved.display(), crate::wsl::parse_host_path(&resolved.to_string_lossy()));
-        assert!(crate::wsl::parse_host_path(&resolved.to_string_lossy()).is_some());
-    }
-
-    #[test]
     fn guard_resolves_before_checking() {
         assert!(guarded(Path::new(r"\\attacker\share\a.png")).is_err());
         assert!(guarded(Path::new("relative.txt")).is_err());

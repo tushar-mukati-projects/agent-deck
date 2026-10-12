@@ -1,7 +1,7 @@
 const DIFF_PREFIX = "diff::";
 const MCP_PREFIX = "mcp::";
 
-export type DiffSource = "session" | "git";
+type DiffSource = "session" | "git";
 
 export interface DiffTab {
   source: DiffSource;

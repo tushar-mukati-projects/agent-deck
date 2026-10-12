@@ -710,15 +710,4 @@ mod tests {
         assert!(String::from_utf8_lossy(&left.stdout).trim().is_empty(), "watcher still running");
         sh("rm -rf /tmp/deck-watch-test");
     }
-
-    #[test]
-    #[ignore]
-    fn probe_real_wsl() {
-        let start = Instant::now();
-        let result = index();
-        println!("wsl sessions={} errors={:?} distros={:?} in {:?}", result.sessions.len(), result.errors, result.distros, start.elapsed());
-        let start = Instant::now();
-        let again = index();
-        println!("warm={} in {:?} live={}", again.sessions.len(), start.elapsed(), live_sessions().len());
-    }
 }

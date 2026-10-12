@@ -9,7 +9,7 @@ import { errorMessage } from "@/lib/utils";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore } from "@/stores/settings-store";
 
-export const useStartDistro = () => {
+const useStartDistro = () => {
   const [starting, setStarting] = useState<string | null>(null);
   const start = async (name: string) => {
     setStarting(name);

@@ -9,7 +9,6 @@ import {
   isPersisted,
   planLaunch,
   shellSpec,
-  type LaunchOptions,
   type LaunchPlan,
 } from "@/lib/agents/launch";
 import { agentName, CLAUDE, findAgent, getAgent } from "@/lib/agents/registry";
@@ -33,7 +32,7 @@ interface WorkspaceState {
   activeId: string | null;
   recentlyClosed: string[];
   openSession: (session: SessionInfo) => string;
-  launch: (workspaceId: string, options?: LaunchOptions) => string | null;
+  launch: (workspaceId: string) => string | null;
   fork: (source: Workspace) => string | null;
   newSession: (cwd: string, options?: NewSessionOptions) => string | null;
   restartAgent: (workspaceId: string, focus?: boolean) => void;
@@ -145,15 +144,14 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           return add(workspaceFromSession(session));
         },
 
-        launch: (workspaceId, options = {}) => {
+        launch: (workspaceId) => {
           const workspace = find(workspaceId);
           if (!workspace || !agentAvailable(workspace.agent)) return null;
-          if (workspace.mode === "live" && !options.fork) {
+          if (workspace.mode === "live") {
             get().activate(workspaceId);
             return workspaceId;
           }
-          if (options.fork) return get().fork(workspace);
-          const next = withAgent(workspace, planLaunch(workspace, options));
+          const next = withAgent(workspace, planLaunch(workspace));
           set((s) => ({
             workspaces: s.workspaces.map((w) => (w.id === workspaceId ? next : w)),
             activeId: workspaceId,

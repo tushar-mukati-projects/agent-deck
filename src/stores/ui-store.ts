@@ -3,7 +3,7 @@ import { persist } from "zustand/middleware";
 
 import type { ContextView, SessionInfo } from "@/types";
 
-export type PaletteMode = "all" | "files" | "commands" | "chats";
+export type PaletteMode = "all" | "files" | "chats";
 
 interface ConfirmRequest {
   title: string;

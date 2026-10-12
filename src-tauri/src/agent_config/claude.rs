@@ -8,7 +8,7 @@ use serde_json::{Map, Value};
 
 use super::{
     ctx::{self, project_dirs, project_key, Ctx},
-    files::{auto_memory, folder_name, json_file, keys, markdown_items, memory_file, skill_dirs, sort_by_name, string, strings, Items, JsonFile},
+    files::{auto_memory, folder_name, json_file, markdown_items, memory_file, skill_dirs, sort_by_name, string, strings, Items, JsonFile},
     redact,
     servers::{self, describe_all, RawServer, ResolvedServer},
     Hook, Item, MemoryFile, Overview, Plugin, Scope, SettingsFile,
@@ -149,7 +149,6 @@ fn settings_file(entry: &SettingsEntry) -> SettingsFile {
         allow: strings(perms.and_then(|p| p.get("allow"))),
         deny: strings(perms.and_then(|p| p.get("deny"))),
         ask: strings(perms.and_then(|p| p.get("ask"))),
-        env_keys: keys(value.and_then(|v| v.get("env"))),
         path: entry.path.to_string_lossy().to_string(),
     }
 }
@@ -241,7 +240,6 @@ pub fn overview(cwd: &str) -> anyhow::Result<Overview> {
                 path: p.root.to_string_lossy().to_string(),
             })
             .collect(),
-        distro,
     })
 }
 

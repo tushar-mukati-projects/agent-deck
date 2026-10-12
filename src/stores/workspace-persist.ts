@@ -2,7 +2,7 @@ import { samePath } from "@/lib/utils";
 import { blankWorkspace } from "@/stores/workspace-factory";
 import type { Workspace } from "@/types";
 
-export interface SavedWorkspaces {
+interface SavedWorkspaces {
   workspaces: Workspace[];
   activeId: string | null;
 }

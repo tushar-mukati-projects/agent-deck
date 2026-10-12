@@ -7,7 +7,7 @@ export interface LaunchContext {
   subagent?: string;
 }
 
-export interface AgentDefinition {
+interface AgentDefinition {
   id: AgentId;
   name: string;
   command: string[];

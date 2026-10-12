@@ -28,7 +28,7 @@ export const contrast = (a: string, b: string) => {
   return (hi + 0.05) / (lo + 0.05);
 };
 
-export const mix = (from: string, to: string, amount: number) => {
+const mix = (from: string, to: string, amount: number) => {
   const a = parseHex(from);
   const b = parseHex(to);
   return toHex(a.map((v, i) => v + (b[i] - v) * amount));

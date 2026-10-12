@@ -248,8 +248,6 @@ export const startTerminal = (spec: TerminalSpec, options?: { focus?: boolean })
   store().upsert({
     id: spec.id,
     kind: spec.kind,
-    workspaceId: spec.workspaceId,
-    cwd: spec.root,
     status: "starting",
     pid: null,
     exitCode: null,

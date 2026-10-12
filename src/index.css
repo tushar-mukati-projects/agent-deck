@@ -152,10 +152,6 @@
   scrollbar-width: none;
 }
 
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-
 .xterm {
   padding: 10px 0 6px 14px;
   height: 100%;
@@ -172,9 +168,6 @@
 
 .markdown-body {
   user-select: text;
-}
-
-.markdown-body {
   --tw-prose-invert-body: color-mix(in srgb, var(--color-fg) 86%, var(--color-bg));
   --tw-prose-invert-headings: var(--color-fg);
   --tw-prose-invert-bold: var(--color-fg);
@@ -192,6 +185,10 @@
 
 .markdown-body :not(pre) > code {
   color: var(--syntax-string, var(--color-fg));
+  background: color-mix(in srgb, var(--color-fg) 8%, transparent);
+  border-radius: 4px;
+  padding: 0.15em 0.4em;
+  font-weight: 450;
 }
 
 .markdown-body strong {
@@ -206,13 +203,6 @@
 .markdown-body pre code.hljs {
   background: transparent;
   padding: 0;
-}
-
-.markdown-body :not(pre) > code {
-  background: color-mix(in srgb, var(--color-fg) 8%, transparent);
-  border-radius: 4px;
-  padding: 0.15em 0.4em;
-  font-weight: 450;
 }
 
 .markdown-body :not(pre) > code::before,

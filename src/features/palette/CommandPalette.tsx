@@ -11,7 +11,6 @@ import { useUiStore, type PaletteMode } from "@/stores/ui-store";
 const placeholders: Record<PaletteMode, string> = {
   all: "Search sessions, open tabs, files…   (type > for actions)",
   files: "Go to file…",
-  commands: "Run an action…",
   chats: "Search inside every conversation…",
 };
 
@@ -26,7 +25,7 @@ const PaletteList = ({
   onClose: () => void;
   inputRef: React.RefObject<HTMLInputElement | null>;
 }) => {
-  const [query, setQuery] = useState(mode === "commands" ? ">" : "");
+  const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(0);
   const [enterQueued, setEnterQueued] = useState(false);
   const { items, loading, emptyHint } = usePaletteItems(mode, query);

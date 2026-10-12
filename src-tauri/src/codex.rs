@@ -177,7 +177,6 @@ struct FileChange {
     created: bool,
     additions: u32,
     deletions: u32,
-    edits: u32,
 }
 
 fn key_of(path: &str) -> String {
@@ -204,10 +203,9 @@ impl Changes {
             (_, ChangeStatus::Modified) if created => ChangeStatus::Added,
             (_, next) => next,
         };
-        let mut change = existing.unwrap_or(FileChange { path, status, created, additions: 0, deletions: 0, edits: 0 });
+        let mut change = existing.unwrap_or(FileChange { path, status, created, additions: 0, deletions: 0 });
         change.status = status;
         change.created = created;
-        change.edits += 1;
         if status == ChangeStatus::Deleted && created {
             return key;
         }
@@ -302,7 +300,6 @@ pub fn changes_from_lines(
                 status,
                 additions: change.additions,
                 deletions: change.deletions,
-                edits: change.edits,
                 backup: None,
             })
         })

@@ -3,7 +3,7 @@ use std::{collections::HashMap, path::PathBuf};
 use serde::Serialize;
 use serde_json::{Map, Value};
 
-use super::{files::keys, files::strings, redact, Scope};
+use super::{files::strings, redact, Scope};
 use crate::wsl;
 
 #[derive(Serialize)]
@@ -18,8 +18,6 @@ pub struct McpServer {
     pub command: Option<String>,
     pub args: Vec<String>,
     pub url: Option<String>,
-    pub env_keys: Vec<String>,
-    pub header_keys: Vec<String>,
     pub postgres: bool,
     pub disabled: bool,
 }
@@ -152,8 +150,6 @@ fn describe_server(raw: &RawServer, server: &ResolvedServer) -> McpServer {
         command: config.get("command").and_then(Value::as_str).map(redact::mask_text),
         args: redact::mask_args(&strings(config.get("args"))),
         url: config.get("url").and_then(Value::as_str).map(redact::mask_url),
-        env_keys: keys(config.get("env")),
-        header_keys: keys(config.get("headers")),
         postgres,
         disabled: raw.disabled,
     }

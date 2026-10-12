@@ -21,7 +21,6 @@ const task = (
   endedMinutesAgo: number | null = null,
 ): AgentTask => ({
   id,
-  tool: "Bash",
   command: `run ${id}`,
   description: null,
   outputPath: null,

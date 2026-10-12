@@ -32,8 +32,6 @@ const workspace = (extra: Partial<Workspace> = {}): Workspace => ({
 const terminal = (extra: Partial<TerminalState> = {}): TerminalState => ({
   id: "term",
   kind: "agent",
-  workspaceId: "w",
-  cwd: "C:\\repo",
   status: "running",
   pid: 42,
   exitCode: null,
@@ -47,10 +45,7 @@ const live = (status: string, pid = 42): LiveSession => ({
   distro: null,
   sessionId: id,
   pid,
-  cwd: "C:\\repo",
   status,
-  kind: "interactive",
-  name: null,
   startedAt: 1,
 });
 

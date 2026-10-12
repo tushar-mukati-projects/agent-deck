@@ -1,6 +1,6 @@
 import type { AgentOverview, ConfigItem, ConfigScope, McpServer, SettingsFile } from "@/types";
 
-export type RuleKind = "allow" | "ask" | "deny";
+type RuleKind = "allow" | "ask" | "deny";
 
 export interface PermissionRule {
   kind: RuleKind;
@@ -29,7 +29,7 @@ export const modeLabel = (file: SettingsFile) =>
     .filter(Boolean)
     .join(" · ");
 
-const matches = (query: string, ...fields: (string | null | undefined)[]) =>
+export const matches = (query: string, ...fields: (string | null | undefined)[]) =>
   !query || fields.some((f) => f?.toLowerCase().includes(query));
 
 export const filterOverview = (overview: AgentOverview, query: string) => {

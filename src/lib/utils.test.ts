@@ -13,7 +13,7 @@ import { parseWslPath, shellQuote } from "@/lib/wsl";
 
 describe("normalizePath", () => {
   it("lowercases Windows paths", () => {
-    expect(normalizePath("C:\\Users\\Me\\Repo\\")).toBe("c:\\users\\me\\repo");
+    expect(normalizePath("C:\\Users\\me\\Repo\\")).toBe("c:\\users\\me\\repo");
   });
 
   it("keeps Linux paths case-sensitive and unifies the WSL prefix and distro", () => {

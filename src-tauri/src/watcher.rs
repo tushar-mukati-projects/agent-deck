@@ -35,14 +35,14 @@ struct WslWatch {
 }
 
 enum WatchHandle {
-    Native(#[allow(dead_code)] notify::RecommendedWatcher),
+    Native { _watcher: notify::RecommendedWatcher },
     Wsl(WslWatch),
 }
 
 impl WatchHandle {
     fn reusable(&self) -> bool {
         match self {
-            WatchHandle::Native(_) => false,
+            WatchHandle::Native { .. } => false,
             WatchHandle::Wsl(watch) => watch.process.running(),
         }
     }
@@ -171,7 +171,7 @@ impl Watchers {
             None => {
                 let mut watcher = make_watcher(tx)?;
                 watcher.watch(Path::new(&root), RecursiveMode::Recursive)?;
-                WatchHandle::Native(watcher)
+                WatchHandle::Native { _watcher: watcher }
             }
         };
         let replaced = self.roots.lock().insert(root, handle);

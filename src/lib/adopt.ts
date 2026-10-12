@@ -1,7 +1,7 @@
 import { samePath } from "@/lib/utils";
 import type { SessionInfo, Workspace } from "@/types";
 
-export const ADOPT_BEFORE_MS = 20_000;
+const ADOPT_BEFORE_MS = 20_000;
 export const ADOPT_AFTER_MS = 10 * 60_000;
 
 const startedMs = (session: SessionInfo) => Date.parse(session.startedAt ?? "");

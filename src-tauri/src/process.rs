@@ -27,7 +27,7 @@ impl Job {
                     handle,
                     JobObjectExtendedLimitInformation,
                     &info as *const _ as *const core::ffi::c_void,
-                    std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
+                    size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
                 );
                 AssignProcessToJobObject(handle, child.as_raw_handle() as _);
             }

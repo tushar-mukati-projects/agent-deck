@@ -64,7 +64,6 @@ export interface PaletteItem {
   run: () => void;
 }
 
-const MAX_PER_GROUP = 40;
 const FILE_CACHE_MS = 20_000;
 const CHAT_SEARCH_DELAY_MS = 250;
 const fileCache = new Map<string, { at: number; files: string[] }>();
@@ -250,7 +249,7 @@ const buildCommands = (workspace: Workspace | null): CommandDef[] => {
   ];
 };
 
-const sortTop = (list: PaletteItem[], limit = MAX_PER_GROUP) =>
+const sortTop = (list: PaletteItem[], limit: number) =>
   list.sort((a, b) => b.score - a.score).slice(0, limit);
 
 const topFiles = (files: string[], query: string, limit: number) => {
@@ -279,7 +278,7 @@ export const usePaletteItems = (mode: PaletteMode, liveQuery: string) => {
   const home = useSessionsStore((s) => s.environment?.home ?? "");
   const workspaces = useWorkspaceStore((s) => s.workspaces);
   const workspace = useActiveWorkspace();
-  const commandMode = mode === "commands" || (mode === "all" && rawQuery.startsWith(">"));
+  const commandMode = mode === "all" && rawQuery.startsWith(">");
   const query = (commandMode ? rawQuery.replace(/^>/, "") : rawQuery).trim().toLowerCase();
   const files = useFileList(
     workspace?.cwd ?? null,

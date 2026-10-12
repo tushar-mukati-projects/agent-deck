@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Play, Square } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -6,14 +6,11 @@ import { Spinner } from "@/components/ui/feedback";
 import { Kbd } from "@/components/ui/kbd";
 import { Alert } from "@/components/ui/panel";
 import { ResultGrid } from "@/features/mcp/ResultGrid";
+import { CodeView } from "@/features/viewer/CodeView";
 import { isMutating } from "@/lib/sql";
 import { errorMessage } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
 import type { PgOutput } from "@/types";
-
-const CodeView = lazy(() =>
-  import("@/features/viewer/CodeView").then((m) => ({ default: m.CodeView })),
-);
 
 const DEFAULT_SQL = "select now();";
 const draftKey = (serverId: string) => `claude-deck:sql:${serverId}`;
@@ -86,15 +83,13 @@ export const SqlPane = ({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="h-[34%] min-h-[120px] shrink-0 overflow-hidden border-b border-border bg-code-bg">
-        <Suspense fallback={<Spinner className="m-3" />}>
-          <CodeView
-            path="query.sql"
-            value={sql}
-            editable
-            onChange={setSql}
-            onSave={() => void execute()}
-          />
-        </Suspense>
+        <CodeView
+          path="query.sql"
+          value={sql}
+          editable
+          onChange={setSql}
+          onSave={() => void execute()}
+        />
       </div>
       <div className="flex shrink-0 items-center gap-2 px-3 py-2">
         <Button size="sm" variant="primary" disabled={running} onClick={() => void execute()}>

@@ -27,8 +27,6 @@ pub struct DirEntry {
     pub is_dir: bool,
     pub is_symlink: bool,
     pub hidden: bool,
-    pub size: u64,
-    pub modified_ms: u64,
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
@@ -62,8 +60,6 @@ pub enum WriteOutcome {
 #[serde(rename_all = "camelCase")]
 pub struct PathStat {
     pub kind: &'static str,
-    pub size: u64,
-    pub modified_ms: u64,
 }
 
 #[cfg(windows)]
@@ -93,8 +89,6 @@ pub fn list_dir(path: &str) -> anyhow::Result<Vec<DirEntry>> {
                 path: entry.path().to_string_lossy().to_string(),
                 is_dir: meta.is_dir(),
                 is_symlink,
-                size: if meta.is_dir() { 0 } else { meta.len() },
-                modified_ms: mtime_ms(&meta),
                 name,
             })
         })
@@ -233,7 +227,6 @@ pub fn write_file(
 #[serde(rename_all = "camelCase")]
 pub struct FileTail {
     pub text: String,
-    pub size: u64,
     pub truncated: bool,
 }
 
@@ -251,17 +244,13 @@ pub fn read_tail(path: &str, max_bytes: u64) -> anyhow::Result<FileTail> {
             text.drain(..=newline);
         }
     }
-    Ok(FileTail { text, size, truncated: start > 0 })
+    Ok(FileTail { text, truncated: start > 0 })
 }
 
 pub fn stat_path(path: &str) -> anyhow::Result<Option<PathStat>> {
     let target = guarded(Path::new(path))?;
     match fs::metadata(&target) {
-        Ok(meta) => Ok(Some(PathStat {
-            kind: if meta.is_dir() { "dir" } else { "file" },
-            size: if meta.is_dir() { 0 } else { meta.len() },
-            modified_ms: mtime_ms(&meta),
-        })),
+        Ok(meta) => Ok(Some(PathStat { kind: if meta.is_dir() { "dir" } else { "file" } })),
         Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
         Err(error) => Err(error).with_context(|| format!("Cannot open {path}")),
     }

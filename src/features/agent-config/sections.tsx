@@ -45,12 +45,12 @@ import {
 import { encodeMcpTab } from "@/lib/diff-tabs";
 import { api } from "@/lib/tauri/commands";
 import { revealInExplorer } from "@/lib/tauri/system";
-import { cn, errorMessage } from "@/lib/utils";
+import { errorMessage } from "@/lib/utils";
 import { useViewerStore } from "@/stores/viewer-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import type { ConfigAgent, ConfigItem, Workspace } from "@/types";
 
-export interface SectionProps {
+interface SectionProps {
   workspace: Workspace;
   agent: ConfigAgent;
   profile: AgentProfile;
@@ -281,7 +281,7 @@ const PermissionsSection = ({ workspace, agent, profile, data }: SectionProps) =
     {data.permissions.map((permission, index) => (
       <ListRow
         key={`${permission.file.path}:${permission.kind}:${index}`}
-        icon={<ShieldCheck className={cn(RULE_TONE[permission.kind])} />}
+        icon={<ShieldCheck className={RULE_TONE[permission.kind]} />}
         title={permission.rule}
         mono
         badge={<ScopeBadge>{permission.kind}</ScopeBadge>}

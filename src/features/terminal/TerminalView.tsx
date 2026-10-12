@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 
 interface TerminalViewProps {
   terminalId: string;
-  dropText?: (path: string) => string;
+  dropText: (path: string) => string;
   dropLabel?: string;
 }
 
@@ -117,13 +117,12 @@ export const TerminalView = ({ terminalId, dropText, dropLabel }: TerminalViewPr
     };
   }, [terminalId]);
 
-  const acceptsDrop = (event: React.DragEvent) =>
-    !!dropText && event.dataTransfer.types.includes(DECK_PATH_MIME);
+  const acceptsDrop = (event: React.DragEvent) => event.dataTransfer.types.includes(DECK_PATH_MIME);
 
   const handleDrop = (event: React.DragEvent) => {
     setDragging(false);
     const path = event.dataTransfer.getData(DECK_PATH_MIME);
-    if (!path || !dropText) return;
+    if (!path) return;
     event.preventDefault();
     pasteIntoTerminal(terminalId, dropText(path));
   };

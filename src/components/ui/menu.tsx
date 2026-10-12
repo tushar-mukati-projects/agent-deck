@@ -76,12 +76,11 @@ export const DropdownMenuContent = ({
   </DropdownPrimitive.Portal>
 );
 
-export const DropdownMenuItem = ({ destructive, disabled, onSelect, ...body }: ItemProps) => (
-  <DropdownPrimitive.Item
-    disabled={disabled}
-    onSelect={onSelect}
-    className={cn(itemClass, destructive && destructiveClass)}
-  >
+export const DropdownMenuItem = ({
+  onSelect,
+  ...body
+}: Omit<ItemProps, "destructive" | "disabled">) => (
+  <DropdownPrimitive.Item onSelect={onSelect} className={itemClass}>
     <ItemBody {...body} />
   </DropdownPrimitive.Item>
 );

@@ -21,7 +21,6 @@ export interface SessionInfo {
   lastPrompt: string | null;
   gitBranch: string | null;
   startedAt: string | null;
-  lastMessageAt: string | null;
   modifiedMs: number;
   promptCount: number;
   size: number;
@@ -33,10 +32,7 @@ export interface LiveSession {
   distro: string | null;
   sessionId: string;
   pid: number;
-  cwd: string | null;
   status: string | null;
-  kind: string | null;
-  name: string | null;
   startedAt: number | null;
 }
 
@@ -44,7 +40,6 @@ export interface TranscriptItem {
   role: "user" | "assistant";
   kind: "text" | "tool";
   text: string;
-  timestamp: string | null;
 }
 
 export interface DirEntry {
@@ -53,8 +48,6 @@ export interface DirEntry {
   isDir: boolean;
   isSymlink: boolean;
   hidden: boolean;
-  size: number;
-  modifiedMs: number;
 }
 
 export interface TranscriptPage {
@@ -92,7 +85,6 @@ export interface SessionTasks {
 
 export interface AgentTask {
   id: string;
-  tool: string;
   command: string;
   description: string | null;
   outputPath: string | null;
@@ -104,14 +96,11 @@ export interface AgentTask {
 
 export interface FileTail {
   text: string;
-  size: number;
   truncated: boolean;
 }
 
 export interface PathStat {
   kind: "file" | "dir";
-  size: number;
-  modifiedMs: number;
 }
 
 export interface PtyInfo {
@@ -134,7 +123,6 @@ export interface SpawnRequest {
 
 export interface AppEnvironment {
   home: string;
-  claudeHome: string;
   shell: string;
   claudeFound: boolean;
   codexFound: boolean;
@@ -147,7 +135,6 @@ export interface ChangedFile {
   status: ChangeStatus;
   additions: number;
   deletions: number;
-  edits: number;
   backup: string | null;
 }
 
@@ -160,7 +147,6 @@ export interface SearchHit {
   sessionId: string;
   role: "user" | "assistant";
   snippet: string;
-  timestamp: string | null;
 }
 
 export type ConfigScope = "user" | "project" | "local" | "plugin" | "auto" | "system";
@@ -171,7 +157,6 @@ export interface MemoryFile {
   path: string;
   exists: boolean;
   description: string | null;
-  size: number;
   modifiedMs: number;
 }
 
@@ -185,8 +170,6 @@ export interface McpServer {
   command: string | null;
   args: string[];
   url: string | null;
-  envKeys: string[];
-  headerKeys: string[];
   postgres: boolean;
   disabled: boolean;
 }
@@ -221,7 +204,6 @@ export interface SettingsFile {
   allow: string[];
   deny: string[];
   ask: string[];
-  envKeys: string[];
 }
 
 export interface ConfigPlugin {
@@ -234,7 +216,6 @@ export interface ConfigPlugin {
 
 export interface AgentOverview {
   home: string;
-  distro: string | null;
   memory: MemoryFile[];
   mcp: McpServer[];
   skills: ConfigItem[];
@@ -274,7 +255,6 @@ export interface JsonSchema {
 
 export interface McpDescription {
   serverInfo: { name?: string; title?: string; version?: string } | null;
-  instructions: string | null;
   tools: McpTool[];
   resources: { uri: string; name?: string; description?: string; mimeType?: string }[];
   prompts: { name: string; description?: string }[];
@@ -319,13 +299,11 @@ export interface FsChange {
 
 export type TerminalKind = "agent" | "shell";
 
-export type TerminalStatus = "starting" | "running" | "exited" | "error";
+type TerminalStatus = "starting" | "running" | "exited" | "error";
 
 export interface TerminalState {
   id: string;
   kind: TerminalKind;
-  workspaceId: string;
-  cwd: string;
   status: TerminalStatus;
   pid: number | null;
   exitCode: number | null;
@@ -334,7 +312,7 @@ export interface TerminalState {
   attention: boolean;
 }
 
-export type WorkspaceMode = "preview" | "live";
+type WorkspaceMode = "preview" | "live";
 
 export interface ShellTab {
   id: string;

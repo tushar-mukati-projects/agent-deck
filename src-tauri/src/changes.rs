@@ -34,14 +34,12 @@ pub struct ChangedFile {
     pub status: ChangeStatus,
     pub additions: u32,
     pub deletions: u32,
-    pub edits: u32,
     pub backup: Option<String>,
 }
 
 #[derive(Default)]
 struct Tracked {
     hash: Option<String>,
-    edits: u32,
 }
 
 fn read_text(path: &Path) -> Option<String> {
@@ -92,7 +90,7 @@ fn record_edits(value: &Value, tracked: &mut BTreeMap<String, Tracked>) {
             .and_then(|i| i.get("file_path").or_else(|| i.get("notebook_path")))
             .and_then(Value::as_str);
         if let (true, Some(target)) = (is_edit, target) {
-            tracked.entry(target.to_string()).or_default().edits += 1;
+            tracked.entry(target.to_string()).or_default();
         }
     }
 }
@@ -151,7 +149,6 @@ fn describe(path: PathBuf, info: Tracked, backups_dir: &Path) -> Option<ChangedF
         status,
         additions,
         deletions,
-        edits: info.edits,
         backup,
     })
 }
@@ -169,7 +166,6 @@ pub fn session_changes(jsonl: &str) -> anyhow::Result<Vec<ChangedFile>> {
         let absolute = resolve(&cwd, &raw);
         let key = absolute.to_string_lossy().replace('/', "\\").to_lowercase();
         let entry = merged.entry(key).or_insert_with(|| (absolute, Tracked::default()));
-        entry.1.edits += info.edits;
         entry.1.hash = entry.1.hash.take().or(info.hash);
     }
 
@@ -208,15 +204,5 @@ mod tests {
         assert!(valid_backup_name("01e3ec2df9d0f6df@v1"));
         assert!(!valid_backup_name("../secrets@v1"));
         assert!(!valid_backup_name("abc@v"));
-    }
-
-    #[test]
-    #[ignore]
-    fn probe_real_changes() {
-        let sessions = crate::sessions::list_sessions();
-        let session = sessions.iter().find(|s| s.cwd.contains("demo")).unwrap();
-        let start = std::time::Instant::now();
-        let files = session_changes(&session.file_path).unwrap();
-        println!("{} files in {:?}", files.len(), start.elapsed());
     }
 }

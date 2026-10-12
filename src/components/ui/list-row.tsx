@@ -6,7 +6,7 @@ interface ListRowProps {
   subtitle?: string | null;
   badge?: React.ReactNode;
   meta?: React.ReactNode;
-  onClick?: () => void;
+  onClick: () => void;
   actions?: React.ReactNode;
   selected?: boolean;
   dim?: boolean;
@@ -38,7 +38,7 @@ export const ListRow = ({
     <button
       type="button"
       onClick={onClick}
-      disabled={disabled || !onClick}
+      disabled={disabled}
       title={subtitle ?? title}
       aria-current={selected || undefined}
       className="min-w-0 flex-1 text-left disabled:cursor-default"

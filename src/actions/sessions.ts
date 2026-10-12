@@ -83,9 +83,9 @@ export const startNewSession = (cwd: string, agent?: AgentId) =>
     .getState()
     .newSession(cwd, { agent: agent ?? useSettingsStore.getState().defaultAgent });
 
-export const startSessionInPickedFolder = async (defaultPath?: string, agent?: AgentId) => {
+export const startSessionInPickedFolder = async (defaultPath?: string) => {
   const folder = await pickFolder(defaultPath);
-  if (folder) startNewSession(folder, agent);
+  if (folder) startNewSession(folder);
 };
 
 export const startAgentSession = (cwd: string, subagent: string) => {

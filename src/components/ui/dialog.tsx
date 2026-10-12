@@ -52,16 +52,16 @@ export const Dialog = ({
           )}
         >
           <DialogPrimitive.Title
-            className={cn(hideHeader ? "sr-only" : "px-5 pt-4 text-[15px] font-semibold")}
+            className={hideHeader ? "sr-only" : "px-5 pt-4 text-[15px] font-semibold"}
           >
             {title}
           </DialogPrimitive.Title>
           <DialogPrimitive.Description
-            className={cn(
+            className={
               hideHeader || !description
                 ? "sr-only"
-                : "px-5 pt-1 text-[12.5px] leading-relaxed text-muted",
-            )}
+                : "px-5 pt-1 text-[12.5px] leading-relaxed text-muted"
+            }
           >
             {description ?? title}
           </DialogPrimitive.Description>

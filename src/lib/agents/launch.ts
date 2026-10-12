@@ -6,7 +6,7 @@ import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import type { SessionInfo, ShellTab, Workspace } from "@/types";
 
-export interface LaunchOptions extends LaunchContext {
+interface LaunchOptions extends LaunchContext {
   fork?: boolean;
 }
 

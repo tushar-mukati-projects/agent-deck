@@ -27,7 +27,7 @@ const loaders = new Map<string, () => Promise<void>>();
 
 const entryKey = (cwd: string, agent: ConfigAgent) => `${agent}:${normalizePath(cwd)}`;
 
-export const useOverviewStore = create<OverviewState>((set) => {
+const useOverviewStore = create<OverviewState>((set) => {
   const patch = (key: string, update: Partial<OverviewEntry>) =>
     set((s) => ({ entries: { ...s.entries, [key]: { ...(s.entries[key] ?? EMPTY), ...update } } }));
 

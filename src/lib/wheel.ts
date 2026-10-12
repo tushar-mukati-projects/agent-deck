@@ -5,7 +5,7 @@ const SETTLE_PX = 0.5;
 export const FRAME_MS = 1000 / 60;
 export const GLIDE_MIN_PX = 50;
 
-export interface WheelDelta {
+interface WheelDelta {
   deltaX: number;
   deltaY: number;
   deltaMode: number;

@@ -29,12 +29,15 @@ export const renameText = (text: string, name: string) => {
 
 export const newNoteId = (date = new Date()) => format(date, "yyyy-MM-dd-HHmmss-SSS");
 
-export const draftNote = (date = new Date()): NoteEntry => ({
-  id: newNoteId(date),
-  text: "",
-  modifiedMs: date.getTime(),
-  stored: false,
-});
+export const draftNote = (): NoteEntry => {
+  const date = new Date();
+  return {
+    id: newNoteId(date),
+    text: "",
+    modifiedMs: date.getTime(),
+    stored: false,
+  };
+};
 
 export const pruneDrafts = (notes: NoteEntry[], keepId?: string | null) =>
   notes.filter((note) => note.stored || note.text || note.id === keepId);

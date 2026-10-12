@@ -3,7 +3,7 @@ import type { Terminal } from "@xterm/xterm";
 
 const MAX_WEBGL_CONTEXTS = 6;
 
-export interface WebglHost {
+interface WebglHost {
   term: Terminal;
   element: HTMLElement;
   webgl: WebglAddon | null;

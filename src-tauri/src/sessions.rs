@@ -62,7 +62,6 @@ pub struct SessionInfo {
     pub last_prompt: Option<String>,
     pub git_branch: Option<String>,
     pub started_at: Option<String>,
-    pub last_message_at: Option<String>,
     pub modified_ms: u64,
     pub prompt_count: u32,
     pub size: u64,
@@ -93,10 +92,7 @@ pub struct LiveSession {
     pub distro: Option<String>,
     pub session_id: String,
     pub pid: u32,
-    pub cwd: Option<String>,
     pub status: Option<String>,
-    pub kind: Option<String>,
-    pub name: Option<String>,
     #[serde(default, deserialize_with = "lenient_u64")]
     pub started_at: Option<u64>,
 }
@@ -107,7 +103,6 @@ pub struct TranscriptItem {
     pub role: String,
     pub kind: String,
     pub text: String,
-    pub timestamp: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -390,11 +385,8 @@ impl Accumulator {
     }
 
     fn note_time(&mut self, timestamp: Option<String>) {
-        if let Some(ts) = timestamp {
-            if self.info.started_at.is_none() {
-                self.info.started_at = Some(ts.clone());
-            }
-            self.info.last_message_at = Some(ts);
+        if self.info.started_at.is_none() {
+            self.info.started_at = timestamp;
         }
     }
 
@@ -589,13 +581,7 @@ struct LiveFile {
     #[serde(default, deserialize_with = "lenient")]
     session_id: Option<String>,
     #[serde(default, deserialize_with = "lenient")]
-    cwd: Option<String>,
-    #[serde(default, deserialize_with = "lenient")]
     status: Option<String>,
-    #[serde(default, deserialize_with = "lenient")]
-    kind: Option<String>,
-    #[serde(default, deserialize_with = "lenient")]
-    name: Option<String>,
     #[serde(default, deserialize_with = "lenient_u64")]
     started_at: Option<u64>,
     #[serde(default, deserialize_with = "lenient")]
@@ -615,10 +601,7 @@ pub fn live_sessions() -> Vec<LiveSession> {
                 distro: None,
                 session_id: live.session_id?,
                 pid,
-                cwd: live.cwd,
                 status: live.status,
-                kind: live.kind,
-                name: live.name,
                 started_at: live.started_at,
             })
         })
@@ -715,8 +698,8 @@ pub fn session_file(file_path: &str) -> anyhow::Result<(PathBuf, String)> {
     Ok((path, session_id))
 }
 
-fn item(role: &str, kind: &str, text: String, timestamp: Option<String>) -> TranscriptItem {
-    TranscriptItem { role: role.into(), kind: kind.into(), text, timestamp }
+fn item(role: &str, kind: &str, text: String) -> TranscriptItem {
+    TranscriptItem { role: role.into(), kind: kind.into(), text }
 }
 
 fn claude_items(raw: RawLine, sidechain: bool, out: &mut Vec<TranscriptItem>) {
@@ -728,10 +711,9 @@ fn claude_items(raw: RawLine, sidechain: bool, out: &mut Vec<TranscriptItem>) {
         return;
     }
     let Some(content) = raw.message.and_then(|m| m.content) else { return };
-    let timestamp = raw.timestamp;
     if kind == "user" {
         if let Some(text) = user_prompt_text(content) {
-            out.push(item("user", "text", truncate_chars(&text, TRANSCRIPT_TEXT_CHARS), timestamp));
+            out.push(item("user", "text", truncate_chars(&text, TRANSCRIPT_TEXT_CHARS)));
         }
         return;
     }
@@ -743,33 +725,32 @@ fn claude_items(raw: RawLine, sidechain: bool, out: &mut Vec<TranscriptItem>) {
     for block in blocks {
         if block.is("text") {
             if let Some(text) = block.text.filter(|t| !t.trim().is_empty()) {
-                out.push(item("assistant", "text", truncate_chars(&text, TRANSCRIPT_TEXT_CHARS), timestamp.clone()));
+                out.push(item("assistant", "text", truncate_chars(&text, TRANSCRIPT_TEXT_CHARS)));
             }
         } else if block.is("tool_use") {
             let summary = summarize_tool(block.name.as_deref().unwrap_or("tool"), block.input);
-            out.push(item("assistant", "tool", summary, timestamp.clone()));
+            out.push(item("assistant", "tool", summary));
         }
     }
 }
 
 fn codex_item(record: codex::Record) -> Option<TranscriptItem> {
-    let timestamp = record.timestamp;
     Some(match record.event {
-        codex::Event::User(text) if !is_system_text(&text) => item("user", "text", truncate_chars(&text, TRANSCRIPT_TEXT_CHARS), timestamp),
+        codex::Event::User(text) if !is_system_text(&text) => item("user", "text", truncate_chars(&text, TRANSCRIPT_TEXT_CHARS)),
         codex::Event::Assistant(text) if !text.trim().is_empty() => {
-            item("assistant", "text", truncate_chars(&text, TRANSCRIPT_TEXT_CHARS), timestamp)
+            item("assistant", "text", truncate_chars(&text, TRANSCRIPT_TEXT_CHARS))
         }
         codex::Event::Tool { name, detail } => {
             let text = match detail {
                 Some(d) => format!("{name} · {}", preview(&d, TOOL_DETAIL_CHARS)),
                 None => name,
             };
-            item("assistant", "tool", text, timestamp)
+            item("assistant", "tool", text)
         }
         codex::Event::Patch(patch) => {
             let files: Vec<&str> =
                 patch.lines().filter_map(|l| codex::PATCH_HEADERS.iter().find_map(|p| l.strip_prefix(p))).collect();
-            item("assistant", "tool", format!("apply_patch · {}", truncate_chars(&files.join(", "), TOOL_DETAIL_CHARS)), timestamp)
+            item("assistant", "tool", format!("apply_patch · {}", truncate_chars(&files.join(", "), TOOL_DETAIL_CHARS)))
         }
         _ => return None,
     })
@@ -833,13 +814,12 @@ pub fn subagent_transcript(file_path: &str, id: &str, from_offset: u64) -> anyho
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct SearchHit {
     pub session_id: String,
     pub role: String,
     pub snippet: String,
-    pub timestamp: Option<String>,
 }
 
 const SEARCH_HITS_PER_SESSION: usize = 3;
@@ -895,7 +875,7 @@ pub fn search_lines<S: AsRef<str>>(session_id: &str, lines: impl Iterator<Item =
         line_items(line.as_ref(), false, &mut items);
         for item in items.into_iter().filter(|i| i.kind == "text") {
             if let Some(snippet) = snippet_around(&item.text, &needle.lower) {
-                hits.push(SearchHit { session_id: session_id.to_string(), role: item.role, snippet, timestamp: item.timestamp });
+                hits.push(SearchHit { session_id: session_id.to_string(), role: item.role, snippet });
             }
         }
         if hits.len() >= SEARCH_HITS_PER_SESSION {
@@ -1025,7 +1005,7 @@ mod tests {
         let info = acc.finish_with(1, 2).unwrap();
         assert_eq!(info.prompt_count, 2);
         assert_eq!((info.first_prompt.as_deref(), info.last_prompt.as_deref()), (Some("first prompt"), Some("second")));
-        assert_eq!((info.started_at.as_deref(), info.last_message_at.as_deref()), (Some("t0"), Some("t5")));
+        assert_eq!(info.started_at.as_deref(), Some("t0"));
         assert_eq!((info.cwd.as_str(), info.git_branch.as_deref(), info.version.as_deref()), ("/w", None, Some("2.1")));
         assert_eq!(info.title.as_deref(), Some("Generated"));
     }
@@ -1053,7 +1033,7 @@ mod tests {
         acc.feed(r#"{"timestamp":"10:40:00","type":"session_meta","payload":{"timestamp":"09:00:00","cwd":"/other"}}"#);
         let info = acc.finish_with(0, 0).unwrap();
         assert_eq!((info.id.as_str(), info.agent.as_str(), info.cwd.as_str()), (id, "codex", "/w"));
-        assert_eq!((info.started_at.as_deref(), info.last_message_at.as_deref()), (Some("10:38:22"), Some("10:40:00")));
+        assert_eq!(info.started_at.as_deref(), Some("10:38:22"));
     }
 
     #[test]
@@ -1138,17 +1118,5 @@ mod tests {
         assert!(cafe.may_match(upper.as_bytes()));
         assert_eq!(search_lines("s", std::iter::once(upper), &cafe)[0].snippet, "CAFÉ menu");
         assert!(Needle::new("x").is_none());
-    }
-
-    #[test]
-    #[ignore]
-    fn probe_real_sessions() {
-        let start = std::time::Instant::now();
-        let sessions = list_sessions();
-        let cold = start.elapsed();
-        let start = std::time::Instant::now();
-        let again = list_sessions();
-        println!("sessions={} cold={cold:?} warm={:?} again={}", sessions.len(), start.elapsed(), again.len());
-        println!("live={:?}", live_sessions());
     }
 }

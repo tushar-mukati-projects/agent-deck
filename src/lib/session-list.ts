@@ -28,7 +28,7 @@ const searchText = (session: SessionInfo) =>
     .join(" ")
     .toLowerCase();
 
-export const searchTerms = (query: string) => query.toLowerCase().split(/\s+/).filter(Boolean);
+const searchTerms = (query: string) => query.toLowerCase().split(/\s+/).filter(Boolean);
 
 export const agentsIn = (sessions: SessionInfo[]) =>
   [...new Set(sessions.map((s) => s.agent))].sort();

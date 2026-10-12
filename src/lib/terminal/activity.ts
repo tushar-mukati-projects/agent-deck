@@ -19,7 +19,6 @@ export interface IdleEvent {
   terminalId: string;
   workspaceId: string;
   cwd: string;
-  busyMs: number;
   needsInput: boolean;
   visible: boolean;
 }
@@ -99,7 +98,6 @@ const settle = (owner: ActivityOwner) => {
     terminalId: spec.id,
     workspaceId: spec.workspaceId,
     cwd: spec.root,
-    busyMs,
     needsInput: INPUT_PROMPT_PATTERN.test(screenTail(owner.term, 18)),
     visible,
   };

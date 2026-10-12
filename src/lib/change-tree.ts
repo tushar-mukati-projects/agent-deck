@@ -8,7 +8,7 @@ export interface ChangeFolder<T> {
   children: ChangeNode<T>[];
 }
 
-export interface ChangeFile<T> {
+interface ChangeFile<T> {
   kind: "file";
   key: string;
   item: T;

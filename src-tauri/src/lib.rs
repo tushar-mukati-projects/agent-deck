@@ -24,14 +24,11 @@ use tauri::{Manager, RunEvent};
 use mcp::McpManager;
 use pg::PgManager;
 use pty::PtyManager;
-use watcher::{HomeWatcher, Watchers};
-
-struct ClaudeHomeWatcher(#[allow(dead_code)] std::sync::Arc<HomeWatcher>);
+use watcher::Watchers;
 
 const IDLE_SWEEP: std::time::Duration = std::time::Duration::from_secs(60);
 const IDLE_LIMIT: std::time::Duration = std::time::Duration::from_secs(15 * 60);
 
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -52,7 +49,7 @@ pub fn run() {
         .manage(McpManager::default())
         .manage(PgManager::default())
         .setup(|app| {
-            app.manage(ClaudeHomeWatcher(watcher::watch_claude_home(app.handle().clone())));
+            app.manage(watcher::watch_claude_home(app.handle().clone()));
             let handle = app.handle().clone();
             std::thread::spawn(move || loop {
                 std::thread::sleep(IDLE_SWEEP);

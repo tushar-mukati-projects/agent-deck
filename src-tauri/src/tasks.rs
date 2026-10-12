@@ -38,7 +38,6 @@ pub enum TaskStatus {
 #[serde(rename_all = "camelCase")]
 pub struct AgentTask {
     pub id: String,
-    pub tool: String,
     pub command: String,
     pub description: Option<String>,
     pub output_path: Option<String>,
@@ -68,7 +67,6 @@ pub struct SessionTasks {
 
 #[derive(Clone)]
 struct Started {
-    tool: String,
     command: String,
     description: Option<String>,
     at: Option<String>,
@@ -152,10 +150,7 @@ impl TaskLog {
             let input = &block["input"];
             if SHELL_TOOLS.contains(&name) && input["run_in_background"] == true {
                 let (Some(id), Some(command)) = (text(&block["id"]), text(&input["command"])) else { continue };
-                self.started.insert(
-                    id,
-                    Started { tool: name.to_string(), command, description: text(&input["description"]), at: at.clone() },
-                );
+                self.started.insert(id, Started { command, description: text(&input["description"]), at: at.clone() });
             } else if AGENT_TOOLS.contains(&name) {
                 let Some(id) = text(&block["id"]) else { continue };
                 self.agents.retain(|a| a.id != id);
@@ -211,7 +206,6 @@ impl TaskLog {
             self.tasks.retain(|t| t.id != id);
             self.tasks.push(AgentTask {
                 id,
-                tool: started.tool,
                 command: started.command,
                 description: started.description,
                 output_path: output_path(&result),

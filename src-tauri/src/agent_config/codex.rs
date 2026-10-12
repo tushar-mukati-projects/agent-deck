@@ -297,7 +297,6 @@ pub fn overview(cwd: &str) -> anyhow::Result<Overview> {
         hooks: Vec::new(),
         settings: settings(&snapshot),
         plugins: plugins(&snapshot),
-        distro,
     })
 }
 

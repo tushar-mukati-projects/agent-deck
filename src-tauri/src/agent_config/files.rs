@@ -131,10 +131,6 @@ pub fn strings(value: Option<&Value>) -> Vec<String> {
         .unwrap_or_default()
 }
 
-pub fn keys(value: Option<&Value>) -> Vec<String> {
-    value.and_then(Value::as_object).map(|m| m.keys().cloned().collect()).unwrap_or_default()
-}
-
 pub fn folder_name(dir: &Path) -> String {
     dir.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| dir.to_string_lossy().to_string())
 }
@@ -145,7 +141,6 @@ pub fn memory_file(scope: Scope, label: String, path: PathBuf) -> MemoryFile {
         scope,
         label,
         exists: meta.is_some(),
-        size: meta.as_ref().map(|m| m.len()).unwrap_or(0),
         modified_ms: meta.as_ref().map(mtime_ms).unwrap_or(0),
         description: meta.as_ref().and_then(|_| describe(&path).1),
         path: path.to_string_lossy().to_string(),

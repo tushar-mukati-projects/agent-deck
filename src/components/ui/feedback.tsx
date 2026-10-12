@@ -13,7 +13,7 @@ const toneClass: Record<DotTone, string> = {
   error: "bg-danger",
 };
 
-export const TONE_LABEL: Record<DotTone, string> = {
+const TONE_LABEL: Record<DotTone, string> = {
   running: "Running in Deck",
   busy: "Working",
   attention: "Finished — needs your attention",

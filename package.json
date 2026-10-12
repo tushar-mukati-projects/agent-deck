@@ -15,7 +15,6 @@
     "check": "tsc -b && vitest run"
   },
   "dependencies": {
-    "@codemirror/commands": "^6.11.1",
     "@codemirror/language": "^6.12.4",
     "@codemirror/language-data": "^6.5.2",
     "@codemirror/merge": "^6.12.2",
