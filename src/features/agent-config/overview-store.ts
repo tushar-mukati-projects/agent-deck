@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import { create } from "zustand";
 
 import { singleFlight } from "@/lib/single-flight";
@@ -27,7 +27,7 @@ const loaders = new Map<string, () => Promise<void>>();
 
 const entryKey = (cwd: string, agent: ConfigAgent) => `${agent}:${normalizePath(cwd)}`;
 
-const useOverviewStore = create<OverviewState>((set) => {
+const useOverviewStore = create<OverviewState>((set, get) => {
   const patch = (key: string, update: Partial<OverviewEntry>) =>
     set((s) => ({ entries: { ...s.entries, [key]: { ...(s.entries[key] ?? EMPTY), ...update } } }));
 
@@ -40,7 +40,11 @@ const useOverviewStore = create<OverviewState>((set) => {
         loader = singleFlight(async () => {
           patch(key, { loading: true });
           try {
-            patch(key, { overview: await api.agentOverview(cwd, agent), error: null });
+            const next = await api.agentOverview(cwd, agent);
+            const current = get().entries[key]?.overview;
+            const overview =
+              current && JSON.stringify(current) === JSON.stringify(next) ? current : next;
+            patch(key, { overview, error: null });
           } catch (error) {
             patch(key, { error: errorMessage(error) });
           } finally {
@@ -71,5 +75,6 @@ export const useOverview = (cwd: string, agent: ConfigAgent) => {
     return () => void unlisten.then((fn) => fn());
   }, [cwd, agent, key]);
 
-  return { ...entry, reload: () => refreshOverview(cwd, agent) };
+  const reload = useCallback(() => refreshOverview(cwd, agent), [cwd, agent]);
+  return { ...entry, reload };
 };

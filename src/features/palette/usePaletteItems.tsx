@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import {
   AppWindow,
   Bell,
@@ -37,8 +37,9 @@ import { openTypedPath } from "@/actions/files";
 import { closeIdleWorkspaces, closeOtherWorkspaces, closeWorkspace } from "@/actions/workspaces";
 import { useAsync } from "@/hooks/useAsync";
 import { runShortcut } from "@/hooks/useGlobalShortcuts";
+import { subscribeFileChanges, watchedSince } from "@/lib/file-events";
 import { FileIcon } from "@/lib/file-icons";
-import { fuzzyPathScore, fuzzyScore } from "@/lib/fuzzy";
+import { fuzzyPathKeyScorer, fuzzyScore, pathKey, type PathKey } from "@/lib/fuzzy";
 import { shortcutLabel, type ShortcutAction } from "@/lib/shortcuts";
 import { api } from "@/lib/tauri/commands";
 import { copyText, revealInExplorer } from "@/lib/tauri/system";
@@ -46,7 +47,7 @@ import { resumeCommandLine } from "@/lib/agents/launch";
 import { agentName, findAgent, listAgents } from "@/lib/agents/registry";
 import { THEMES } from "@/lib/themes";
 import { parseTypedPath } from "@/lib/typed-path";
-import { basename, joinPath, shortenHome, timeAgo } from "@/lib/utils";
+import { basename, joinPath, normalizePath, shortenHome, timeAgo } from "@/lib/utils";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import type { PaletteMode } from "@/stores/ui-store";
@@ -64,22 +65,41 @@ export interface PaletteItem {
   run: () => void;
 }
 
-const FILE_CACHE_MS = 20_000;
+const FILE_CACHE_MS = 5 * 60_000;
+const UNWATCHED_FILE_CACHE_MS = 20_000;
 const CHAT_SEARCH_DELAY_MS = 250;
+const CHAT_HIT_LIMIT = 150;
 const fileCache = new Map<string, { at: number; files: string[] }>();
+const filesChangedAt = new Map<string, number>();
+
+subscribeFileChanges((change) => filesChangedAt.set(normalizePath(change.root), Date.now()));
 
 const listFiles = async (root: string) => {
-  const cached = fileCache.get(root);
-  if (cached && Date.now() - cached.at < FILE_CACHE_MS) return cached.files;
-  const files = await api.listFiles(root).catch(() => cached?.files ?? []);
-  fileCache.set(root, { at: Date.now(), files });
-  return files;
+  const key = normalizePath(root);
+  const cached = fileCache.get(key);
+  const since = watchedSince(root);
+  const watchedThroughout = since !== null && cached !== undefined && since <= cached.at;
+  const maxAge = watchedThroughout ? FILE_CACHE_MS : UNWATCHED_FILE_CACHE_MS;
+  if (cached && Date.now() - cached.at < maxAge && cached.at > (filesChangedAt.get(key) ?? 0))
+    return cached.files;
+  const at = Date.now();
+  try {
+    const files = await api.listFiles(root);
+    fileCache.set(key, { at, files });
+    return files;
+  } catch {
+    return cached?.files ?? [];
+  }
 };
 
-const useFileList = (root: string | null, enabled: boolean) => {
-  const active = enabled ? root : null;
+const useFileList = (root: string | null, wanted: boolean) => {
+  const [wantedRoot, setWantedRoot] = useState<string | null>(null);
+  useEffect(() => {
+    if (wanted && root) setWantedRoot(root);
+  }, [wanted, root]);
+  const active = wanted || wantedRoot === root ? root : null;
   const { data } = useAsync(active ? () => listFiles(active) : null, [active]);
-  return data ?? (active ? (fileCache.get(active)?.files ?? null) : null);
+  return data ?? (active ? (fileCache.get(normalizePath(active))?.files ?? null) : null);
 };
 
 const useChatSearch = (query: string, enabled: boolean) => {
@@ -249,26 +269,46 @@ const buildCommands = (workspace: Workspace | null): CommandDef[] => {
   ];
 };
 
-const sortTop = (list: PaletteItem[], limit: number) =>
+const sortTop = <T extends { score: number }>(list: T[], limit: number) =>
   list.sort((a, b) => b.score - a.score).slice(0, limit);
 
-const topFiles = (files: string[], query: string, limit: number) => {
-  if (!query) return files.slice(0, limit).map((rel) => ({ rel, score: 0 }));
+interface PreparedFile {
+  rel: string;
+  key: PathKey;
+}
+
+interface FileNarrowing {
+  files: PreparedFile[];
+  query: string;
+  matched: PreparedFile[];
+}
+
+const topFiles = (files: PreparedFile[], query: string, limit: number) => {
+  if (!query)
+    return { top: files.slice(0, limit).map(({ rel }) => ({ rel, score: 0 })), matched: files };
+  const scoreOf = fuzzyPathKeyScorer(query);
   const top: { rel: string; score: number }[] = [];
-  for (const rel of files) {
-    const score = fuzzyPathScore(query, rel);
+  const matched: PreparedFile[] = [];
+  for (const file of files) {
+    const score = scoreOf(file.key);
     if (score === null) continue;
-    if (top.length < limit) top.push({ rel, score });
-    else if (score > top[top.length - 1].score) top[top.length - 1] = { rel, score };
+    matched.push(file);
+    if (top.length < limit) top.push({ rel: file.rel, score });
+    else if (score > top[top.length - 1].score) top[top.length - 1] = { rel: file.rel, score };
     else continue;
     top.sort((a, b) => b.score - a.score);
   }
-  return top;
+  return { top, matched };
 };
 
 const groupBySession = (hits: SearchHit[]) => {
-  const order = [...new Set(hits.map((hit) => hit.sessionId))];
-  return order.flatMap((id) => hits.filter((hit) => hit.sessionId === id));
+  const groups = new Map<string, SearchHit[]>();
+  for (const hit of hits) {
+    const group = groups.get(hit.sessionId);
+    if (group) group.push(hit);
+    else groups.set(hit.sessionId, [hit]);
+  }
+  return [...groups.values()].flat();
 };
 
 export const usePaletteItems = (mode: PaletteMode, liveQuery: string) => {
@@ -280,13 +320,26 @@ export const usePaletteItems = (mode: PaletteMode, liveQuery: string) => {
   const workspace = useActiveWorkspace();
   const commandMode = mode === "all" && rawQuery.startsWith(">");
   const query = (commandMode ? rawQuery.replace(/^>/, "") : rawQuery).trim().toLowerCase();
-  const files = useFileList(
-    workspace?.cwd ?? null,
-    mode === "files" || (mode === "all" && query.length > 0),
-  );
+  const wantFiles = mode === "files" || (mode === "all" && !commandMode && query.length > 0);
+  const files = useFileList(workspace?.cwd ?? null, wantFiles);
   const chats = useChatSearch(query, mode === "chats");
 
   const commands = useMemo(() => buildCommands(workspace), [workspace]);
+
+  const prepared = useMemo(
+    () => files?.map((rel) => ({ rel, key: pathKey(rel) })) ?? null,
+    [files],
+  );
+  const fileLimit = mode === "files" ? 80 : 15;
+  const narrowing = useRef<FileNarrowing | null>(null);
+  const fileMatches = useMemo(() => {
+    if (!wantFiles || !prepared) return [];
+    const last = narrowing.current;
+    const pool = last?.files === prepared && query.startsWith(last.query) ? last.matched : prepared;
+    const { top, matched } = topFiles(pool, query, fileLimit);
+    narrowing.current = { files: prepared, query, matched };
+    return top;
+  }, [wantFiles, prepared, query, fileLimit]);
 
   const items = useMemo(() => {
     const commandItems = (): PaletteItem[] =>
@@ -307,9 +360,9 @@ export const usePaletteItems = (mode: PaletteMode, liveQuery: string) => {
             ];
       });
 
-    const fileItems = (limit: number): PaletteItem[] => {
-      if (!workspace || !files) return [];
-      return topFiles(files, query, limit).map(({ rel, score }) => ({
+    const fileItems = (): PaletteItem[] => {
+      if (!workspace) return [];
+      return fileMatches.map(({ rel, score }) => ({
         id: `file:${rel}`,
         group: "Files",
         title: basename(rel),
@@ -322,21 +375,23 @@ export const usePaletteItems = (mode: PaletteMode, liveQuery: string) => {
     };
 
     const chatItems = (): PaletteItem[] =>
-      groupBySession(chats.hits ?? []).flatMap((hit, index) => {
-        const session = byId[hit.sessionId];
-        if (!session) return [];
-        return [
-          {
-            id: `chat:${hit.sessionId}:${index}`,
-            group: session.title ?? "Untitled session",
-            title: hit.snippet,
-            subtitle: `${hit.role === "user" ? "You" : agentName(session.agent)} · ${basename(session.cwd)} · ${timeAgo(session.modifiedMs)}`,
-            icon: <MessageSquareText />,
-            score: -index,
-            run: () => openSessionByClick(session),
-          },
-        ];
-      });
+      groupBySession(chats.hits ?? [])
+        .slice(0, CHAT_HIT_LIMIT)
+        .flatMap((hit, index) => {
+          const session = byId[hit.sessionId];
+          if (!session) return [];
+          return [
+            {
+              id: `chat:${hit.sessionId}:${index}`,
+              group: session.title ?? "Untitled session",
+              title: hit.snippet,
+              subtitle: `${hit.role === "user" ? "You" : agentName(session.agent)} · ${basename(session.cwd)} · ${timeAgo(session.modifiedMs)}`,
+              icon: <MessageSquareText />,
+              score: -index,
+              run: () => openSessionByClick(session),
+            },
+          ];
+        });
 
     const typedPath = workspace ? parseTypedPath(rawQuery, workspace.cwd, home) : null;
     const pathItems: PaletteItem[] =
@@ -355,7 +410,7 @@ export const usePaletteItems = (mode: PaletteMode, liveQuery: string) => {
         : [];
 
     if (commandMode) return sortTop(commandItems(), 100);
-    if (mode === "files") return [...pathItems, ...fileItems(80)];
+    if (mode === "files") return [...pathItems, ...fileItems()];
     if (mode === "chats") return chatItems();
 
     const tabItems = workspaces.flatMap((w) => {
@@ -376,32 +431,31 @@ export const usePaletteItems = (mode: PaletteMode, liveQuery: string) => {
     });
 
     const openSessionIds = new Set(workspaces.map((w) => w.sessionId));
-    const sessionItems = sessions.flatMap((s) => {
+    const scoredSessions = sessions.flatMap((s) => {
       if (openSessionIds.has(s.id)) return [];
       const score = fuzzyScore(
         query,
         `${s.title ?? ""} ${basename(s.cwd)} ${s.gitBranch ?? ""} ${s.lastPrompt ?? ""}`,
       );
-      return score === null
-        ? []
-        : [
-            {
-              id: `session:${s.id}`,
-              group: "Sessions",
-              title: s.title ?? "Untitled session",
-              subtitle: `${shortenHome(s.cwd, home)} · ${timeAgo(s.modifiedMs)}`,
-              icon: <MessagesSquare />,
-              score: score + s.modifiedMs / 1e13,
-              run: () => openSessionByClick(s),
-            },
-          ];
+      return score === null ? [] : [{ session: s, score: score + s.modifiedMs / 1e13 }];
     });
+    const sessionItems = sortTop(scoredSessions, query ? 30 : 12).map(
+      ({ session: s, score }): PaletteItem => ({
+        id: `session:${s.id}`,
+        group: "Sessions",
+        title: s.title ?? "Untitled session",
+        subtitle: `${shortenHome(s.cwd, home)} · ${timeAgo(s.modifiedMs)}`,
+        icon: <MessagesSquare />,
+        score,
+        run: () => openSessionByClick(s),
+      }),
+    );
 
     return [
       ...pathItems,
       ...sortTop(tabItems, 8),
-      ...sortTop(sessionItems, query ? 30 : 12),
-      ...(query ? fileItems(15) : []),
+      ...sessionItems,
+      ...(query ? fileItems() : []),
       ...sortTop(commandItems(), query ? 8 : 6),
     ];
   }, [
@@ -411,7 +465,7 @@ export const usePaletteItems = (mode: PaletteMode, liveQuery: string) => {
     rawQuery,
     commands,
     workspace,
-    files,
+    fileMatches,
     workspaces,
     sessions,
     byId,

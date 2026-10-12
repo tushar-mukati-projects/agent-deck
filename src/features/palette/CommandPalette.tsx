@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { Search } from "lucide-react";
 
 import { Dialog } from "@/components/ui/dialog";
@@ -15,6 +15,69 @@ const placeholders: Record<PaletteMode, string> = {
 };
 
 const PAGE_STEP = 8;
+
+const PaletteRow = memo(
+  ({
+    item,
+    index,
+    selected,
+    showGroup,
+    mode,
+    onHover,
+    onRun,
+  }: {
+    item: PaletteItem;
+    index: number;
+    selected: boolean;
+    showGroup: boolean;
+    mode: PaletteMode;
+    onHover: (index: number) => void;
+    onRun: (item: PaletteItem) => void;
+  }) => (
+    <div role="presentation">
+      {showGroup && (
+        <div
+          role="presentation"
+          className="truncate px-2.5 pt-2 pb-1 text-[10.5px] font-semibold tracking-wider text-faint uppercase"
+        >
+          {item.group}
+        </div>
+      )}
+      <div
+        role="option"
+        id={`palette-item-${index}`}
+        aria-selected={selected}
+        data-index={index}
+        onMouseMove={() => !selected && onHover(index)}
+        onClick={() => onRun(item)}
+        className={cn(
+          "flex h-9 w-full cursor-default items-center gap-2.5 rounded-md px-2.5 text-left [&_svg]:size-3.5 [&_svg]:shrink-0 [&_svg]:text-muted",
+          selected && "bg-accent-soft",
+        )}
+      >
+        {item.icon}
+        <span
+          className={cn(
+            "min-w-0 truncate text-[13px] text-fg",
+            mode === "chats" ? "flex-1" : "max-w-[65%] shrink-0",
+          )}
+        >
+          {item.title}
+        </span>
+        <span
+          className={cn(
+            "min-w-0 truncate text-[11.5px] text-faint",
+            mode === "chats" ? "max-w-[40%] shrink-0" : "flex-1",
+          )}
+        >
+          {item.subtitle}
+        </span>
+        {item.hint && <Kbd keys={item.hint} className="shrink-0" />}
+      </div>
+    </div>
+  ),
+);
+PaletteRow.displayName = "PaletteRow";
 
 const PaletteList = ({
   mode,
@@ -40,11 +103,14 @@ const PaletteList = ({
       ?.scrollIntoView({ block: "nearest" });
   }, [current]);
 
-  const run = (item: PaletteItem | undefined) => {
-    if (!item) return;
-    onClose();
-    requestAnimationFrame(item.run);
-  };
+  const run = useCallback(
+    (item: PaletteItem | undefined) => {
+      if (!item) return;
+      onClose();
+      requestAnimationFrame(item.run);
+    },
+    [onClose],
+  );
 
   useEffect(() => {
     if (!enterQueued || loading) return;
@@ -97,47 +163,16 @@ const PaletteList = ({
           <p className="px-3 py-8 text-center text-xs text-faint">{emptyHint}</p>
         ) : (
           items.map((item, index) => (
-            <div key={item.id} role="presentation">
-              {(index === 0 || items[index - 1].group !== item.group) && (
-                <div
-                  role="presentation"
-                  className="truncate px-2.5 pt-2 pb-1 text-[10.5px] font-semibold tracking-wider text-faint uppercase"
-                >
-                  {item.group}
-                </div>
-              )}
-              <div
-                role="option"
-                id={`palette-item-${index}`}
-                aria-selected={index === current}
-                data-index={index}
-                onMouseMove={() => index !== current && setSelected(index)}
-                onClick={() => run(item)}
-                className={cn(
-                  "flex h-9 w-full cursor-default items-center gap-2.5 rounded-md px-2.5 text-left [&_svg]:size-3.5 [&_svg]:shrink-0 [&_svg]:text-muted",
-                  index === current && "bg-accent-soft",
-                )}
-              >
-                {item.icon}
-                <span
-                  className={cn(
-                    "min-w-0 truncate text-[13px] text-fg",
-                    mode === "chats" ? "flex-1" : "max-w-[65%] shrink-0",
-                  )}
-                >
-                  {item.title}
-                </span>
-                <span
-                  className={cn(
-                    "min-w-0 truncate text-[11.5px] text-faint",
-                    mode === "chats" ? "max-w-[40%] shrink-0" : "flex-1",
-                  )}
-                >
-                  {item.subtitle}
-                </span>
-                {item.hint && <Kbd keys={item.hint} className="shrink-0" />}
-              </div>
-            </div>
+            <PaletteRow
+              key={item.id}
+              item={item}
+              index={index}
+              selected={index === current}
+              showGroup={index === 0 || items[index - 1].group !== item.group}
+              mode={mode}
+              onHover={setSelected}
+              onRun={run}
+            />
           ))
         )}
       </div>

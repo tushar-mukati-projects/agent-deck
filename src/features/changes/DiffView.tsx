@@ -7,15 +7,18 @@ import { FileCode2, FolderOpen } from "lucide-react";
 import { EmptyState, LoadingState } from "@/components/ui/feedback";
 import { IconButton } from "@/components/ui/icon-button";
 import { useDeckTheme, useLanguage } from "@/features/viewer/CodeView";
-import { useAsync } from "@/hooks/useAsync";
+import { useAsync, useThrottledCallback } from "@/hooks/useAsync";
 import { useSessionFile } from "@/hooks/useSessionFile";
 import type { DiffTab } from "@/lib/diff-tabs";
 import { subscribeFileChanges } from "@/lib/file-events";
 import { api } from "@/lib/tauri/commands";
 import { revealInExplorer } from "@/lib/tauri/system";
-import { basename, relativePath, samePath } from "@/lib/utils";
+import { basename, normalizePath, relativePath } from "@/lib/utils";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import type { Workspace } from "@/types";
+
+const RELOAD_DELAY_MS = 300;
+const RELOAD_MAX_WAIT_MS = 2000;
 
 interface DiffContent {
   before: string;
@@ -94,22 +97,28 @@ export const DiffView = ({ tab, workspace }: { tab: DiffTab; workspace: Workspac
     { keepPrevious: true },
   );
 
-  useEffect(
-    () =>
-      subscribeFileChanges((change) => {
-        if (change.paths.some((p) => samePath(p, tab.path))) void reload(true);
-      }),
-    [tab.path, reload],
+  const scheduleReload = useThrottledCallback(
+    () => void reload(true),
+    RELOAD_DELAY_MS,
+    RELOAD_MAX_WAIT_MS,
   );
 
+  useEffect(() => {
+    const target = normalizePath(tab.path);
+    return subscribeFileChanges((change) => {
+      if (change.paths.some((p) => normalizePath(p) === target)) scheduleReload();
+    });
+  }, [tab.path, scheduleReload]);
+
+  const before = content?.before;
   const extensions = useMemo(
     () =>
-      content
+      before !== undefined
         ? [
             EditorView.lineWrapping,
             diffTheme,
             unifiedMergeView({
-              original: content.before,
+              original: before,
               mergeControls: false,
               highlightChanges: true,
               gutter: true,
@@ -119,7 +128,7 @@ export const DiffView = ({ tab, workspace }: { tab: DiffTab; workspace: Workspac
             ...(language ? [language] : []),
           ]
         : [],
-    [content, language],
+    [before, language],
   );
 
   return (

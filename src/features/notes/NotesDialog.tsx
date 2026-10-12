@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { FolderOpen, Plus, TextCursorInput, Trash2, X } from "lucide-react";
 
 import {
@@ -18,7 +18,7 @@ import { LoadingState } from "@/components/ui/feedback";
 import { IconButton } from "@/components/ui/icon-button";
 import { TimeAgo } from "@/components/ui/time-ago";
 import { CodeView } from "@/features/viewer/CodeView";
-import { noteTitle } from "@/lib/notes";
+import { noteTitle, type NoteEntry } from "@/lib/notes";
 import { shortcutLabel } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
@@ -47,6 +47,36 @@ const NameInput = ({ title, onDone }: { title: string; onDone: (name: string | n
   );
 };
 
+const NoteRow = memo(
+  ({
+    note,
+    active,
+    onSelect,
+    onRename,
+  }: {
+    note: NoteEntry;
+    active: boolean;
+    onSelect: (id: string) => void;
+    onRename: () => void;
+  }) => (
+    <button
+      type="button"
+      title="Double-click to rename"
+      aria-current={active ? "page" : undefined}
+      onClick={() => onSelect(note.id)}
+      onDoubleClick={onRename}
+      className={cn(
+        "flex w-full flex-col rounded-md px-2.5 py-1.5 text-left",
+        active ? "bg-active" : "hover:bg-hover",
+      )}
+    >
+      <span className="truncate text-[12.5px] text-fg/90">{noteTitle(note.text)}</span>
+      <TimeAgo ms={note.modifiedMs} className="text-[10.5px] text-faint" />
+    </button>
+  ),
+);
+NoteRow.displayName = "NoteRow";
+
 export const NotesDialog = () => {
   const open = useUiStore((s) => s.notesOpen);
   const notes = useNotesStore((s) => s.notes);
@@ -54,6 +84,7 @@ export const NotesDialog = () => {
   const loaded = useNotesStore((s) => s.loaded);
   const [renaming, setRenaming] = useState(false);
   const active = loaded ? (notes.find((note) => note.id === activeId) ?? null) : null;
+  const startRename = useCallback(() => setRenaming(true), []);
 
   useEffect(() => {
     if (open) void loadNotes();
@@ -92,21 +123,13 @@ export const NotesDialog = () => {
           <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2 pb-2">
             {loaded &&
               notes.map((note) => (
-                <button
+                <NoteRow
                   key={note.id}
-                  type="button"
-                  title="Double-click to rename"
-                  aria-current={note.id === activeId ? "page" : undefined}
-                  onClick={() => selectNote(note.id)}
-                  onDoubleClick={() => setRenaming(true)}
-                  className={cn(
-                    "flex w-full flex-col rounded-md px-2.5 py-1.5 text-left",
-                    note.id === activeId ? "bg-active" : "hover:bg-hover",
-                  )}
-                >
-                  <span className="truncate text-[12.5px] text-fg/90">{noteTitle(note.text)}</span>
-                  <TimeAgo ms={note.modifiedMs} className="text-[10.5px] text-faint" />
-                </button>
+                  note={note}
+                  active={note.id === activeId}
+                  onSelect={selectNote}
+                  onRename={startRename}
+                />
               ))}
           </div>
           <p className="px-4 pb-3 text-[11px] leading-snug text-faint">Saved as you type.</p>

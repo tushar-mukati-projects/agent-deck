@@ -51,7 +51,7 @@ const ContentView = ({ item }: { item: ContentItem }) => {
   return <TextResult text={JSON.stringify(item, null, 2)} />;
 };
 
-export const CallResult = ({ result }: { result: unknown }) => {
+export const CallResult = memo(({ result }: { result: unknown }) => {
   const value = (result && typeof result === "object" ? result : {}) as {
     content?: unknown;
     isError?: boolean;
@@ -69,7 +69,8 @@ export const CallResult = ({ result }: { result: unknown }) => {
       ))}
     </div>
   );
-};
+});
+CallResult.displayName = "CallResult";
 
 export const resourceTexts = (value: unknown) => {
   const contents = (value && typeof value === "object" ? value : {}) as { contents?: unknown };

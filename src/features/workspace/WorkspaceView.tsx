@@ -51,7 +51,6 @@ const WorkspaceLayout = ({ workspace }: { workspace: Workspace }) => {
       useUiStore.getState().setSubagentsOpen(false);
     runningBefore.current = subagents.length;
   }, [subagents.length]);
-  useAgentShellSync(workspace);
   const columns = useSavedLayout("deck-columns", hasFiles ? ["main", "viewer"] : ["main"]);
   const rows = useSavedLayout("deck-rows", [
     "primary",
@@ -111,7 +110,17 @@ const WorkspaceLayout = ({ workspace }: { workspace: Workspace }) => {
   );
 };
 
+const AgentShellSync = ({ workspace }: { workspace: Workspace }) => {
+  useAgentShellSync(workspace);
+  return null;
+};
+
 export const WorkspaceView = ({ workspaceId }: { workspaceId: string }) => {
   const workspace = useWorkspace(workspaceId);
-  return workspace ? <WorkspaceLayout workspace={workspace} /> : null;
+  return workspace ? (
+    <>
+      <AgentShellSync workspace={workspace} />
+      <WorkspaceLayout workspace={workspace} />
+    </>
+  ) : null;
 };

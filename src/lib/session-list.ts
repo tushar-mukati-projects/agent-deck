@@ -15,18 +15,26 @@ export interface SessionGroup {
   sessions: SessionInfo[];
 }
 
-const searchText = (session: SessionInfo) =>
-  [
-    session.title,
-    session.firstPrompt,
-    session.lastPrompt,
-    session.cwd,
-    session.gitBranch,
-    session.id,
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
+const searchTexts = new WeakMap<SessionInfo, string>();
+
+const searchText = (session: SessionInfo) => {
+  let text = searchTexts.get(session);
+  if (text === undefined) {
+    text = [
+      session.title,
+      session.firstPrompt,
+      session.lastPrompt,
+      session.cwd,
+      session.gitBranch,
+      session.id,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+    searchTexts.set(session, text);
+  }
+  return text;
+};
 
 const searchTerms = (query: string) => query.toLowerCase().split(/\s+/).filter(Boolean);
 

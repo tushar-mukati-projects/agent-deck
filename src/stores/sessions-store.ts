@@ -79,8 +79,13 @@ export const useSessionsStore = create<SessionsState>((set, get) => {
     }
   });
 
+  const setWslErrors = (wslErrors: Record<string, string>) => {
+    if (JSON.stringify(wslErrors) !== JSON.stringify(get().wslErrors)) set({ wslErrors });
+  };
+
   const clearWsl = () => {
-    set({ wslErrors: {}, wslLoading: false });
+    setWslErrors({});
+    set({ wslLoading: false });
     if (get().wslSessions.length) setLists(get().windowsSessions, []);
   };
 
@@ -89,14 +94,15 @@ export const useSessionsStore = create<SessionsState>((set, get) => {
     if (!wslIndexed) set({ wslLoading: true });
     try {
       const index = await api.listWslSessions();
-      set({ distros: index.distros });
+      if (JSON.stringify(index.distros) !== JSON.stringify(get().distros))
+        set({ distros: index.distros });
       wslIndexed = true;
       if (!index.distros.some((d) => d.running)) return clearWsl();
-      set({ wslErrors: index.errors });
+      setWslErrors(index.errors);
       setLists(get().windowsSessions, index.sessions);
       await refreshLive();
     } catch (error) {
-      set({ wslErrors: { WSL: errorMessage(error) } });
+      setWslErrors({ WSL: errorMessage(error) });
     } finally {
       set({ wslLoading: false });
     }

@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { Play, Square } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -80,6 +80,28 @@ export const SqlPane = ({
     }
   }, [run]);
 
+  const grids = useMemo(
+    () =>
+      output?.results.map((result, index) =>
+        result.columns.length ? (
+          <ResultGrid
+            key={index}
+            className="mb-3 max-h-[480px]"
+            columns={result.columns}
+            rows={result.rows}
+            footer={
+              result.truncated ? <span>showing the first {result.rows.length}</span> : undefined
+            }
+          />
+        ) : (
+          <p key={index} className="mb-2 text-[12px] text-muted">
+            Done · {result.rowCount} {result.rowCount === 1 ? "row" : "rows"} affected
+          </p>
+        ),
+      ),
+    [output],
+  );
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="h-[34%] min-h-[120px] shrink-0 overflow-hidden border-b border-border bg-code-bg">
@@ -116,23 +138,7 @@ export const SqlPane = ({
             <span className="whitespace-pre-wrap">{error}</span>
           </Alert>
         )}
-        {output?.results.map((result, index) =>
-          result.columns.length ? (
-            <ResultGrid
-              key={index}
-              className="mb-3 max-h-[480px]"
-              columns={result.columns}
-              rows={result.rows}
-              footer={
-                result.truncated ? <span>showing the first {result.rows.length}</span> : undefined
-              }
-            />
-          ) : (
-            <p key={index} className="mb-2 text-[12px] text-muted">
-              Done · {result.rowCount} {result.rowCount === 1 ? "row" : "rows"} affected
-            </p>
-          ),
-        )}
+        {grids}
       </div>
     </div>
   );

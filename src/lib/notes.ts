@@ -11,11 +11,11 @@ const LINE_MARKER = /^(?:#+\s*|[-*+>]\s+(?:\[[ xX]\]\s+)?|\d+[.)]\s+)/;
 const HEADING = /^(#{1,6})\s/;
 
 export const noteTitle = (text: string) => {
-  const line = text
-    .split("\n")
-    .map((part) => part.trim().replace(LINE_MARKER, "").trim())
-    .find(Boolean);
-  return line ? line.slice(0, 80) : "Untitled";
+  for (const part of text.split("\n")) {
+    const line = part.trim().replace(LINE_MARKER, "").trim();
+    if (line) return line.slice(0, 80);
+  }
+  return "Untitled";
 };
 
 export const renameText = (text: string, name: string) => {

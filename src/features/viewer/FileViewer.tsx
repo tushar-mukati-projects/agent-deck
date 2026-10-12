@@ -76,7 +76,8 @@ const DocumentBody = ({ workspace, path }: { workspace: Workspace; path: string 
   const needsText = isTextKind(kind);
   const { state, reload, staleOnDisk, dismissStale } = useFileContent(path, needsText);
   const key = normalizePath(path);
-  const draft = useViewerStore((s) => s.drafts[key]);
+  const dirty = useViewerStore((s) => key in s.drafts);
+  const draft = useViewerStore.getState().drafts[key];
   const editing = useViewerStore((s) => !!s.editing[key]);
   const markdownMode = useViewerStore((s) => s.markdownMode[key] ?? "preview");
   const line = useViewerStore((s) => s.lines[key] ?? null);
@@ -88,7 +89,6 @@ const DocumentBody = ({ workspace, path }: { workspace: Workspace; path: string 
   contentRef.current = content;
   const text = content?.text ?? null;
   const readOnly = content?.encoding === "lossy";
-  const dirty = draft !== undefined;
   const showSource = kind === "text" || (kind === "markdown" && markdownMode === "source");
 
   useEffect(() => {

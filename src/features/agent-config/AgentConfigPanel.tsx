@@ -1,4 +1,4 @@
-import { useDeferredValue, useMemo, useState } from "react";
+import { memo, useDeferredValue, useMemo, useState } from "react";
 import { BrainCircuit, RefreshCw } from "lucide-react";
 
 import { EmptyState, LoadingState } from "@/components/ui/feedback";
@@ -18,55 +18,58 @@ import type { AgentOverview, ConfigAgent, Workspace } from "@/types";
 
 const DEFAULT_OPEN: SectionKey[] = ["memory", "mcp"];
 
-const Sections = ({
-  workspace,
-  agent,
-  overview,
-  query,
-  reload,
-}: {
-  workspace: Workspace;
-  agent: ConfigAgent;
-  overview: AgentOverview;
-  query: string;
-  reload: () => void;
-}) => {
-  const [open, setOpen] = useState<Set<SectionKey>>(() => new Set(DEFAULT_OPEN));
-  const data = useMemo(() => filterOverview(overview, query), [overview, query]);
-  const profile = PROFILES[agent];
-  const toggle = (key: SectionKey) =>
-    setOpen((current) => {
-      const next = new Set(current);
-      if (!next.delete(key)) next.add(key);
-      return next;
-    });
+const Sections = memo(
+  ({
+    workspace,
+    agent,
+    overview,
+    query,
+    reload,
+  }: {
+    workspace: Workspace;
+    agent: ConfigAgent;
+    overview: AgentOverview;
+    query: string;
+    reload: () => void;
+  }) => {
+    const [open, setOpen] = useState<Set<SectionKey>>(() => new Set(DEFAULT_OPEN));
+    const data = useMemo(() => filterOverview(overview, query), [overview, query]);
+    const profile = PROFILES[agent];
+    const toggle = (key: SectionKey) =>
+      setOpen((current) => {
+        const next = new Set(current);
+        if (!next.delete(key)) next.add(key);
+        return next;
+      });
 
-  return (
-    <>
-      {profile.sections.map((key) => {
-        const { title, icon, count, Body } = SECTIONS[key];
-        return (
-          <CollapsibleSection
-            key={key}
-            title={profile.titles[key] ?? title}
-            icon={icon}
-            count={count(data)}
-            open={!!query || open.has(key)}
-            onToggle={() => toggle(key)}
-          >
-            <Body
-              workspace={workspace}
-              agent={agent}
-              profile={profile}
-              data={data}
-              reload={reload}
-            />
-          </CollapsibleSection>
-        );
-      })}
-    </>
-  );
-};
+    return (
+      <>
+        {profile.sections.map((key) => {
+          const { title, icon, count, Body } = SECTIONS[key];
+          return (
+            <CollapsibleSection
+              key={key}
+              title={profile.titles[key] ?? title}
+              icon={icon}
+              count={count(data)}
+              open={!!query || open.has(key)}
+              onToggle={() => toggle(key)}
+            >
+              <Body
+                workspace={workspace}
+                agent={agent}
+                profile={profile}
+                data={data}
+                reload={reload}
+              />
+            </CollapsibleSection>
+          );
+        })}
+      </>
+    );
+  },
+);
+Sections.displayName = "Sections";
 
 const useDistroStopped = (cwd: string, error: string | null) => {
   const distro = parseWslPath(cwd)?.distro ?? null;
@@ -125,7 +128,7 @@ const WorkspaceConfig = ({ workspace, agent }: { workspace: Workspace; agent: Co
                 agent={agent}
                 overview={overview}
                 query={deferredQuery}
-                reload={() => void reload()}
+                reload={reload}
               />
             ) : (
               !error && <LoadingState className="py-8" />

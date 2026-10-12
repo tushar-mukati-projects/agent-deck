@@ -41,6 +41,8 @@ const FindBar = ({
     inputRef.current?.select();
   }, [request]);
 
+  useEffect(() => () => clearTerminalSearch(terminalId), [terminalId]);
+
   const find = (direction: "next" | "previous", text = query) =>
     setMissing(!!text && !findInTerminal(terminalId, text, direction));
 

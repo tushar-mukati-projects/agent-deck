@@ -4,6 +4,7 @@ use std::{
     path::{Path, PathBuf},
     sync::{mpsc, Arc},
     thread,
+    time::{Duration, Instant},
 };
 
 use anyhow::{anyhow, Context};
@@ -15,6 +16,9 @@ use tauri::ipc::Channel;
 const REPLAY_LIMIT: usize = 2 * 1024 * 1024;
 const LINE_SEARCH_LIMIT: usize = 64 * 1024;
 const SENDER_BATCH_LIMIT: usize = 512 * 1024;
+const SENDER_COALESCE: Duration = Duration::from_millis(4);
+const SENDER_HOT_GAP: Duration = Duration::from_millis(16);
+const SENDER_HOT_BURST: u32 = 8;
 
 const ALLOWED_PROGRAMS: &[&str] = &["claude", "codex", "pwsh", "powershell", "cmd", "wsl", "bash", "zsh", "fish", "nu", "sh"];
 
@@ -430,14 +434,21 @@ fn spawn_reader(mut reader: Box<dyn Read + Send>, tx: mpsc::Sender<String>) {
 
 fn spawn_sender(rx: mpsc::Receiver<String>, exit: mpsc::Receiver<Option<u32>>, output: Arc<Mutex<Output>>) {
     thread::spawn(move || {
+        let mut sent_at: Option<Instant> = None;
+        let mut burst = 0u32;
         while let Ok(mut batch) = rx.recv() {
+            burst = if sent_at.is_some_and(|at| at.elapsed() < SENDER_HOT_GAP) { burst.saturating_add(1) } else { 0 };
+            let hot = burst >= SENDER_HOT_BURST;
+            let deadline = Instant::now() + SENDER_COALESCE;
             while batch.len() < SENDER_BATCH_LIMIT {
-                match rx.try_recv() {
-                    Ok(more) => batch.push_str(&more),
-                    Err(_) => break,
+                let next = if hot { rx.recv_timeout(deadline.saturating_duration_since(Instant::now())).ok() } else { rx.try_recv().ok() };
+                match next {
+                    Some(more) => batch.push_str(&more),
+                    None => break,
                 }
             }
             output.lock().push(batch);
+            sent_at = Some(Instant::now());
         }
         let code = exit.recv().ok().flatten();
         output.lock().finish(code);
@@ -510,5 +521,28 @@ mod tests {
         assert!(!ok(&["line\nbreak"]));
         assert_eq!(msvc_quote(r#"{"a":"b"}"#), r#""{\"a\":\"b\"}""#);
         assert_eq!(msvc_quote(r"C:\dir with space\"), r#""C:\dir with space\\""#);
+    }
+
+    #[test]
+    fn sender_flushes_pending_output_before_exit() {
+        let (tx, rx) = mpsc::channel();
+        let (exit_tx, exit_rx) = mpsc::channel();
+        let output = Arc::new(Mutex::new(Output::default()));
+        spawn_sender(rx, exit_rx, output.clone());
+        let deadline = Instant::now() + Duration::from_secs(5);
+        tx.send("first ".to_string()).unwrap();
+        while output.lock().replay.is_empty() && Instant::now() < deadline {
+            thread::sleep(Duration::from_millis(1));
+        }
+        for chunk in ["second ", "third"] {
+            tx.send(chunk.to_string()).unwrap();
+        }
+        drop(tx);
+        exit_tx.send(Some(7)).unwrap();
+        while !output.lock().exited && Instant::now() < deadline {
+            thread::sleep(Duration::from_millis(1));
+        }
+        let output = output.lock();
+        assert_eq!((output.replay.as_str(), output.exited, output.exit_code), ("first second third", true, Some(7)));
     }
 }

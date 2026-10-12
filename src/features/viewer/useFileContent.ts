@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { subscribeFileChanges } from "@/lib/file-events";
 import { api } from "@/lib/tauri/commands";
 import { appWindow } from "@/lib/tauri/system";
-import { errorMessage, normalizePath, samePath } from "@/lib/utils";
+import { errorMessage, normalizePath } from "@/lib/utils";
 import { isDirty } from "@/stores/viewer-store";
 import type { FileContent } from "@/types";
 
@@ -37,7 +37,17 @@ export const useFileContent = (path: string, enabled: boolean) => {
       try {
         const content = await api.readFile(path);
         remember(path, content);
-        setState({ status: "ready", content });
+        setState((current) =>
+          current.status === "ready" &&
+          current.content.kind === "text" &&
+          content.kind === "text" &&
+          current.content.modifiedMs === content.modifiedMs &&
+          current.content.encoding === content.encoding &&
+          current.content.size === content.size &&
+          current.content.text === content.text
+            ? current
+            : { status: "ready", content },
+        );
         setStaleOnDisk(false);
       } catch (error) {
         setState({ status: "error", error: errorMessage(error) });
@@ -52,12 +62,13 @@ export const useFileContent = (path: string, enabled: boolean) => {
 
   useEffect(() => {
     if (!enabled) return;
+    const target = normalizePath(path);
     const onChanged = () => {
       if (isDirty(path)) setStaleOnDisk(true);
       else void load(true);
     };
     const unsubscribe = subscribeFileChanges((change) => {
-      if (change.paths.some((p) => samePath(p, path))) onChanged();
+      if (change.paths.some((p) => normalizePath(p) === target)) onChanged();
     });
     const unlisten = appWindow.onFocusChanged(({ payload: focused }) => {
       if (focused && !isDirty(path)) void load(true);
@@ -73,12 +84,11 @@ export const useFileContent = (path: string, enabled: boolean) => {
 
 export const useFileVersion = (path: string) => {
   const [version, setVersion] = useState(0);
-  useEffect(
-    () =>
-      subscribeFileChanges((change) => {
-        if (change.paths.some((p) => samePath(p, path))) setVersion((v) => v + 1);
-      }),
-    [path],
-  );
+  useEffect(() => {
+    const target = normalizePath(path);
+    return subscribeFileChanges((change) => {
+      if (change.paths.some((p) => normalizePath(p) === target)) setVersion((v) => v + 1);
+    });
+  }, [path]);
   return version;
 };

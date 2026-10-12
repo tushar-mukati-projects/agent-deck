@@ -60,6 +60,7 @@ interface Entry {
   activity: Activity;
   ptySize: { cols: number; rows: number } | null;
   resizeTimer: number | undefined;
+  reflowTimer: number | undefined;
   scrollHold: ScrollHold | null;
 }
 
@@ -71,6 +72,8 @@ interface ScrollHold {
 }
 
 const PTY_RESIZE_DELAY_MS = 200;
+const REFLOW_LINES = 200;
+const REFLOW_DELAY_MS = 100;
 const FIRST_OUTPUT_MS = 1000;
 const QUIET_OUTPUT_MS = 300;
 const MAX_HOLD_MS = 3000;
@@ -174,6 +177,7 @@ const createEntry = (spec: TerminalSpec): Entry => {
     activity: createActivity(),
     ptySize: null,
     resizeTimer: undefined,
+    reflowTimer: undefined,
     scrollHold: null,
   };
 
@@ -328,15 +332,22 @@ const syncPtySize = (entry: Entry) => {
   }, PTY_RESIZE_DELAY_MS);
 };
 
-export const fitTerminal = (id: string) => {
+export const fitTerminal = (id: string, settled = false) => {
   const entry = entries.get(id);
   if (!entry?.opened || !entry.element.isConnected || performance.now() < fitsHeldUntil) return;
   if (entry.element.clientWidth < 20 || entry.element.clientHeight < 20) return;
   const proposed = entry.fit.proposeDimensions();
   if (!proposed || Number.isNaN(proposed.cols) || Number.isNaN(proposed.rows)) return;
   if (proposed.cols === entry.term.cols && proposed.rows === entry.term.rows) return;
+  const deferCols =
+    !settled && proposed.cols !== entry.term.cols && entry.term.buffer.active.length > REFLOW_LINES;
+  if (deferCols) {
+    window.clearTimeout(entry.reflowTimer);
+    entry.reflowTimer = window.setTimeout(() => fitTerminal(id, true), REFLOW_DELAY_MS);
+    if (proposed.rows === entry.term.rows) return;
+  }
   holdScroll(entry);
-  entry.fit.fit();
+  entry.term.resize(deferCols ? entry.term.cols : proposed.cols, proposed.rows);
   if (entry.scrollHold) scrollToAnchor(entry.term, entry.scrollHold.anchor);
   syncPtySize(entry);
 };
@@ -357,7 +368,7 @@ export const mountTerminal = (id: string, host: HTMLElement) => {
     entry.opened = true;
   }
   ensureWebgl(entry);
-  fitTerminal(id);
+  fitTerminal(id, true);
   entry.term.refresh(0, entry.term.rows - 1);
   store().update(id, { attention: false });
   if (entry.focusOnMount) {
@@ -425,6 +436,7 @@ export const disposeTerminal = async (id: string) => {
     entry.generation += 1;
     window.clearTimeout(entry.activity.idleTimer);
     window.clearTimeout(entry.resizeTimer);
+    window.clearTimeout(entry.reflowTimer);
     entry.scrollHold?.release();
     releaseWebgl(entry);
     entry.term.dispose();

@@ -32,14 +32,15 @@ import { findAgent } from "@/lib/agents/registry";
 import { copyText, revealInExplorer } from "@/lib/tauri/system";
 import { basename, cn } from "@/lib/utils";
 import { useSessionsStore } from "@/stores/sessions-store";
+import { useSettingsStore } from "@/stores/settings-store";
 import { useWorkspace, useWorkspaceStore } from "@/stores/workspace-store";
 import type { Workspace } from "@/types";
 
 const TAB_DRAG_TYPE = "application/x-claude-deck-tab";
 
 const TabMenu = ({ workspace, children }: { workspace: Workspace; children: React.ReactNode }) => {
-  const session = useSessionsStore((s) => s.byId[workspace.sessionId]);
-  const canFork = findAgent(workspace.agent).canFork && !!session;
+  const hasSession = useSessionsStore((s) => !!s.byId[workspace.sessionId]);
+  const canFork = findAgent(workspace.agent).canFork && hasSession;
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
@@ -58,8 +59,11 @@ const TabMenu = ({ workspace, children }: { workspace: Workspace; children: Reac
         </ContextMenuItem>
         <ContextMenuItem
           icon={<Pencil />}
-          disabled={!session}
-          onSelect={() => session && renameSession(session)}
+          disabled={!hasSession}
+          onSelect={() => {
+            const session = useSessionsStore.getState().byId[workspace.sessionId];
+            if (session) renameSession(session);
+          }}
         >
           Rename…
         </ContextMenuItem>
@@ -108,6 +112,7 @@ const TabMenu = ({ workspace, children }: { workspace: Workspace; children: Reac
 
 const TabBody = ({ workspace, isActive }: { workspace: Workspace; isActive: boolean }) => {
   const tone = useWorkspaceTone(workspace);
+  const hidden = useSettingsStore((s) => s.hideMode);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -140,7 +145,7 @@ const TabBody = ({ workspace, isActive }: { workspace: Workspace; isActive: bool
       >
         {isActive && <span className="absolute inset-x-0 top-0 h-[2px] bg-accent" />}
         {isActive && <span className="absolute inset-x-0 -bottom-px h-px bg-bg" />}
-        {tone ? (
+        {hidden ? null : tone ? (
           <StatusDot tone={tone} />
         ) : (
           <span className="size-[7px] shrink-0 rounded-full border border-faint/60" />

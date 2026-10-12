@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Square } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -61,7 +61,7 @@ export const DataPane = ({
   }, [table, page, order, appliedWhere, run]);
 
   const hasMore = (result?.rows.length ?? 0) > PAGE_SIZE;
-  const rows = result?.rows.slice(0, PAGE_SIZE) ?? [];
+  const rows = useMemo(() => result?.rows.slice(0, PAGE_SIZE) ?? [], [result]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2 p-3">

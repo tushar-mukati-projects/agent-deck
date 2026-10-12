@@ -5,7 +5,7 @@ type Listener = (change: FsChange) => void;
 const RELEASE_GRACE_MS = 3000;
 
 const listeners = new Set<Listener>();
-const watches = new Map<string, { count: number; releaseTimer?: number }>();
+const watches = new Map<string, { count: number; since: number; releaseTimer?: number }>();
 
 export const subscribeFileChanges = (listener: Listener) => {
   listeners.add(listener);
@@ -24,7 +24,7 @@ export const retainWatch = (root: string, watch: (root: string) => Promise<void>
     current.count += 1;
     return false;
   }
-  watches.set(root, { count: 1 });
+  watches.set(root, { count: 1, since: Date.now() });
   void watch(root).catch(() => undefined);
   return true;
 };
@@ -41,3 +41,5 @@ export const releaseWatch = (root: string, unwatch: (root: string) => Promise<vo
 };
 
 export const watchedRoots = () => [...watches.keys()];
+
+export const watchedSince = (root: string) => watches.get(root)?.since ?? null;

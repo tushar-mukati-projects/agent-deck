@@ -14,7 +14,7 @@ import { errorMessage } from "@/lib/utils";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import type { AgentTask, FileTail } from "@/types";
 
-const OUTPUT_BYTES = 256 * 1024;
+const OUTPUT_BYTES = 64 * 1024;
 const POLL_MS = 1000;
 
 const STATE_LABEL: Record<TaskState, string> = {
@@ -38,7 +38,11 @@ const useOutput = (path: string | null, live: boolean) => {
       try {
         const next = await api.readTail(path, OUTPUT_BYTES);
         if (!cancelled) {
-          setTail(next);
+          setTail((current) =>
+            current && current.text === next.text && current.truncated === next.truncated
+              ? current
+              : next,
+          );
           setError(null);
         }
       } catch (e) {

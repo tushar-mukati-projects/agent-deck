@@ -28,7 +28,7 @@ export const Dialog = ({
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="animate-fade-in fixed inset-0 z-40 bg-scrim backdrop-blur-[2px]" />
+        <DialogPrimitive.Overlay className="animate-fade-in fixed inset-0 z-40 bg-scrim" />
         <DialogPrimitive.Content
           onOpenAutoFocus={(event) => {
             previousFocus.current =

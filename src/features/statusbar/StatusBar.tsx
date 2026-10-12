@@ -78,7 +78,9 @@ const SubagentsItem = ({ workspace }: { workspace: Workspace }) => {
 
 export const StatusBar = () => {
   const workspace = useActiveWorkspace();
-  const session = useSessionsStore((s) => (workspace ? s.byId[workspace.sessionId] : undefined));
+  const gitBranch = useSessionsStore((s) =>
+    workspace ? s.byId[workspace.sessionId]?.gitBranch : undefined,
+  );
   const home = useSessionsStore((s) => s.environment?.home ?? "");
   const hidden = useSettingsStore((s) => s.hideMode);
   const pet = useSettingsStore((s) => s.pet);
@@ -98,10 +100,10 @@ export const StatusBar = () => {
               <FolderOpen />
               <span className="truncate">{shortenHome(workspace.cwd, home)}</span>
             </Item>
-            {session?.gitBranch && session.gitBranch !== "HEAD" && (
-              <Item title={session.gitBranch}>
+            {gitBranch && gitBranch !== "HEAD" && (
+              <Item title={gitBranch}>
                 <GitBranch />
-                <span className="max-w-[220px] truncate">{session.gitBranch}</span>
+                <span className="max-w-[220px] truncate">{gitBranch}</span>
               </Item>
             )}
             {!hidden && (

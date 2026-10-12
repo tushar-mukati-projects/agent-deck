@@ -4,7 +4,7 @@ import dos from "highlight.js/lib/languages/dos";
 import nginx from "highlight.js/lib/languages/nginx";
 import powershell from "highlight.js/lib/languages/powershell";
 import { common } from "lowlight";
-import ReactMarkdown, { type Components } from "react-markdown";
+import ReactMarkdown, { type Components, type Options } from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
@@ -36,6 +36,13 @@ const schema = {
     div: [...(defaultSchema.attributes?.div ?? []), "align"],
   },
 };
+
+const remarkPlugins: Options["remarkPlugins"] = [remarkGfm];
+const rehypePlugins: Options["rehypePlugins"] = [
+  rehypeRaw,
+  [rehypeSanitize, schema],
+  [rehypeHighlight, highlightOptions],
+];
 
 const isExternal = (href: string) => /^(https?:|mailto:)/i.test(href);
 const isDrivePath = (path: string) => /^[a-zA-Z]:[\\/]/.test(path);
@@ -125,8 +132,8 @@ export const MarkdownView = memo(({ source, baseDir, onOpenPath, compact }: Mark
     >
       {fields.length > 0 && <Frontmatter fields={fields} />}
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeRaw, [rehypeSanitize, schema], [rehypeHighlight, highlightOptions]]}
+        remarkPlugins={remarkPlugins}
+        rehypePlugins={rehypePlugins}
         components={components}
       >
         {body}

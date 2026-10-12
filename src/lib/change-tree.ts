@@ -19,9 +19,11 @@ export type ChangeNode<T> = ChangeFolder<T> | ChangeFile<T>;
 const label = (node: ChangeNode<unknown>) =>
   node.kind === "folder" ? node.name : basename(node.key);
 
+const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+
 const foldersFirstByName = (a: ChangeNode<unknown>, b: ChangeNode<unknown>) => {
   if (a.kind !== b.kind) return a.kind === "folder" ? -1 : 1;
-  return label(a).localeCompare(label(b), undefined, { numeric: true, sensitivity: "base" });
+  return collator.compare(label(a), label(b));
 };
 
 const sortAndCompact = <T>(folder: ChangeFolder<T>): ChangeFolder<T> => {

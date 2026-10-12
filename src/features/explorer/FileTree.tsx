@@ -35,10 +35,12 @@ const showError = (error: unknown) => toast.error(errorMessage(error));
 
 const ROW_HEIGHT = 22;
 const OVERSCAN = 12;
+const SCROLL_STEP = ROW_HEIGHT * 6;
 const INDENT = 12;
 
 interface Row {
   entry: DirEntry;
+  key: string;
   depth: number;
   expanded: boolean;
 }
@@ -53,8 +55,9 @@ const useRows = (root: string) => {
     const walk = (dir: string, depth: number) => {
       for (const entry of children[normalizePath(dir)] ?? []) {
         if (!showHidden && entry.hidden) continue;
-        const isExpanded = entry.isDir && !!expanded[normalizePath(entry.path)];
-        rows.push({ entry, depth, expanded: isExpanded });
+        const key = normalizePath(entry.path);
+        const isExpanded = entry.isDir && !!expanded[key];
+        rows.push({ entry, key, depth, expanded: isExpanded });
         if (isExpanded) walk(entry.path, depth + 1);
       }
     };
@@ -161,7 +164,7 @@ export const FileTree = ({ workspace }: { workspace: Workspace }) => {
   const selectedIndex = useMemo(() => {
     if (!selected) return -1;
     const key = normalizePath(selected);
-    return rows.findIndex((r) => normalizePath(r.entry.path) === key);
+    return rows.findIndex((r) => r.key === key);
   }, [rows, selected]);
   const activeKey = activeFile ? normalizePath(activeFile) : null;
 
@@ -241,8 +244,8 @@ export const FileTree = ({ workspace }: { workspace: Workspace }) => {
       tabIndex={0}
       onKeyDown={handleKeyDown}
       onScroll={(e) => {
-        const top = e.currentTarget.scrollTop;
-        setViewport((v) => ({ ...v, top }));
+        const top = Math.floor(e.currentTarget.scrollTop / SCROLL_STEP) * SCROLL_STEP;
+        setViewport((v) => (v.top === top ? v : { ...v, top }));
       }}
       className="relative min-h-0 flex-1 overflow-y-auto outline-none focus-visible:ring-1 focus-visible:ring-accent/60 focus-visible:ring-inset"
     >
@@ -251,10 +254,10 @@ export const FileTree = ({ workspace }: { workspace: Workspace }) => {
           const index = start + offset;
           const { entry } = row;
           const isSelected = index === selectedIndex;
-          const isOpenFile = activeKey === normalizePath(entry.path);
+          const isOpenFile = activeKey === row.key;
           const spec = entry.isDir ? folderIcon(entry.name, row.expanded) : fileIcon(entry.path);
           const Icon = spec.icon;
-          const isLoading = entry.isDir && loading[normalizePath(entry.path)];
+          const isLoading = entry.isDir && loading[row.key];
           return (
             <RowMenu key={entry.path} row={row} workspace={workspace}>
               <div

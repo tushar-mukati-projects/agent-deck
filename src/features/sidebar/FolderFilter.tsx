@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { Check, ChevronDown, FolderOpen, FolderSearch, Layers } from "lucide-react";
 
 import {
@@ -14,14 +14,13 @@ import { basename, cn, samePath, shortenHome } from "@/lib/utils";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore } from "@/stores/settings-store";
 
-export const FolderFilter = () => {
+const FolderMenu = ({ onClose }: { onClose: () => void }) => {
   const folders = useFolders();
   const home = useSessionsStore((s) => s.environment?.home ?? "");
   const folderFilter = useSettingsStore((s) => s.folderFilter);
   const includeSubfolders = useSettingsStore((s) => s.includeSubfolders);
   const setSettings = useSettingsStore((s) => s.set);
   const [query, setQuery] = useState("");
-  const [open, setOpen] = useState(false);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -45,21 +44,72 @@ export const FolderFilter = () => {
     if (event.key === "Enter" && query.trim() && visible[0]) {
       event.preventDefault();
       setSettings({ folderFilter: visible[0].cwd });
-      setOpen(false);
+      onClose();
       return;
     }
     if (event.key !== "Escape") event.stopPropagation();
   };
 
   return (
+    <>
+      <div className="border-b border-border p-1.5">
+        <input
+          autoFocus
+          aria-label="Filter folders"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={onFilterKey}
+          placeholder="Filter folders…"
+          className="h-7 w-full rounded-md bg-bg px-2 text-xs text-fg outline-none placeholder:text-faint"
+        />
+      </div>
+      <div className="max-h-[360px] overflow-y-auto p-1">
+        <DropdownMenuItem
+          icon={folderFilter ? <Layers /> : <Check className="!text-accent" />}
+          onSelect={() => setSettings({ folderFilter: null })}
+        >
+          <span className={cn(!folderFilter && "text-accent")}>All folders</span>
+        </DropdownMenuItem>
+        {visible.map((folder) => {
+          const selected = !!folderFilter && samePath(folderFilter, folder.cwd);
+          return (
+            <DropdownMenuItem
+              key={folder.cwd}
+              icon={selected ? <Check className="!text-accent" /> : <FolderOpen />}
+              shortcut={String(folder.count)}
+              onSelect={() => setSettings({ folderFilter: folder.cwd })}
+            >
+              <span className={cn(selected && "text-accent")}>{folder.name}</span>
+              <span className="ml-2 text-[11px] text-faint">{shortenHome(folder.cwd, home)}</span>
+            </DropdownMenuItem>
+          );
+        })}
+      </div>
+      <div className="border-t border-border p-1">
+        <DropdownMenuItem icon={<FolderSearch />} onSelect={() => void browse()}>
+          Browse for any folder…
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          icon={
+            includeSubfolders ? <Check className="!text-accent" /> : <span className="size-3.5" />
+          }
+          onSelect={() => setSettings({ includeSubfolders: !includeSubfolders })}
+        >
+          Include subfolders
+        </DropdownMenuItem>
+      </div>
+    </>
+  );
+};
+
+export const FolderFilter = memo(() => {
+  const folderFilter = useSettingsStore((s) => s.folderFilter);
+  const [open, setOpen] = useState(false);
+
+  return (
     <div className="flex items-center gap-1 px-2 pb-2">
-      <DropdownMenu
-        open={open}
-        onOpenChange={(next) => {
-          setOpen(next);
-          if (!next) setQuery("");
-        }}
-      >
+      <DropdownMenu open={open} onOpenChange={setOpen}>
         <DropdownMenuTrigger asChild>
           <button
             type="button"
@@ -77,61 +127,10 @@ export const FolderFilter = () => {
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent className="w-[340px] p-0">
-          <div className="border-b border-border p-1.5">
-            <input
-              autoFocus
-              aria-label="Filter folders"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={onFilterKey}
-              placeholder="Filter folders…"
-              className="h-7 w-full rounded-md bg-bg px-2 text-xs text-fg outline-none placeholder:text-faint"
-            />
-          </div>
-          <div className="max-h-[360px] overflow-y-auto p-1">
-            <DropdownMenuItem
-              icon={folderFilter ? <Layers /> : <Check className="!text-accent" />}
-              onSelect={() => setSettings({ folderFilter: null })}
-            >
-              <span className={cn(!folderFilter && "text-accent")}>All folders</span>
-            </DropdownMenuItem>
-            {visible.map((folder) => {
-              const selected = !!folderFilter && samePath(folderFilter, folder.cwd);
-              return (
-                <DropdownMenuItem
-                  key={folder.cwd}
-                  icon={selected ? <Check className="!text-accent" /> : <FolderOpen />}
-                  shortcut={String(folder.count)}
-                  onSelect={() => setSettings({ folderFilter: folder.cwd })}
-                >
-                  <span className={cn(selected && "text-accent")}>{folder.name}</span>
-                  <span className="ml-2 text-[11px] text-faint">
-                    {shortenHome(folder.cwd, home)}
-                  </span>
-                </DropdownMenuItem>
-              );
-            })}
-          </div>
-          <div className="border-t border-border p-1">
-            <DropdownMenuItem icon={<FolderSearch />} onSelect={() => void browse()}>
-              Browse for any folder…
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              icon={
-                includeSubfolders ? (
-                  <Check className="!text-accent" />
-                ) : (
-                  <span className="size-3.5" />
-                )
-              }
-              onSelect={() => setSettings({ includeSubfolders: !includeSubfolders })}
-            >
-              Include subfolders
-            </DropdownMenuItem>
-          </div>
+          <FolderMenu onClose={() => setOpen(false)} />
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
   );
-};
+});
+FolderFilter.displayName = "FolderFilter";

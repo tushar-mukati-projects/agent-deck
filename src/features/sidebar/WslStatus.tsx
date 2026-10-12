@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import { Power } from "lucide-react";
 import { toast } from "sonner";
 
@@ -46,7 +46,7 @@ export const StartDistroButton = ({
   );
 };
 
-export const WslStatus = () => {
+export const WslStatus = memo(() => {
   const includeWsl = useSettingsStore((s) => s.includeWsl);
   const distros = useSessionsStore((s) => s.distros);
   const loading = useSessionsStore((s) => s.wslLoading);
@@ -83,4 +83,5 @@ export const WslStatus = () => {
       ))}
     </div>
   );
-};
+});
+WslStatus.displayName = "WslStatus";

@@ -18,7 +18,7 @@ import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useActiveWorkspace } from "@/stores/workspace-store";
 
-export const NewSessionMenu = ({ children }: { children: React.ReactNode }) => {
+const NewSessionItems = () => {
   const folders = useFolders();
   const active = useActiveWorkspace();
   const home = useSessionsStore((s) => s.environment?.home ?? "");
@@ -27,51 +27,55 @@ export const NewSessionMenu = ({ children }: { children: React.ReactNode }) => {
   const recent = folders.filter((f) => !active || !samePath(f.cwd, active.cwd)).slice(0, 7);
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
-      <DropdownMenuContent className="w-[340px]">
-        {active && (
-          <>
-            <DropdownMenuLabel>In {basename(active.cwd)}</DropdownMenuLabel>
-            {agents.map((agent) => (
-              <DropdownMenuItem
-                key={agent.id}
-                icon={
-                  <Sparkles className={agent.id === defaultAgent ? "!text-accent" : undefined} />
-                }
-                shortcut={agent.id === defaultAgent ? shortcutLabel("newSession") : undefined}
-                onSelect={() => startNewSession(active.cwd, agent.id)}
-              >
-                New {agent.name} session
-              </DropdownMenuItem>
-            ))}
-            <DropdownMenuSeparator />
-          </>
-        )}
-        <DropdownMenuItem
-          icon={<FolderPlus />}
-          onSelect={() => void startSessionInPickedFolder(active?.cwd)}
-        >
-          Choose folder…{" "}
-          <span className="ml-1 text-[11px] text-faint">({agentName(defaultAgent)})</span>
-        </DropdownMenuItem>
-        {recent.length > 0 && (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuLabel>Recent folders · {agentName(defaultAgent)}</DropdownMenuLabel>
-            {recent.map((folder) => (
-              <DropdownMenuItem
-                key={folder.cwd}
-                icon={<FolderOpen />}
-                onSelect={() => startNewSession(folder.cwd)}
-              >
-                <span className="text-fg">{folder.name}</span>
-                <span className="ml-2 text-[11px] text-faint">{shortenHome(folder.cwd, home)}</span>
-              </DropdownMenuItem>
-            ))}
-          </>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <>
+      {active && (
+        <>
+          <DropdownMenuLabel>In {basename(active.cwd)}</DropdownMenuLabel>
+          {agents.map((agent) => (
+            <DropdownMenuItem
+              key={agent.id}
+              icon={<Sparkles className={agent.id === defaultAgent ? "!text-accent" : undefined} />}
+              shortcut={agent.id === defaultAgent ? shortcutLabel("newSession") : undefined}
+              onSelect={() => startNewSession(active.cwd, agent.id)}
+            >
+              New {agent.name} session
+            </DropdownMenuItem>
+          ))}
+          <DropdownMenuSeparator />
+        </>
+      )}
+      <DropdownMenuItem
+        icon={<FolderPlus />}
+        onSelect={() => void startSessionInPickedFolder(active?.cwd)}
+      >
+        Choose folder…{" "}
+        <span className="ml-1 text-[11px] text-faint">({agentName(defaultAgent)})</span>
+      </DropdownMenuItem>
+      {recent.length > 0 && (
+        <>
+          <DropdownMenuSeparator />
+          <DropdownMenuLabel>Recent folders · {agentName(defaultAgent)}</DropdownMenuLabel>
+          {recent.map((folder) => (
+            <DropdownMenuItem
+              key={folder.cwd}
+              icon={<FolderOpen />}
+              onSelect={() => startNewSession(folder.cwd)}
+            >
+              <span className="text-fg">{folder.name}</span>
+              <span className="ml-2 text-[11px] text-faint">{shortenHome(folder.cwd, home)}</span>
+            </DropdownMenuItem>
+          ))}
+        </>
+      )}
+    </>
   );
 };
+
+export const NewSessionMenu = ({ children }: { children: React.ReactNode }) => (
+  <DropdownMenu>
+    <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
+    <DropdownMenuContent className="w-[340px]">
+      <NewSessionItems />
+    </DropdownMenuContent>
+  </DropdownMenu>
+);

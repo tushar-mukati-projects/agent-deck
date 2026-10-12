@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Eye, EyeOff, GitCompare, RefreshCw } from "lucide-react";
 
 import { EmptyState, Hint, LoadingState } from "@/components/ui/feedback";
@@ -189,143 +189,147 @@ const loadChanges = async (cwd: string, filePath: string | null, distro: string 
   };
 };
 
-const SessionChanges = ({
-  workspace,
-  files,
-  error,
-  showUnchanged,
-  sessionFile,
-}: {
-  workspace: Workspace;
-  files: ChangedFile[];
-  error: string | null;
-  showUnchanged: boolean;
-  sessionFile: string | null;
-}) => {
-  const [open, setOpen] = useState(true);
-  const [collapsed, toggleFolder] = useCollapsed();
-  const agent = useSessionsStore((s) => s.byId[workspace.sessionId]?.agent ?? workspace.agent);
-  const visible = useMemo(
-    () => files.filter((f) => showUnchanged || f.status !== "unchanged"),
-    [files, showUnchanged],
-  );
-  const tree = useMemo(
-    () => buildChangeTree(visible, (f) => f.path, workspace.cwd),
-    [visible, workspace.cwd],
-  );
-  const totals = visible.reduce(
-    (acc, f) => ({ add: acc.add + f.additions, del: acc.del + f.deletions }),
-    { add: 0, del: 0 },
-  );
-  const openDiff = (file: ChangedFile) => {
-    const source = file.backup || agent === CLAUDE ? "session" : "git";
-    useWorkspaceStore
-      .getState()
-      .openFile(workspace.id, encodeDiffTab({ source, path: file.path, backup: file.backup }));
-  };
+type Changes = Awaited<ReturnType<typeof loadChanges>>;
 
-  return (
-    <CollapsibleSection
-      title="Edited in this session"
-      count={visible.length}
-      open={open}
-      onToggle={() => setOpen((v) => !v)}
-      summary={
-        visible.length > 0 && (
-          <>
-            <span className="text-add">+{totals.add}</span>{" "}
-            <span className="text-del">−{totals.del}</span>
-          </>
-        )
-      }
-    >
-      {error && <Hint className="text-danger">{error}</Hint>}
-      {!error && visible.length === 0 && (
-        <Hint>
-          {sessionFile
-            ? `${agentName(agent)} hasn't changed any files in this session.`
-            : "Changes appear here after the first prompt."}
-        </Hint>
-      )}
-      <ChangeTree
-        nodes={tree}
-        collapsed={collapsed}
-        onToggle={toggleFolder}
-        renderFile={(file, depth) => (
-          <Row
-            path={file.path}
-            depth={depth}
-            badge={STATUS_BADGE[file.status]}
-            onOpen={() => openDiff(file)}
-          >
-            <span className="shrink-0 font-mono text-[10.5px]">
-              {file.additions > 0 && <span className="text-add">+{file.additions}</span>}
-              {file.deletions > 0 && <span className="ml-1 text-del">−{file.deletions}</span>}
-            </span>
-          </Row>
-        )}
-      />
-    </CollapsibleSection>
-  );
-};
+const SessionChanges = memo(
+  ({
+    workspace,
+    files,
+    error,
+    showUnchanged,
+    sessionFile,
+  }: {
+    workspace: Workspace;
+    files: ChangedFile[];
+    error: string | null;
+    showUnchanged: boolean;
+    sessionFile: string | null;
+  }) => {
+    const [open, setOpen] = useState(true);
+    const [collapsed, toggleFolder] = useCollapsed();
+    const agent = useSessionsStore((s) => s.byId[workspace.sessionId]?.agent ?? workspace.agent);
+    const visible = useMemo(
+      () => files.filter((f) => showUnchanged || f.status !== "unchanged"),
+      [files, showUnchanged],
+    );
+    const tree = useMemo(
+      () => buildChangeTree(visible, (f) => f.path, workspace.cwd),
+      [visible, workspace.cwd],
+    );
+    const totals = visible.reduce(
+      (acc, f) => ({ add: acc.add + f.additions, del: acc.del + f.deletions }),
+      { add: 0, del: 0 },
+    );
+    const openDiff = (file: ChangedFile) => {
+      const source = file.backup || agent === CLAUDE ? "session" : "git";
+      useWorkspaceStore
+        .getState()
+        .openFile(workspace.id, encodeDiffTab({ source, path: file.path, backup: file.backup }));
+    };
 
-const RepoChanges = ({
-  workspace,
-  git,
-  error,
-}: {
-  workspace: Workspace;
-  git: GitChange[];
-  error: string | null;
-}) => {
-  const [open, setOpen] = useState(true);
-  const [collapsed, toggleFolder] = useCollapsed();
-  const tree = useMemo(
-    () => buildChangeTree(git, (c) => c.path, workspace.cwd),
-    [git, workspace.cwd],
-  );
-  return (
-    <CollapsibleSection
-      title="Uncommitted in repo"
-      count={error ? null : git.length}
-      open={open}
-      onToggle={() => setOpen((v) => !v)}
-    >
-      {error && <Hint>{gitMessage(error)}</Hint>}
-      {!error && git.length === 0 && <Hint>Working tree is clean.</Hint>}
-      <ChangeTree
-        nodes={tree}
-        collapsed={collapsed}
-        onToggle={toggleFolder}
-        renderFile={(change, depth) => (
-          <Row
-            path={change.path}
-            depth={depth}
-            badge={gitBadge(change.code)}
-            onOpen={() =>
-              useWorkspaceStore
-                .getState()
-                .openFile(
-                  workspace.id,
-                  encodeDiffTab({ source: "git", path: change.path, backup: null }),
-                )
-            }
-          />
+    return (
+      <CollapsibleSection
+        title="Edited in this session"
+        count={visible.length}
+        open={open}
+        onToggle={() => setOpen((v) => !v)}
+        summary={
+          visible.length > 0 && (
+            <>
+              <span className="text-add">+{totals.add}</span>{" "}
+              <span className="text-del">−{totals.del}</span>
+            </>
+          )
+        }
+      >
+        {error && <Hint className="text-danger">{error}</Hint>}
+        {!error && visible.length === 0 && (
+          <Hint>
+            {sessionFile
+              ? `${agentName(agent)} hasn't changed any files in this session.`
+              : "Changes appear here after the first prompt."}
+          </Hint>
         )}
-      />
-    </CollapsibleSection>
-  );
-};
+        <ChangeTree
+          nodes={tree}
+          collapsed={collapsed}
+          onToggle={toggleFolder}
+          renderFile={(file, depth) => (
+            <Row
+              path={file.path}
+              depth={depth}
+              badge={STATUS_BADGE[file.status]}
+              onOpen={() => openDiff(file)}
+            >
+              <span className="shrink-0 font-mono text-[10.5px]">
+                {file.additions > 0 && <span className="text-add">+{file.additions}</span>}
+                {file.deletions > 0 && <span className="ml-1 text-del">−{file.deletions}</span>}
+              </span>
+            </Row>
+          )}
+        />
+      </CollapsibleSection>
+    );
+  },
+);
+SessionChanges.displayName = "SessionChanges";
+
+const RepoChanges = memo(
+  ({ workspace, git, error }: { workspace: Workspace; git: GitChange[]; error: string | null }) => {
+    const [open, setOpen] = useState(true);
+    const [collapsed, toggleFolder] = useCollapsed();
+    const tree = useMemo(
+      () => buildChangeTree(git, (c) => c.path, workspace.cwd),
+      [git, workspace.cwd],
+    );
+    return (
+      <CollapsibleSection
+        title="Uncommitted in repo"
+        count={error ? null : git.length}
+        open={open}
+        onToggle={() => setOpen((v) => !v)}
+      >
+        {error && <Hint>{gitMessage(error)}</Hint>}
+        {!error && git.length === 0 && <Hint>Working tree is clean.</Hint>}
+        <ChangeTree
+          nodes={tree}
+          collapsed={collapsed}
+          onToggle={toggleFolder}
+          renderFile={(change, depth) => (
+            <Row
+              path={change.path}
+              depth={depth}
+              badge={gitBadge(change.code)}
+              onOpen={() =>
+                useWorkspaceStore
+                  .getState()
+                  .openFile(
+                    workspace.id,
+                    encodeDiffTab({ source: "git", path: change.path, backup: null }),
+                  )
+              }
+            />
+          )}
+        />
+      </CollapsibleSection>
+    );
+  },
+);
+RepoChanges.displayName = "RepoChanges";
 
 const WorkspaceChanges = ({ workspace }: { workspace: Workspace }) => {
   const { filePath, distro } = useSessionFile(workspace);
   const modifiedMs = useSessionsStore((s) => s.byId[workspace.sessionId]?.modifiedMs ?? null);
   const [showUnchanged, setShowUnchanged] = useState(false);
   const { cwd } = workspace;
-  const { data, loading, reload } = useAsync(
-    () => loadChanges(cwd, filePath, distro),
-    [cwd, filePath, distro],
-  );
+  const previous = useRef<Changes | null>(null);
+  const { data, loading, reload } = useAsync(async () => {
+    const next = await loadChanges(cwd, filePath, distro);
+    if (previous.current && JSON.stringify(previous.current) === JSON.stringify(next))
+      return previous.current;
+    previous.current = next;
+    return next;
+  }, [cwd, filePath, distro]);
   const scheduleReload = useThrottledCallback(
     () => void reload(true),
     RELOAD_DELAY_MS,

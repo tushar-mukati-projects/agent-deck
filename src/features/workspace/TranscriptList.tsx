@@ -1,4 +1,4 @@
-import { memo, useMemo, useState } from "react";
+import { memo, useDeferredValue, useMemo, useState } from "react";
 import { AlertTriangle, ArrowDown, MessageSquare, Wrench } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,7 @@ import { useStickToBottom } from "@/features/workspace/useStickToBottom";
 import { MarkdownView } from "@/features/viewer/MarkdownView";
 import type { TranscriptItem } from "@/types";
 
-const PAGE = 60;
+const PAGE = 30;
 
 const Message = memo(
   ({
@@ -55,13 +55,14 @@ interface TranscriptListProps {
 }
 
 export const TranscriptList = ({
-  items,
+  items: latestItems,
   error,
   query,
   emptyDescription,
   baseDir,
   onOpenPath,
 }: TranscriptListProps) => {
+  const items = useDeferredValue(latestItems, null);
   const [page, setPage] = useState({ query, visible: PAGE });
   const visible = page.query === query ? page.visible : PAGE;
   const matches = useMemo(() => {

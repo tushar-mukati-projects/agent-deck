@@ -42,12 +42,21 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
     const k = key(dir);
     const request = (requests.get(k) ?? 0) + 1;
     requests.set(k, request);
-    set((s) => ({ loading: { ...s.loading, [k]: true } }));
+    if (!get().children[k]) set((s) => ({ loading: { ...s.loading, [k]: true } }));
     const result = await api.listDir(dir).then(
       (entries) => ({ entries }),
       (error: unknown) => ({ error: errorMessage(error) }),
     );
     if (requests.get(k) !== request) return;
+    const current = get();
+    const unchanged =
+      "entries" in result &&
+      !current.loading[k] &&
+      !(k in current.errors) &&
+      current.paths[k] === dir &&
+      current.children[k] !== undefined &&
+      JSON.stringify(current.children[k]) === JSON.stringify(result.entries);
+    if (unchanged) return;
     set((s) => ({
       loading: omitKey(s.loading, k),
       ...("entries" in result

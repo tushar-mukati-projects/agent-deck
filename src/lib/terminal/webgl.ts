@@ -2,6 +2,8 @@ import { WebglAddon } from "@xterm/addon-webgl";
 import type { Terminal } from "@xterm/xterm";
 
 const MAX_WEBGL_CONTEXTS = 6;
+const REACQUIRE_DELAY_MS = 1000;
+const REACQUIRE_COOLDOWN_MS = 60_000;
 
 interface WebglHost {
   term: Terminal;
@@ -10,6 +12,17 @@ interface WebglHost {
 }
 
 const order: WebglHost[] = [];
+const lastLoss = new WeakMap<WebglHost, number>();
+
+const recover = (host: WebglHost) => {
+  const previous = lastLoss.get(host);
+  lastLoss.set(host, Date.now());
+  releaseWebgl(host);
+  if (previous !== undefined && Date.now() - previous < REACQUIRE_COOLDOWN_MS) return;
+  window.setTimeout(() => {
+    if (host.element.isConnected && !host.webgl) ensureWebgl(host);
+  }, REACQUIRE_DELAY_MS);
+};
 
 export const releaseWebgl = (host: WebglHost) => {
   host.webgl?.dispose();
@@ -32,7 +45,7 @@ export const ensureWebgl = (host: WebglHost) => {
   if (!host.webgl) {
     try {
       const addon = new WebglAddon();
-      addon.onContextLoss(() => releaseWebgl(host));
+      addon.onContextLoss(() => recover(host));
       host.term.loadAddon(addon);
       host.webgl = addon;
     } catch {
