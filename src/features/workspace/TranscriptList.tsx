@@ -1,10 +1,12 @@
-import { memo, useDeferredValue, useMemo, useState } from "react";
+import { memo, useCallback, useDeferredValue, useMemo, useState } from "react";
 import { AlertTriangle, ArrowDown, MessageSquare, Wrench } from "lucide-react";
 
+import { openTypedPath } from "@/actions/files";
 import { Button } from "@/components/ui/button";
 import { EmptyState, LoadingState } from "@/components/ui/feedback";
 import { useStickToBottom } from "@/features/workspace/useStickToBottom";
 import { MarkdownView } from "@/features/viewer/MarkdownView";
+import { findWorkspace } from "@/stores/workspace-store";
 import type { TranscriptItem } from "@/types";
 
 const PAGE = 30;
@@ -51,7 +53,7 @@ interface TranscriptListProps {
   query: string;
   emptyDescription: string;
   baseDir: string;
-  onOpenPath: (path: string) => void;
+  workspaceId: string;
 }
 
 export const TranscriptList = ({
@@ -60,7 +62,7 @@ export const TranscriptList = ({
   query,
   emptyDescription,
   baseDir,
-  onOpenPath,
+  workspaceId,
 }: TranscriptListProps) => {
   const items = useDeferredValue(latestItems, null);
   const [page, setPage] = useState({ query, visible: PAGE });
@@ -71,6 +73,13 @@ export const TranscriptList = ({
   }, [items, query]);
   const shown = matches.slice(Math.max(0, matches.length - visible));
   const hiddenCount = matches.length - shown.length;
+  const onOpenPath = useCallback(
+    (path: string) => {
+      const current = findWorkspace(workspaceId);
+      if (current) void openTypedPath(current, path);
+    },
+    [workspaceId],
+  );
   const { scrollRef, contentRef, atBottom, onScroll, keepPosition, jumpToBottom } =
     useStickToBottom(`${shown.length}:${items?.length ?? -1}:${query}`);
 

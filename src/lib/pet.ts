@@ -1,6 +1,6 @@
-export type PetMood = "sleeping" | "working" | "waiting" | "celebrating";
+import { plural } from "@/lib/utils";
 
-const sessions = (count: number) => `${count} session${count === 1 ? "" : "s"}`;
+export type PetMood = "sleeping" | "working" | "waiting" | "celebrating";
 
 export const petMood = (busy: number, waiting: number, celebrating: boolean): PetMood =>
   waiting > 0 ? "waiting" : celebrating ? "celebrating" : busy > 0 ? "working" : "sleeping";
@@ -8,11 +8,11 @@ export const petMood = (busy: number, waiting: number, celebrating: boolean): Pe
 export const petLine = (mood: PetMood, busy: number, waiting: number) => {
   switch (mood) {
     case "waiting":
-      return `Deckie is waving: ${sessions(waiting)} ${waiting === 1 ? "needs" : "need"} you. Click to jump there.`;
+      return `Deckie is waving: ${plural(waiting, "session")} ${waiting === 1 ? "needs" : "need"} you. Click to jump there.`;
     case "celebrating":
       return "Deckie is celebrating: a session just finished!";
     case "working":
-      return `Deckie is working with you: ${sessions(busy)} busy.`;
+      return `Deckie is working with you: ${plural(busy, "session")} busy.`;
     default:
       return "Deckie is napping. Nothing is running right now.";
   }

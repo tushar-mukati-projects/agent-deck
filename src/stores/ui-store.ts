@@ -94,11 +94,6 @@ export const useUiStore = create<UiState>()(
     {
       name: "agent-deck-ui",
       version: 2,
-      migrate: (persisted) => {
-        const state = persisted as Omit<Partial<UiState>, "contextView"> & { contextView?: string };
-        const contextView = state.contextView === "claude" ? "agent" : state.contextView;
-        return { ...state, contextView, subagentsOpen: false } as UiState;
-      },
       partialize: (s) => ({
         sessionsOpen: s.sessionsOpen,
         sessionsWidth: s.sessionsWidth,

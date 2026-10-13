@@ -14,11 +14,10 @@ import {
   Trash2,
   Webhook,
 } from "lucide-react";
-import { toast } from "sonner";
 
 import { sendToAgent } from "@/actions/files";
 import { startAgentSession } from "@/actions/sessions";
-import { Hint } from "@/components/ui/feedback";
+import { Hint, showError } from "@/components/ui/feedback";
 import { IconButton } from "@/components/ui/icon-button";
 import { ListRow } from "@/components/ui/list-row";
 import { ScopeBadge } from "@/components/ui/panel";
@@ -45,7 +44,6 @@ import {
 import { encodeMcpTab } from "@/lib/diff-tabs";
 import { api } from "@/lib/tauri/commands";
 import { revealInExplorer } from "@/lib/tauri/system";
-import { errorMessage } from "@/lib/utils";
 import { useViewerStore } from "@/stores/viewer-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import type { ConfigAgent, ConfigItem, Workspace } from "@/types";
@@ -68,7 +66,7 @@ const createMemory = async (workspace: Workspace, path: string, reload: () => vo
     useViewerStore.getState().setEditing(path, true);
     reload();
   } catch (error) {
-    toast.error(errorMessage(error));
+    showError(error);
   }
 };
 

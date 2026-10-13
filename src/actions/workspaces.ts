@@ -2,7 +2,7 @@ import { toast } from "sonner";
 
 import { processStart, shownTasks } from "@/lib/agent-tasks";
 import { appName } from "@/lib/hide-mode";
-import { samePath } from "@/lib/utils";
+import { plural, samePath } from "@/lib/utils";
 import { useAgentTasksStore } from "@/stores/agent-tasks-store";
 import { useExplorerStore } from "@/stores/explorer-store";
 import { useSessionsStore } from "@/stores/sessions-store";
@@ -12,8 +12,6 @@ import { useUiStore } from "@/stores/ui-store";
 import { dirtyPaths, useViewerStore } from "@/stores/viewer-store";
 import { getActiveWorkspace, useWorkspaceStore } from "@/stores/workspace-store";
 import type { Workspace } from "@/types";
-
-const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
 
 const describeRunning = (workspaces: Workspace[]) => {
   const agents = aliveTerminals(workspaces.map((w) => w.agentTerminalId));

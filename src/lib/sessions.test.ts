@@ -1,32 +1,11 @@
 import { describe, expect, it } from "vitest";
 
+import { sessionInfo } from "@/lib/session-fixture";
 import { mergeSessions, reuseSessions } from "@/lib/sessions";
 import type { SessionInfo } from "@/types";
 
-const session = (
-  id: string,
-  modifiedMs: number,
-  extra: Partial<SessionInfo> = {},
-): SessionInfo => ({
-  id,
-  agent: "claude",
-  distro: null,
-  filePath: `C:\\s\\${id}.jsonl`,
-  projectKey: "p",
-  cwd: "C:\\repo",
-  title: id,
-  customTitle: null,
-  firstPrompt: null,
-  lastPrompt: null,
-  gitBranch: null,
-  startedAt: null,
-  modifiedMs,
-  promptCount: 1,
-  size: 10,
-  version: null,
-  recentCwds: [],
-  ...extra,
-});
+const session = (id: string, modifiedMs: number, extra: Partial<SessionInfo> = {}) =>
+  sessionInfo(id, { modifiedMs, ...extra });
 
 describe("mergeSessions", () => {
   it("prefers the WSL copy and sorts newest first", () => {

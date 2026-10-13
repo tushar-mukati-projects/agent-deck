@@ -2,7 +2,7 @@ import { Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
-import { Input } from "@/components/ui/input";
+import { Input, selectClass } from "@/components/ui/input";
 import { useAgents } from "@/hooks/useAgents";
 import { CLAUDE } from "@/lib/agents/registry";
 import { newId } from "@/lib/utils";
@@ -17,7 +17,7 @@ export const DefaultAgentPicker = ({ id }: { id?: string }) => {
       id={id}
       value={agents.some((a) => a.id === defaultAgent) ? defaultAgent : CLAUDE}
       onChange={(e) => useSettingsStore.getState().set({ defaultAgent: e.target.value })}
-      className="h-8 rounded-md border border-border-strong bg-bg px-2 text-xs text-fg outline-none focus:border-accent/70"
+      className={selectClass}
     >
       {agents.map((agent) => (
         <option key={agent.id} value={agent.id}>

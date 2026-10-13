@@ -5,7 +5,8 @@ import { toast } from "sonner";
 import { toggleHideMode } from "@/actions/hide-mode";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
+import { showError } from "@/components/ui/feedback";
+import { Input, selectClass } from "@/components/ui/input";
 import { Segmented } from "@/components/ui/panel";
 import { CustomAgentsEditor, DefaultAgentPicker } from "@/features/settings/AgentSettings";
 import { ThemePicker } from "@/features/settings/ThemePicker";
@@ -14,7 +15,7 @@ import { playChime } from "@/lib/chime";
 import { shortcutLabel } from "@/lib/shortcuts";
 import { englishVoices, pickVoice, speak, voiceLabel } from "@/lib/speech";
 import { api } from "@/lib/tauri/commands";
-import { cn, errorMessage } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore, type ClickBehavior, type SettingsData } from "@/stores/settings-store";
 import { useUiStore } from "@/stores/ui-store";
@@ -261,7 +262,7 @@ const PhonePing = () => {
       await api.phonePing(topic, "Test ping", "Phone pings are working.", false);
       toast.success("Test ping sent");
     } catch (error) {
-      toast.error(errorMessage(error));
+      showError(error);
     } finally {
       setTesting(false);
     }
@@ -310,7 +311,7 @@ const VoicePicker = () => {
       aria-label="Voice"
       value={voices.some((v) => v.name === voice) ? voice : ""}
       onChange={(event) => setSetting({ voice: event.target.value })}
-      className="h-8 rounded-md border border-border-strong bg-bg px-2 text-xs text-fg outline-none focus:border-accent/70"
+      className={selectClass}
     >
       <option value="">Automatic{automatic ? ` (${voiceLabel(automatic.name)})` : ""}</option>
       {voices.map((v) => (

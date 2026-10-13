@@ -27,7 +27,7 @@ export const renameText = (text: string, name: string) => {
   return lines.join("\n");
 };
 
-export const newNoteId = (date = new Date()) => format(date, "yyyy-MM-dd-HHmmss-SSS");
+export const newNoteId = (date: Date) => format(date, "yyyy-MM-dd-HHmmss-SSS");
 
 export const draftNote = (): NoteEntry => {
   const date = new Date();

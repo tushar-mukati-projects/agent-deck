@@ -24,7 +24,7 @@ import {
 import { newId, samePath } from "@/lib/utils";
 import { parseWslPath } from "@/lib/wsl";
 import { blankWorkspace, workspaceFromSession } from "@/stores/workspace-factory";
-import { migrateSaved, restoreSaved } from "@/stores/workspace-persist";
+import { restoreSaved } from "@/stores/workspace-persist";
 import type { AgentId, SessionInfo, ShellTab, Workspace } from "@/types";
 
 interface WorkspaceState {
@@ -32,9 +32,9 @@ interface WorkspaceState {
   activeId: string | null;
   recentlyClosed: string[];
   openSession: (session: SessionInfo) => string;
-  launch: (workspaceId: string) => string | null;
-  fork: (source: Workspace) => string | null;
-  newSession: (cwd: string, options?: NewSessionOptions) => string | null;
+  launch: (workspaceId: string) => void;
+  fork: (source: Workspace) => void;
+  newSession: (cwd: string, options?: NewSessionOptions) => void;
   restartAgent: (workspaceId: string, focus?: boolean) => void;
   close: (workspaceId: string) => Promise<void>;
   activate: (workspaceId: string) => void;
@@ -146,28 +146,27 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
         launch: (workspaceId) => {
           const workspace = find(workspaceId);
-          if (!workspace || !agentAvailable(workspace.agent)) return null;
+          if (!workspace || !agentAvailable(workspace.agent)) return;
           if (workspace.mode === "live") {
             get().activate(workspaceId);
-            return workspaceId;
+            return;
           }
           const next = withAgent(workspace, planLaunch(workspace));
           set((s) => ({
             workspaces: s.workspaces.map((w) => (w.id === workspaceId ? next : w)),
             activeId: workspaceId,
           }));
-          return workspaceId;
         },
 
         fork: (source) => {
-          if (!agentAvailable(source.agent)) return null;
+          if (!agentAvailable(source.agent)) return;
           if (!findAgent(source.agent).canFork) {
             toast.error(`${agentName(source.agent)} sessions can't be forked.`);
-            return null;
+            return;
           }
           if (!isPersisted(source)) {
             toast.error("Nothing to fork yet — send a prompt in this session first.");
-            return null;
+            return;
           }
           const plan = planLaunch(source, { fork: true });
           const base = blankWorkspace({
@@ -178,11 +177,11 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             filePath: null,
             agent: source.agent,
           });
-          return add(withAgent(base, plan));
+          add(withAgent(base, plan));
         },
 
         newSession: (cwd, { agent = CLAUDE, subagent } = {}) => {
-          if (!agentAvailable(agent)) return null;
+          if (!agentAvailable(agent)) return;
           const sessionId = newId();
           const base = blankWorkspace({
             id: sessionId,
@@ -192,7 +191,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             filePath: null,
             agent,
           });
-          return add(withAgent(base, planLaunch(base, { subagent })));
+          add(withAgent(base, planLaunch(base, { subagent })));
         },
 
         restartAgent: (workspaceId, focus = true) => {
@@ -368,7 +367,6 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       name: "agent-deck-workspaces",
       version: 3,
       partialize: (s) => ({ workspaces: s.workspaces, activeId: s.activeId }),
-      migrate: migrateSaved,
       merge: (persisted, current) => ({ ...current, ...restoreSaved(persisted) }),
     },
   ),

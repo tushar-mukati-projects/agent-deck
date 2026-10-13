@@ -16,6 +16,9 @@ export const parseWslPath = (path: string): WslLocation | null => {
   return { distro, linuxPath: `/${tail.replace(/\\/g, "/")}`.replace(/\/+$/, "") || "/" };
 };
 
+export const wslUncPath = (distro: string, linuxPath: string) =>
+  `\\\\wsl.localhost\\${distro}${linuxPath.replace(/\//g, "\\")}`;
+
 export const shellQuote = (arg: string) =>
   /^[\w@%+=:,./-]+$/.test(arg) ? arg : `'${arg.replace(/'/g, `'"'"'`)}'`;
 

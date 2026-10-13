@@ -1,9 +1,8 @@
 import { useCallback, useState } from "react";
 import { Database, RefreshCw } from "lucide-react";
-import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { Hint, LoadingState } from "@/components/ui/feedback";
+import { Hint, LoadingState, showError } from "@/components/ui/feedback";
 import { IconButton } from "@/components/ui/icon-button";
 import { Alert, Segmented } from "@/components/ui/panel";
 import { DataPane } from "@/features/mcp/pg/DataPane";
@@ -13,7 +12,6 @@ import { StructurePane } from "@/features/mcp/pg/StructurePane";
 import { TableList } from "@/features/mcp/pg/TableList";
 import { useAsync } from "@/hooks/useAsync";
 import { api } from "@/lib/tauri/commands";
-import { errorMessage } from "@/lib/utils";
 
 type Pane = "data" | "structure" | "sql";
 
@@ -34,7 +32,7 @@ const ConnectionLabel = ({ cwd, serverId }: { cwd: string; serverId: string }) =
 export const PgBrowser = ({ cwd, serverId }: { cwd: string; serverId: string }) => {
   const run = useCallback((sql: string) => api.pgQuery(cwd, serverId, sql), [cwd, serverId]);
   const cancel = useCallback(
-    () => void api.pgCancel(cwd, serverId).catch((error) => toast.error(errorMessage(error))),
+    () => void api.pgCancel(cwd, serverId).catch(showError),
     [cwd, serverId],
   );
   const tables = useAsync(async () => (await run(TABLES_SQL)).results[0], [run], {

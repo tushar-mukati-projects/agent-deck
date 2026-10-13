@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { ADOPT_AFTER_MS, adoptSessions } from "@/lib/adopt";
+import { sessionInfo } from "@/lib/session-fixture";
 import { blankWorkspace } from "@/stores/workspace-factory";
 import type { SessionInfo, Workspace } from "@/types";
 
@@ -19,25 +20,16 @@ const pendingTab = (id: string, since: number, cwd = "C:\\repo"): Workspace => (
   pendingSince: since,
 });
 
-const codexSession = (id: string, started: number, cwd = "C:\\repo"): SessionInfo => ({
-  id,
-  agent: "codex",
-  distro: null,
-  filePath: `C:\\codex\\${id}.jsonl`,
-  projectKey: "",
-  cwd,
-  title: `title ${id}`,
-  customTitle: null,
-  firstPrompt: null,
-  lastPrompt: null,
-  gitBranch: null,
-  startedAt: new Date(started).toISOString(),
-  modifiedMs: started,
-  promptCount: 1,
-  size: 1,
-  version: null,
-  recentCwds: [],
-});
+const codexSession = (id: string, started: number, cwd = "C:\\repo") =>
+  sessionInfo(id, {
+    agent: "codex",
+    filePath: `C:\\codex\\${id}.jsonl`,
+    cwd,
+    title: `title ${id}`,
+    startedAt: new Date(started).toISOString(),
+    modifiedMs: started,
+    size: 1,
+  });
 
 const byId = (...sessions: SessionInfo[]) => Object.fromEntries(sessions.map((s) => [s.id, s]));
 

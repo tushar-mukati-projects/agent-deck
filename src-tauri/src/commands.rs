@@ -352,11 +352,7 @@ pub async fn unwatch_dir(app: AppHandle, root: String) -> CmdResult<()> {
 
 #[tauri::command]
 pub fn set_attention_badge(window: tauri::WebviewWindow, active: bool) -> CmdResult<()> {
-    #[cfg(windows)]
-    window.set_overlay_icon(active.then(badge_icon)).map_err(|e| e.to_string())?;
-    #[cfg(not(windows))]
-    let _ = (window, active);
-    Ok(())
+    window.set_overlay_icon(active.then(badge_icon)).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -395,7 +391,6 @@ pub async fn notes_folder(app: AppHandle) -> CmdResult<String> {
     blocking(move || Ok(notes_dir(&app)?.to_string_lossy().into_owned())).await
 }
 
-#[cfg(windows)]
 fn badge_icon() -> tauri::image::Image<'static> {
     const SIZE: u32 = 32;
     let center = (SIZE as f32 - 1.0) / 2.0;

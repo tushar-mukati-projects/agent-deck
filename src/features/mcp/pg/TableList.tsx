@@ -4,7 +4,7 @@ import { Eye, Table2 } from "lucide-react";
 import { Hint } from "@/components/ui/feedback";
 import { Chevron, SearchInput } from "@/components/ui/panel";
 import { tableKey, type TableRef } from "@/features/mcp/pg/queries";
-import { cn } from "@/lib/utils";
+import { cn, toggled } from "@/lib/utils";
 
 const RENDER_LIMIT = 400;
 
@@ -34,12 +34,7 @@ export const TableList = ({
   const [closed, setClosed] = useState<Set<string>>(new Set());
   const needle = filter.trim().toLowerCase();
   const groups = useMemo(() => groupBySchema(tables, needle), [tables, needle]);
-  const toggle = (schema: string) =>
-    setClosed((current) => {
-      const next = new Set(current);
-      if (!next.delete(schema)) next.add(schema);
-      return next;
-    });
+  const toggle = (schema: string) => setClosed((current) => toggled(current, schema));
 
   let budget = RENDER_LIMIT;
   const selectedKey = selected ? tableKey(selected) : null;

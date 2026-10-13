@@ -62,16 +62,10 @@ pub struct PathStat {
     pub kind: &'static str,
 }
 
-#[cfg(windows)]
 fn is_hidden(name: &str, meta: &fs::Metadata) -> bool {
     use std::os::windows::fs::MetadataExt;
     const FILE_ATTRIBUTE_HIDDEN: u32 = 0x2;
     name.starts_with('.') || meta.file_attributes() & FILE_ATTRIBUTE_HIDDEN != 0
-}
-
-#[cfg(not(windows))]
-fn is_hidden(name: &str, _meta: &fs::Metadata) -> bool {
-    name.starts_with('.')
 }
 
 pub fn list_dir(path: &str) -> anyhow::Result<Vec<DirEntry>> {
@@ -165,7 +159,6 @@ fn overwrite(target: &Path, data: &[u8]) -> io::Result<()> {
     file.flush()
 }
 
-#[cfg(windows)]
 fn replace_atomically(target: &Path, data: &[u8]) -> io::Result<()> {
     use std::os::windows::ffi::OsStrExt;
     use windows_sys::Win32::Storage::FileSystem::{ReplaceFileW, REPLACEFILE_IGNORE_MERGE_ERRORS};
@@ -190,11 +183,6 @@ fn replace_atomically(target: &Path, data: &[u8]) -> io::Result<()> {
     let error = io::Error::last_os_error();
     let _ = fs::remove_file(&tmp);
     Err(error)
-}
-
-#[cfg(not(windows))]
-fn replace_atomically(_target: &Path, _data: &[u8]) -> io::Result<()> {
-    Err(io::Error::from(io::ErrorKind::Unsupported))
 }
 
 fn save_bytes(target: &Path, data: &[u8]) -> io::Result<()> {

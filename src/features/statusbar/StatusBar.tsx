@@ -7,7 +7,7 @@ import { StatusDot } from "@/components/ui/feedback";
 import { DeckPet } from "@/features/statusbar/DeckPet";
 import { shortcutLabel } from "@/lib/shortcuts";
 import { copyText } from "@/lib/tauri/system";
-import { shortenHome } from "@/lib/utils";
+import { plural, shortenHome } from "@/lib/utils";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useTerminalStore } from "@/stores/terminal-store";
@@ -46,8 +46,6 @@ const agentCounts = (terminals: Record<string, TerminalState>) => {
     agents.filter((t) => t.attention).length,
   ];
 };
-
-const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
 
 const ShellItem = ({ workspace }: { workspace: Workspace }) => {
   const agentRunning = useAgentShells(workspace).filter((t) => t.status === "running").length;

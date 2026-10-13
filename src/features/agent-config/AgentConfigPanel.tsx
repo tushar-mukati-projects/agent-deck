@@ -10,7 +10,7 @@ import { PROFILES, type SectionKey } from "@/features/agent-config/profiles";
 import { SECTIONS } from "@/features/agent-config/sections";
 import { StartDistroButton } from "@/features/sidebar/WslStatus";
 import { agentName, getAgent } from "@/lib/agents/registry";
-import { basename, cn } from "@/lib/utils";
+import { basename, cn, toggled } from "@/lib/utils";
 import { parseWslPath } from "@/lib/wsl";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useActiveWorkspace } from "@/stores/workspace-store";
@@ -35,12 +35,7 @@ const Sections = memo(
     const [open, setOpen] = useState<Set<SectionKey>>(() => new Set(DEFAULT_OPEN));
     const data = useMemo(() => filterOverview(overview, query), [overview, query]);
     const profile = PROFILES[agent];
-    const toggle = (key: SectionKey) =>
-      setOpen((current) => {
-        const next = new Set(current);
-        if (!next.delete(key)) next.add(key);
-        return next;
-      });
+    const toggle = (key: SectionKey) => setOpen((current) => toggled(current, key));
 
     return (
       <>

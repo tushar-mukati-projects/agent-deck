@@ -1,16 +1,12 @@
 use std::process::Child;
 
 pub struct Job {
-    #[cfg(windows)]
     handle: windows_sys::Win32::Foundation::HANDLE,
-    #[cfg(not(windows))]
-    pid: Option<u32>,
 }
 
 unsafe impl Send for Job {}
 unsafe impl Sync for Job {}
 
-#[cfg(windows)]
 impl Job {
     pub fn for_child(child: &Child) -> Self {
         use std::os::windows::io::AsRawHandle;
@@ -42,24 +38,10 @@ impl Job {
     }
 }
 
-#[cfg(windows)]
 impl Drop for Job {
     fn drop(&mut self) {
         if !self.handle.is_null() {
             unsafe { windows_sys::Win32::Foundation::CloseHandle(self.handle) };
-        }
-    }
-}
-
-#[cfg(not(windows))]
-impl Job {
-    pub fn for_child(child: &Child) -> Self {
-        Self { pid: Some(child.id()) }
-    }
-
-    pub fn terminate(&self) {
-        if let Some(pid) = self.pid {
-            let _ = std::process::Command::new("kill").arg(pid.to_string()).status();
         }
     }
 }
@@ -93,7 +75,7 @@ impl Drop for Managed {
     }
 }
 
-#[cfg(all(test, windows))]
+#[cfg(test)]
 mod tests {
     use super::*;
     use std::process::{Command, Stdio};

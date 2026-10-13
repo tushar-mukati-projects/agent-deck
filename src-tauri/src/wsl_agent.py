@@ -330,16 +330,16 @@ def scan(path, offset, reducer, budget=None):
 
 def index_file(path, stat, known, reducer, budget):
     stamp = int(stat.st_mtime * 1000)
-    if known and known.get("size") == stat.st_size and known.get("mtime") == stamp:
+    if known and known["size"] == stat.st_size and known["mtime"] == stamp:
         return None
-    start = known["offset"] if known and stat.st_size >= known.get("offset", 0) else 0
+    start = known["offset"] if known and stat.st_size >= known["offset"] else 0
     records, start, end, last = scan(path, start, reducer, budget)
     size, mtime = (stat.st_size, stamp) if end >= stat.st_size else (end, 0)
     return {"path": path, "size": size, "mtime": mtime, "start": start, "end": end, "records": records, "last": last}
 
 
 def index(request):
-    offsets = request.get("offsets") or {}
+    offsets = request["offsets"]
     budget = Budget(INDEX_BUDGET)
     files, changes = [], []
     sources = [(path, "claude") for path in claude_files()] + [(path, "codex") for path in codex_files()]
@@ -387,8 +387,7 @@ def live_sessions():
                         continue
             except (OSError, ValueError, TypeError, AttributeError):
                 continue
-            entry = {k: data.get(k) if isinstance(data.get(k), str) else None for k in ("status",)}
-            entry.update({"pid": pid, "sessionId": session_id})
+            entry = {"status": data.get("status") if isinstance(data.get("status"), str) else None, "pid": pid, "sessionId": session_id}
             if isinstance(data.get("startedAt"), int):
                 entry["startedAt"] = data["startedAt"]
             result.append(entry)
@@ -649,7 +648,7 @@ def changes(path):
 
 
 def exists(paths):
-    return {"exists": [p for p in paths if isinstance(p, str) and os.path.isfile(p)]}
+    return {"exists": [p for p in paths if os.path.isfile(p)]}
 
 
 def backup(path, name):
@@ -725,9 +724,9 @@ def searchable_texts(record):
 
 
 def search(request):
-    needle = (request.get("prefilter") or "").encode("utf-8")
-    query = request.get("query") or ""
-    fold = bool(request.get("fold"))
+    needle = request["prefilter"].encode("utf-8")
+    query = request["query"]
+    fold = request["fold"]
     found = []
     if len(needle) < 2 or not query:
         return {"files": found}
@@ -825,22 +824,21 @@ def watch(root):
 
 
 def read_stdin_json():
-    text = sys.stdin.read()
-    return json.loads(text) if text.strip() else {}
+    return json.loads(sys.stdin.read())
 
 
 def main():
     mode, args = sys.argv[1], sys.argv[2:]
     handlers = {
         "index": lambda: index(read_stdin_json()),
-        "transcript": lambda: transcript(args[0], int(args[1]) if len(args) > 1 else 0),
-        "tasks": lambda: tasks(args[0], int(args[1]) if len(args) > 1 else 0),
-        "subagent": lambda: subagent(args[0], args[1], int(args[2]) if len(args) > 2 else 0),
+        "transcript": lambda: transcript(args[0], int(args[1])),
+        "tasks": lambda: tasks(args[0], int(args[1])),
+        "subagent": lambda: subagent(args[0], args[1], int(args[2])),
         "delete": lambda: delete(args[0]),
         "terminate": lambda: terminate(args[0], args[1]),
         "files": lambda: list_files(args[0]),
         "changes": lambda: changes(args[0]),
-        "exists": lambda: exists(read_stdin_json() or []),
+        "exists": lambda: exists(read_stdin_json()),
         "backup": lambda: backup(args[0], args[1]),
         "git_status": lambda: git_status(args[0]),
         "git_head": lambda: git_head(args[0]),
@@ -849,16 +847,13 @@ def main():
         "loginenv": login_env,
         "watch": lambda: watch(args[0]),
     }
-    if mode not in handlers:
-        raise ValueError("unknown mode %s" % mode)
     result = handlers[mode]()
     if result is not None:
         emit(result)
 
 
-if __name__ == "__main__":
-    try:
-        main()
-    except Exception as error:
-        emit({"error": str(error) or error.__class__.__name__})
-        sys.exit(1)
+try:
+    main()
+except Exception as error:
+    emit({"error": str(error) or error.__class__.__name__})
+    sys.exit(1)

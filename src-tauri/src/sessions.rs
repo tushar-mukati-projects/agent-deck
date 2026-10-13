@@ -85,10 +85,9 @@ fn file_name_of(path: &str) -> &str {
     path.rsplit(['/', '\\']).next().unwrap_or_default()
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct LiveSession {
-    #[serde(default)]
     pub distro: Option<String>,
     pub session_id: String,
     pub pid: u32,
@@ -546,7 +545,6 @@ pub fn list_sessions() -> Vec<SessionInfo> {
     sessions
 }
 
-#[cfg(windows)]
 fn is_agent_process(pid: u32) -> bool {
     use windows_sys::Win32::{
         Foundation::{CloseHandle, STILL_ACTIVE},
@@ -567,11 +565,6 @@ fn is_agent_process(pid: u32) -> bool {
         let name = image.rsplit('\\').next().unwrap_or_default();
         alive && (!named || ["claude", "node", "bun"].iter().any(|n| name.contains(n)))
     }
-}
-
-#[cfg(not(windows))]
-fn is_agent_process(pid: u32) -> bool {
-    fs::read(format!("/proc/{pid}/cmdline")).is_ok_and(|cmd| memchr::memmem::find(&cmd, b"claude").is_some())
 }
 
 #[derive(Deserialize)]
@@ -608,7 +601,6 @@ pub fn live_sessions() -> Vec<LiveSession> {
         .collect()
 }
 
-#[cfg(windows)]
 fn process_start(pid: u32) -> Option<u64> {
     use windows_sys::Win32::{
         Foundation::{CloseHandle, FILETIME},
@@ -627,17 +619,9 @@ fn process_start(pid: u32) -> Option<u64> {
     }
 }
 
-#[cfg(not(windows))]
-fn process_start(pid: u32) -> Option<u64> {
-    let stat = fs::read_to_string(format!("/proc/{pid}/stat")).ok()?;
-    stat.rsplit(')').next()?.split_whitespace().nth(19)?.parse().ok()
-}
-
 fn end_process_tree(pid: u32) -> anyhow::Result<()> {
     let pid_text = pid.to_string();
-    let mut command = if cfg!(windows) { Command::new("taskkill") } else { Command::new("kill") };
-    let args: &[&str] = if cfg!(windows) { &["/PID", &pid_text, "/T", "/F"] } else { &["-TERM", &pid_text] };
-    let output = run_with_timeout(command.args(args), None, Duration::from_secs(10))?;
+    let output = run_with_timeout(Command::new("taskkill").args(["/PID", &pid_text, "/T", "/F"]), None, Duration::from_secs(10))?;
     if output.status.success() || !is_agent_process(pid) {
         return Ok(());
     }

@@ -1,5 +1,5 @@
 import { resolvePath } from "@/lib/utils";
-import { parseWslPath } from "@/lib/wsl";
+import { parseWslPath, wslUncPath } from "@/lib/wsl";
 
 const QUOTES = /^["'`]+|["'`]+$/g;
 const LOCATION_SUFFIX = /(?::\d+){1,2}$|#L\d+(?:-L?\d+)?$/;
@@ -23,9 +23,6 @@ const looksLikePath = (value: string) =>
   !/[\r\n]/.test(value) &&
   (/[\\/]/.test(value) || /^[a-zA-Z]:$/.test(value) || /^[^\s]+\.[A-Za-z0-9]{1,10}$/.test(value));
 
-const wslHost = (distro: string, linuxPath: string) =>
-  `\\\\wsl.localhost\\${distro}${linuxPath.replace(/\//g, "\\")}`;
-
 const userHome = (linuxPath: string) => /^\/home\/[^/]+/.exec(linuxPath)?.[0] ?? "/root";
 
 export const parseTypedPath = (input: string, cwd: string, windowsHome: string): string | null => {
@@ -37,11 +34,11 @@ export const parseTypedPath = (input: string, cwd: string, windowsHome: string):
   if (value.startsWith("\\\\")) return resolvePath(value, "");
   if (value.startsWith("~")) {
     const rest = value.slice(1);
-    if (wsl) return wslHost(wsl.distro, `${userHome(wsl.linuxPath)}${rest.replace(/\\/g, "/")}`);
+    if (wsl) return wslUncPath(wsl.distro, `${userHome(wsl.linuxPath)}${rest.replace(/\\/g, "/")}`);
     return resolvePath(windowsHome, rest);
   }
   if (value.startsWith("/")) {
-    if (wsl) return wslHost(wsl.distro, value.replace(/\/+$/, "") || "/");
+    if (wsl) return wslUncPath(wsl.distro, value.replace(/\/+$/, "") || "/");
     const drive = /^\/([a-zA-Z])(\/.*|$)/.exec(value);
     return drive ? resolvePath(`${drive[1].toUpperCase()}:`, drive[2]) : null;
   }

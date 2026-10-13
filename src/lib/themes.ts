@@ -42,7 +42,6 @@ interface ThemeInput {
   accentStrong?: string;
   onAccent: string;
   ansi: Ansi;
-  terminalFg?: string;
   codeBg?: string;
   syntax?: Partial<Syntax>;
 }
@@ -224,7 +223,7 @@ const defineTheme = (input: ThemeInput): Theme => {
   ] = input.ansi;
   const terminal: ITheme = {
     background: input.bg,
-    foreground: input.terminalFg ?? fg,
+    foreground: fg,
     cursor: accent,
     cursorAccent: input.bg,
     selectionBackground: `${accent}${input.kind === "dark" ? "44" : "38"}`,

@@ -1,4 +1,4 @@
-import { useCallback, useDeferredValue, useState } from "react";
+import { useDeferredValue, useState } from "react";
 import {
   Calendar,
   FolderOpen,
@@ -13,7 +13,6 @@ import {
 } from "lucide-react";
 import { format, isValid } from "date-fns";
 
-import { openTypedPath } from "@/actions/files";
 import { deleteSessionWithConfirm, renameSession, resumeWorkspace } from "@/actions/sessions";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/feedback";
@@ -31,7 +30,7 @@ import { api } from "@/lib/tauri/commands";
 import { revealInExplorer } from "@/lib/tauri/system";
 import { formatBytes, shortenHome } from "@/lib/utils";
 import { useSessionsStore } from "@/stores/sessions-store";
-import { findWorkspace, useWorkspaceStore } from "@/stores/workspace-store";
+import { useWorkspaceStore } from "@/stores/workspace-store";
 import type { SessionInfo, Workspace } from "@/types";
 
 const startedLabel = (startedAt: string) => {
@@ -241,14 +240,6 @@ export const SessionPreview = ({ workspace }: { workspace: Workspace }) => {
   );
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query.trim().toLowerCase());
-  const workspaceId = workspace.id;
-  const openPath = useCallback(
-    (path: string) => {
-      const current = findWorkspace(workspaceId);
-      if (current) void openTypedPath(current, path);
-    },
-    [workspaceId],
-  );
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-bg">
@@ -266,7 +257,7 @@ export const SessionPreview = ({ workspace }: { workspace: Workspace }) => {
         query={deferredQuery}
         emptyDescription={`Start the session and your conversation with ${findAgent(workspace.agent).name} will appear here.`}
         baseDir={workspace.cwd}
-        onOpenPath={openPath}
+        workspaceId={workspace.id}
       />
     </div>
   );

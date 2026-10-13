@@ -80,8 +80,3 @@ export const fuzzyPathKeyScorer = (query: string) => {
     return Math.max((nameScore ?? -Infinity) + 400, pathScore ?? -Infinity);
   };
 };
-
-export const fuzzyPathKeyScore = (query: string, key: PathKey) => fuzzyPathKeyScorer(query)(key);
-
-export const fuzzyPathScore = (query: string, path: string) =>
-  fuzzyPathKeyScore(query, pathKey(path));

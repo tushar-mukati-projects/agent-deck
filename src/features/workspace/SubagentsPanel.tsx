@@ -1,7 +1,6 @@
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import { Bot, ChevronDown } from "lucide-react";
 
-import { openTypedPath } from "@/actions/files";
 import { StatusDot } from "@/components/ui/feedback";
 import { IconButton } from "@/components/ui/icon-button";
 import { panelTabClass, Tab, TabStrip } from "@/components/ui/tabs";
@@ -11,20 +10,11 @@ import { useSessionFile } from "@/hooks/useSessionFile";
 import { subagentLabel } from "@/lib/agent-tasks";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
-import { findWorkspace } from "@/stores/workspace-store";
 import type { Subagent, Workspace } from "@/types";
 
 const SubagentView = ({ workspace, agent }: { workspace: Workspace; agent: Subagent }) => {
   const { filePath, distro } = useSessionFile(workspace);
   const { items, error } = useSubagentTranscript(filePath, distro, agent.agentId ?? agent.id);
-  const workspaceId = workspace.id;
-  const openPath = useCallback(
-    (path: string) => {
-      const current = findWorkspace(workspaceId);
-      if (current) void openTypedPath(current, path);
-    },
-    [workspaceId],
-  );
   return (
     <TranscriptList
       items={items}
@@ -32,7 +22,7 @@ const SubagentView = ({ workspace, agent }: { workspace: Workspace; agent: Subag
       query=""
       emptyDescription="What this subagent does shows up here as it works."
       baseDir={workspace.cwd}
-      onOpenPath={openPath}
+      workspaceId={workspace.id}
     />
   );
 };

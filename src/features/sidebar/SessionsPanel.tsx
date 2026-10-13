@@ -21,7 +21,7 @@ import {
   partitionSessions,
   type SessionGroup,
 } from "@/lib/session-list";
-import { basename, cn, normalizePath, samePath } from "@/lib/utils";
+import { basename, cn, normalizePath, samePath, toggled } from "@/lib/utils";
 import { parseWslPath } from "@/lib/wsl";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -116,11 +116,7 @@ const useExpandedGroups = (searching: boolean, groups: SessionGroup[]) => {
   const toggle = (cwd: string) => {
     const key = normalizePath(cwd);
     if (searching) {
-      setCollapsedInSearch((current) => {
-        const next = new Set(current);
-        if (!next.delete(key)) next.add(key);
-        return next;
-      });
+      setCollapsedInSearch((current) => toggled(current, key));
     } else {
       setSaved((current) => new Map(current).set(key, !isExpanded(cwd)));
     }

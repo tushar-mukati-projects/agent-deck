@@ -114,11 +114,6 @@ export const useSettingsStore = create<SettingsState>()(
     {
       name: "agent-deck-settings",
       version: 1,
-      migrate: (persisted, version) => {
-        const state = persisted as Partial<SettingsData>;
-        if (version < 1 && state.fontSize === 13) state.fontSize = DEFAULT_FONT_SIZE;
-        return state as SettingsState;
-      },
     },
   ),
 );

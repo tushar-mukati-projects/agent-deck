@@ -6,12 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "typecheck": "tsc -b",
     "tauri": "tauri",
     "app:dev": "tauri dev --config src-tauri/tauri.dev.conf.json",
     "app:build": "tauri build",
     "test": "vitest run",
-    "test:watch": "vitest",
     "check": "tsc -b && vitest run"
   },
   "dependencies": {

@@ -111,6 +111,14 @@ export const shortTimeAgo = (ms: number, now = Date.now()) => {
   return unit ? `${Math.floor(elapsed / unit[0])}${unit[1]}` : "now";
 };
 
+export const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
+
+export const toggled = <T>(set: ReadonlySet<T>, value: T) => {
+  const next = new Set(set);
+  if (!next.delete(value)) next.add(value);
+  return next;
+};
+
 export const newId = () => crypto.randomUUID();
 
 export const omitKey = <T>(record: Record<string, T>, key: string): Record<string, T> => {

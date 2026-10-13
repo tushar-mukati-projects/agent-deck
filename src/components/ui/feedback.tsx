@@ -1,6 +1,7 @@
 import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
-import { cn } from "@/lib/utils";
+import { cn, errorMessage } from "@/lib/utils";
 
 export type DotTone = "running" | "busy" | "attention" | "external" | "exited" | "error";
 
@@ -30,6 +31,8 @@ export const StatusDot = ({ tone, className }: { tone: DotTone; className?: stri
     className={cn("inline-block size-[7px] shrink-0 rounded-full", toneClass[tone], className)}
   />
 );
+
+export const showError = (error: unknown) => toast.error(errorMessage(error));
 
 export const Spinner = ({ className }: { className?: string }) => (
   <Loader2 className={cn("size-4 animate-spin text-faint", className)} />

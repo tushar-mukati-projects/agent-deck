@@ -13,7 +13,7 @@ import { subscribeFileChanges } from "@/lib/file-events";
 import { FileIcon, folderIcon } from "@/lib/file-icons";
 import { api } from "@/lib/tauri/commands";
 import { DECK_PATH_MIME } from "@/lib/terminal/input";
-import { basename, cn, errorMessage, isWithin, shortenHome } from "@/lib/utils";
+import { basename, cn, errorMessage, isWithin, shortenHome, toggled } from "@/lib/utils";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useActiveWorkspace, useWorkspaceStore } from "@/stores/workspace-store";
 import type { ChangedFile, ChangeStatus, GitChange, Workspace } from "@/types";
@@ -129,15 +129,7 @@ const FolderRow = ({
 
 const useCollapsed = () => {
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set());
-  const toggle = useCallback(
-    (key: string) =>
-      setCollapsed((current) => {
-        const next = new Set(current);
-        if (!next.delete(key)) next.add(key);
-        return next;
-      }),
-    [],
-  );
+  const toggle = useCallback((key: string) => setCollapsed((current) => toggled(current, key)), []);
   return [collapsed, toggle] as const;
 };
 

@@ -13,7 +13,6 @@ export interface SessionInfo {
   agent: AgentId;
   distro: string | null;
   filePath: string;
-  projectKey: string;
   cwd: string;
   title: string | null;
   customTitle: string | null;

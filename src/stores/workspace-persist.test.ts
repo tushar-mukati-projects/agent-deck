@@ -1,31 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { migrateSaved, restoreSaved } from "@/stores/workspace-persist";
+import { restoreSaved } from "@/stores/workspace-persist";
 
 describe("saved workspaces", () => {
-  it("migrates the old Claude-only field names and drops media tabs", () => {
-    const { workspaces } = migrateSaved({
-      workspaces: [
-        {
-          id: "w",
-          sessionId: "s",
-          cwd: "C:\\repo",
-          title: "t",
-          claudeTerminalId: "term",
-          claudeArgs: ["--resume", "s"],
-          openFiles: ["media::x.png", "C:\\repo\\a.ts"],
-        },
-      ],
-      activeId: "w",
-    });
-    expect(workspaces[0]).toMatchObject({
-      agentTerminalId: "term",
-      agentArgs: ["--resume", "s"],
-      openFiles: ["C:\\repo\\a.ts"],
-    });
-    expect(workspaces[0]).not.toHaveProperty("claudeTerminalId");
-  });
-
   it("fills defaults and repairs the active file and tab", () => {
     const restored = restoreSaved({
       workspaces: [
@@ -56,6 +33,5 @@ describe("saved workspaces", () => {
 
   it("handles missing or empty storage", () => {
     expect(restoreSaved(undefined)).toEqual({ workspaces: [], activeId: null });
-    expect(migrateSaved(null)).toEqual({ workspaces: [], activeId: null });
   });
 });

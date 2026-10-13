@@ -7,22 +7,6 @@ interface SavedWorkspaces {
   activeId: string | null;
 }
 
-type LegacyWorkspace = Workspace & { claudeTerminalId?: string | null; claudeArgs?: string[] };
-
-export const migrateSaved = (persisted: unknown): SavedWorkspaces => {
-  const saved = (persisted ?? {}) as Partial<SavedWorkspaces>;
-  const workspaces = (saved.workspaces ?? []).map((raw) => {
-    const { claudeTerminalId, claudeArgs, ...rest } = raw as LegacyWorkspace;
-    return {
-      ...rest,
-      agentTerminalId: rest.agentTerminalId ?? claudeTerminalId ?? null,
-      agentArgs: rest.agentArgs ?? claudeArgs ?? [],
-      openFiles: (rest.openFiles ?? []).filter((f) => !f.startsWith("media::")),
-    };
-  });
-  return { workspaces, activeId: saved.activeId ?? null };
-};
-
 const withDefaults = (saved: Workspace): Workspace => {
   const workspace = { ...blankWorkspace(saved), ...saved };
   const activeFile =

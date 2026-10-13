@@ -36,7 +36,7 @@ const FORWARDED_VARS: [&str; 2] = ["CLAUDE_CONFIG_DIR", "CODEX_HOME"];
 
 static SCRIPT: LazyLock<String> = LazyLock::new(|| base64::engine::general_purpose::STANDARD.encode(AGENT));
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Distro {
     pub name: String,
@@ -71,9 +71,8 @@ struct DistroCache {
 
 const CACHE_VERSION: u32 = 2;
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 struct Cache {
-    #[serde(default)]
     version: u32,
     distros: HashMap<String, DistroCache>,
 }
@@ -105,16 +104,13 @@ struct IndexResponse {
     changes: Vec<IndexChange>,
     live: Vec<Value>,
     shell: String,
-    #[serde(default)]
     more: bool,
 }
 
 #[derive(Deserialize)]
 struct Lines {
     lines: Vec<Box<RawValue>>,
-    #[serde(default)]
     start: u64,
-    #[serde(default)]
     end: u64,
 }
 
@@ -194,9 +190,6 @@ fn running_names(fresh: bool) -> Vec<String> {
 }
 
 pub fn distros() -> Vec<Distro> {
-    if !cfg!(windows) {
-        return Vec::new();
-    }
     let running = running_names(true);
     distro_names(false).into_iter().map(|name| Distro { running: running.contains(&name), name }).collect()
 }

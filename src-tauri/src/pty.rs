@@ -191,7 +191,7 @@ pub fn resolve_program(program: &str) -> anyhow::Result<PathBuf> {
         return Ok(found);
     }
     let home = dirs::home_dir().unwrap_or_default();
-    let exe = if cfg!(windows) { format!("{program}.exe") } else { program.to_string() };
+    let exe = format!("{program}.exe");
     [home.join(".local").join("bin").join(&exe), home.join(".claude").join("local").join(&exe)]
         .into_iter()
         .find(|p| p.is_file())
@@ -199,15 +199,7 @@ pub fn resolve_program(program: &str) -> anyhow::Result<PathBuf> {
 }
 
 pub fn default_shell() -> String {
-    if cfg!(windows) {
-        ["pwsh.exe", "powershell.exe", "cmd.exe"]
-            .into_iter()
-            .find(|s| which::which(s).is_ok())
-            .unwrap_or("cmd.exe")
-            .to_string()
-    } else {
-        std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".into())
-    }
+    ["pwsh.exe", "powershell.exe", "cmd.exe"].into_iter().find(|s| which::which(s).is_ok()).unwrap_or("cmd.exe").to_string()
 }
 
 fn is_agent_name(name: &str) -> bool {

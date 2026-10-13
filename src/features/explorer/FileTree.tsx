@@ -8,11 +8,11 @@ import {
   Sparkles,
   SquareTerminal,
 } from "lucide-react";
-import { toast } from "sonner";
 
 import { canMention, mentionInAgent } from "@/actions/files";
 import { startNewSession } from "@/actions/sessions";
 import { agentName } from "@/lib/agents/registry";
+import { showError } from "@/components/ui/feedback";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -25,13 +25,11 @@ import { fileIcon, folderIcon } from "@/lib/file-icons";
 import { api } from "@/lib/tauri/commands";
 import { copyText, openExternal, revealInExplorer } from "@/lib/tauri/system";
 import { DECK_PATH_MIME } from "@/lib/terminal/input";
-import { cn, errorMessage, normalizePath, relativePath } from "@/lib/utils";
+import { cn, normalizePath, relativePath } from "@/lib/utils";
 import { useExplorerStore } from "@/stores/explorer-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import type { DirEntry, Workspace } from "@/types";
-
-const showError = (error: unknown) => toast.error(errorMessage(error));
 
 const ROW_HEIGHT = 22;
 const OVERSCAN = 12;

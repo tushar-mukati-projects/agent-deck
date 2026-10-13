@@ -9,7 +9,6 @@ pub fn apply(window: &tauri::WebviewWindow, enabled: bool) -> anyhow::Result<Opt
     let icon = if enabled { warp_icon() } else { None };
     let title = if enabled { TITLE.to_string() } else { window.app_handle().package_info().name.clone() };
     window.set_title(&title)?;
-    #[cfg(windows)]
     set_window_icon(window.hwnd()?.0, icon.as_deref());
     let Some(path) = icon else { return Ok(None) };
     Ok(Some(format!("data:image/x-icon;base64,{}", base64::engine::general_purpose::STANDARD.encode(std::fs::read(path)?))))
@@ -21,7 +20,6 @@ fn warp_icon() -> Option<PathBuf> {
     [program_files, user_programs].into_iter().flatten().map(|dir| dir.join("Warp").join("icon.ico")).find(|path| path.is_file())
 }
 
-#[cfg(windows)]
 fn set_window_icon(hwnd: *mut std::ffi::c_void, icon: Option<&std::path::Path>) {
     use std::{os::windows::ffi::OsStrExt, sync::OnceLock};
     use windows_sys::Win32::UI::WindowsAndMessaging::{

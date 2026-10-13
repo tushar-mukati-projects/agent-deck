@@ -4,7 +4,7 @@ import { SUBAGENT_NAME } from "@/lib/agents/registry";
 import { externalLive } from "@/lib/sessions";
 import { api } from "@/lib/tauri/commands";
 import { pickFolder } from "@/lib/tauri/system";
-import { errorMessage } from "@/lib/utils";
+import { errorMessage, plural } from "@/lib/utils";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { isTerminalAlive, useTerminalStore } from "@/stores/terminal-store";
@@ -13,8 +13,6 @@ import { useViewerStore } from "@/stores/viewer-store";
 import { workspaceFromSession } from "@/stores/workspace-factory";
 import { findWorkspace, findWorkspaceBySession, useWorkspaceStore } from "@/stores/workspace-store";
 import type { AgentId, LiveSession, SessionInfo } from "@/types";
-
-const promptLabel = (count: number) => `${count} ${count === 1 ? "prompt" : "prompts"}`;
 
 const openElsewhere = (sessionId: string) => {
   const ownPids = Object.values(useTerminalStore.getState().terminals).map((t) => t.pid);
@@ -112,8 +110,8 @@ export const deleteSessionWithConfirm = async (session: SessionInfo) => {
   const confirmed = await useUiStore.getState().askConfirm({
     title: `Delete “${session.title ?? "Untitled session"}”?`,
     description: session.distro
-      ? `This permanently deletes the conversation (${promptLabel(session.promptCount)}) from WSL ${session.distro}. It can't be undone.`
-      : `The conversation (${promptLabel(session.promptCount)}) and its history files will be moved to the Recycle Bin.`,
+      ? `This permanently deletes the conversation (${plural(session.promptCount, "prompt")}) from WSL ${session.distro}. It can't be undone.`
+      : `The conversation (${plural(session.promptCount, "prompt")}) and its history files will be moved to the Recycle Bin.`,
     confirmLabel: session.distro ? "Delete permanently" : "Move to Recycle Bin",
     destructive: true,
   });

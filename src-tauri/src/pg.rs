@@ -119,11 +119,7 @@ fn finish(mut config: Config, verify: Verify) -> Target {
     if config.get_application_name().is_none() {
         config.application_name("agent-deck");
     }
-    #[allow(unreachable_patterns)]
-    let host = config.get_hosts().iter().find_map(|h| match h {
-        Host::Tcp(host) => Some(host.clone()),
-        _ => None,
-    });
+    let host = config.get_hosts().first().map(|Host::Tcp(host)| host.clone());
     let port = config.get_ports().first().copied().unwrap_or(5432);
     Target { host: host.unwrap_or_else(|| "localhost".into()), port, verify, config }
 }

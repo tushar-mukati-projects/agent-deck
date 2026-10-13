@@ -14,6 +14,7 @@ import { toast } from "sonner";
 
 import { canMention, mentionInAgent } from "@/actions/files";
 import { Button } from "@/components/ui/button";
+import { showError } from "@/components/ui/feedback";
 import { agentName } from "@/lib/agents/registry";
 import { IconButton } from "@/components/ui/icon-button";
 import {
@@ -25,7 +26,7 @@ import {
 import { Segmented } from "@/components/ui/panel";
 import { api } from "@/lib/tauri/commands";
 import { copyText, openExternal, revealInExplorer } from "@/lib/tauri/system";
-import { cn, errorMessage, formatBytes, relativePath } from "@/lib/utils";
+import { cn, formatBytes, relativePath } from "@/lib/utils";
 import type { MarkdownMode } from "@/stores/viewer-store";
 import type { Workspace } from "@/types";
 
@@ -130,13 +131,13 @@ export const FileToolbar = ({
         <DropdownMenuContent align="end">
           <DropdownMenuItem
             icon={<Code2 />}
-            onSelect={() => void api.openInEditor(path).catch((e) => toast.error(errorMessage(e)))}
+            onSelect={() => void api.openInEditor(path).catch(showError)}
           >
             Open in VS Code
           </DropdownMenuItem>
           <DropdownMenuItem
             icon={<ExternalLink />}
-            onSelect={() => void openExternal(path).catch((e) => toast.error(errorMessage(e)))}
+            onSelect={() => void openExternal(path).catch(showError)}
           >
             Open with default app
           </DropdownMenuItem>

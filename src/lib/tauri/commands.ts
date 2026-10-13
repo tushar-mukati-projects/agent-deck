@@ -43,9 +43,9 @@ export const api = {
   environment: () => invoke<AppEnvironment>("environment"),
   listSessions: () => invoke<SessionInfo[]>("list_sessions"),
   liveSessions: () => invoke<LiveSession[]>("live_sessions"),
-  sessionTranscript: (filePath: string, distro: string | null, fromOffset = 0) =>
+  sessionTranscript: (filePath: string, distro: string | null, fromOffset: number) =>
     invoke<TranscriptPage>("session_transcript", { filePath, distro, fromOffset }),
-  subagentTranscript: (filePath: string, id: string, distro: string | null, fromOffset = 0) =>
+  subagentTranscript: (filePath: string, id: string, distro: string | null, fromOffset: number) =>
     invoke<TranscriptPage>("subagent_transcript", { filePath, id, distro, fromOffset }),
   deleteSession: (filePath: string, distro: string | null) =>
     invoke<void>("delete_session", { filePath, distro }),
@@ -100,7 +100,7 @@ export const api = {
 
   listDir: (path: string) => invoke<DirEntry[]>("list_dir", { path }),
   readFile: (path: string) => invoke<FileContent>("read_file", { path }),
-  writeFile: (path: string, contents: string, options: WriteOptions = {}) =>
+  writeFile: (path: string, contents: string, options: WriteOptions) =>
     invoke<WriteOutcome>("write_file", {
       path,
       contents,
