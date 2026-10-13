@@ -6,7 +6,7 @@ A Windows app for your Claude Code and Codex sessions. It lists every session fr
 
 ## Install
 
-1. Download `agent-deck-0.1.0-x64-setup.exe` from [Releases](https://github.com/SDE-Tushar-Funity/agent-deck/releases).
+1. Download `agent-deck-0.1.1-x64-setup.exe` from [Releases](https://github.com/SDE-Tushar-Funity/agent-deck/releases).
 2. Run it. It installs for your user only, no admin needed.
 
 You need Windows 10 or 11 (x64) and Claude Code or Codex on your PATH. WSL sessions also need `python3` inside the distro.
