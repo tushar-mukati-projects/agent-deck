@@ -102,7 +102,8 @@ impl Snapshot {
         let dirs = project_dirs(&ctx, &cwd);
         let settings = settings_entries(&ctx, &dirs);
         let plugins = installed_plugins(&ctx, &dirs, &settings);
-        let claude_json_path = ctx.home.join(".claude.json");
+        let config_home = if ctx.claude_home == ctx.home.join(".claude") { &ctx.home } else { &ctx.claude_home };
+        let claude_json_path = config_home.join(".claude.json");
         Ok(Self { claude_json: json_file(&claude_json_path), claude_json_path, settings, plugins, dirs, cwd, ctx })
     }
 
