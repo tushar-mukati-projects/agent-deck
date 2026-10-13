@@ -20,6 +20,7 @@ import { useAppEvents } from "@/hooks/useAppEvents";
 import { useAttentionAlerts } from "@/hooks/useAttentionAlerts";
 import { useGlobalShortcuts } from "@/hooks/useGlobalShortcuts";
 import { useWindowActivity } from "@/hooks/useWindowActivity";
+import { DESKTOP_AGENT_OPT_IN_ID } from "@/lib/desktopAgent";
 import { holdTerminalFits } from "@/lib/terminal/registry";
 import { findTheme } from "@/lib/themes";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -95,7 +96,7 @@ export const App = () => {
 
   return (
     <TooltipProvider>
-      <div className="flex h-full flex-col">
+      <div id={DESKTOP_AGENT_OPT_IN_ID} role="group" aria-label="Claude Deck" className="flex h-full flex-col">
         <TitleBar />
         <Group orientation="horizontal" className="min-h-0 flex-1">
           <Panel

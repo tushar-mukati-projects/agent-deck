@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, X } from "lucide-react";
 
+import { protectedTerminalId } from "@/lib/desktopAgent";
 import { DECK_PATH_MIME } from "@/lib/terminal/input";
 import {
   clearTerminalSearch,
@@ -130,7 +131,12 @@ export const TerminalView = ({ terminalId, dropText, dropLabel }: TerminalViewPr
   };
 
   return (
-    <div className="relative h-full w-full">
+    <div
+      id={protectedTerminalId(terminalId)}
+      role="region"
+      aria-label="Session terminal"
+      className="relative h-full w-full"
+    >
       <div
         ref={hostRef}
         style={{ backgroundColor: "var(--color-terminal-bg)" }}
