@@ -164,7 +164,7 @@ pub fn is_wsl_host(host: &str) -> bool {
 
 pub fn check_remote(path: &Path) -> anyhow::Result<()> {
     match unc_host(&path.to_string_lossy()) {
-        Some(host) if !is_wsl_host(&host) => anyhow::bail!("Claude Deck only opens network paths inside WSL"),
+        Some(host) if !is_wsl_host(&host) => anyhow::bail!("Agent Deck only opens network paths inside WSL"),
         _ => Ok(()),
     }
 }
@@ -191,7 +191,7 @@ pub fn guarded(path: &Path) -> anyhow::Result<PathBuf> {
     check_remote(&resolved)?;
     anyhow::ensure!(
         !is_sensitive(path) && !is_sensitive(&resolved),
-        "Claude Deck doesn't open files in credential folders"
+        "Agent Deck doesn't open files in credential folders"
     );
     Ok(resolved)
 }

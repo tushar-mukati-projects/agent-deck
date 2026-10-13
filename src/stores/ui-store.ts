@@ -92,7 +92,7 @@ export const useUiStore = create<UiState>()(
       },
     }),
     {
-      name: "claude-deck-ui",
+      name: "agent-deck-ui",
       version: 2,
       migrate: (persisted) => {
         const state = persisted as Omit<Partial<UiState>, "contextView"> & { contextView?: string };

@@ -9,6 +9,45 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
+name = "agent-deck"
+version = "0.1.0"
+dependencies = [
+ "aho-corasick",
+ "anyhow",
+ "base64 0.22.1",
+ "dirs",
+ "dunce",
+ "futures-util",
+ "ignore",
+ "memchr",
+ "native-tls",
+ "notify",
+ "parking_lot",
+ "percent-encoding",
+ "portable-pty",
+ "postgres-native-tls",
+ "rayon",
+ "serde",
+ "serde_json",
+ "similar",
+ "socket2",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-dialog",
+ "tauri-plugin-notification",
+ "tauri-plugin-opener",
+ "tauri-plugin-window-state",
+ "tokio",
+ "tokio-postgres",
+ "toml_edit 0.25.15+spec-1.1.0",
+ "trash",
+ "ureq",
+ "wait-timeout",
+ "which",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "aho-corasick"
 version = "1.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -505,45 +544,6 @@ dependencies = [
  "num-traits",
  "serde",
  "windows-link 0.2.1",
-]
-
-[[package]]
-name = "claude-deck"
-version = "0.1.0"
-dependencies = [
- "aho-corasick",
- "anyhow",
- "base64 0.22.1",
- "dirs",
- "dunce",
- "futures-util",
- "ignore",
- "memchr",
- "native-tls",
- "notify",
- "parking_lot",
- "percent-encoding",
- "portable-pty",
- "postgres-native-tls",
- "rayon",
- "serde",
- "serde_json",
- "similar",
- "socket2",
- "tauri",
- "tauri-build",
- "tauri-plugin-dialog",
- "tauri-plugin-notification",
- "tauri-plugin-opener",
- "tauri-plugin-window-state",
- "tokio",
- "tokio-postgres",
- "toml_edit 0.25.15+spec-1.1.0",
- "trash",
- "ureq",
- "wait-timeout",
- "which",
- "windows-sys 0.61.2",
 ]
 
 [[package]]

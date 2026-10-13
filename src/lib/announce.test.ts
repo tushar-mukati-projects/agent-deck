@@ -15,8 +15,8 @@ describe("spoken announcements", () => {
 
   it("keeps long titles short and drops symbols that sound odd", () => {
     expect(
-      spokenTitle("claude-deck: Tauri desktop app for browsing Claude sessions on Windows"),
-    ).toBe("claude-deck Tauri desktop app for browsing Claude sessions");
+      spokenTitle("agent-deck: Tauri desktop app for browsing Claude sessions on Windows"),
+    ).toBe("agent-deck Tauri desktop app for browsing Claude sessions");
     expect(spokenTitle("Prices ₹2,000 → ₹10,000!!")).toBe("Prices 2 000 10 000");
   });
 

@@ -286,7 +286,7 @@ fn build_command(req: &SpawnRequest) -> anyhow::Result<CommandBuilder> {
     }
     cmd.env("TERM", "xterm-256color");
     cmd.env("COLORTERM", "truecolor");
-    cmd.env("TERM_PROGRAM", "claude-deck");
+    cmd.env("TERM_PROGRAM", "agent-deck");
     if program_stem(&req.program) == "wsl" {
         let forwarded = std::env::var("WSLENV").unwrap_or_default();
         let joined = [forwarded.as_str(), "COLORTERM", "TERM_PROGRAM"]

@@ -6,14 +6,14 @@ describe("candidatePaths", () => {
   it("tries each recent working folder, newest first, without duplicates", () => {
     expect(
       candidatePaths("src\\features\\mcp\\PgBrowser.tsx", [
-        "C:\\Users\\me\\my-files\\dev\\claude-deck\\src-tauri",
-        "C:\\Users\\me\\my-files\\dev\\claude-deck",
-        "c:\\users\\me\\my-files\\dev\\claude-deck",
+        "C:\\Users\\me\\my-files\\dev\\agent-deck\\src-tauri",
+        "C:\\Users\\me\\my-files\\dev\\agent-deck",
+        "c:\\users\\me\\my-files\\dev\\agent-deck",
         "C:\\Users\\me\\my-files",
       ]),
     ).toEqual([
-      "C:\\Users\\me\\my-files\\dev\\claude-deck\\src-tauri\\src\\features\\mcp\\PgBrowser.tsx",
-      "C:\\Users\\me\\my-files\\dev\\claude-deck\\src\\features\\mcp\\PgBrowser.tsx",
+      "C:\\Users\\me\\my-files\\dev\\agent-deck\\src-tauri\\src\\features\\mcp\\PgBrowser.tsx",
+      "C:\\Users\\me\\my-files\\dev\\agent-deck\\src\\features\\mcp\\PgBrowser.tsx",
       "C:\\Users\\me\\my-files\\src\\features\\mcp\\PgBrowser.tsx",
     ]);
   });

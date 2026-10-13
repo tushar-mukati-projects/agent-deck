@@ -36,7 +36,7 @@ import { useSettingsStore } from "@/stores/settings-store";
 import { useWorkspace, useWorkspaceStore } from "@/stores/workspace-store";
 import type { Workspace } from "@/types";
 
-const TAB_DRAG_TYPE = "application/x-claude-deck-tab";
+const TAB_DRAG_TYPE = "application/x-agent-deck-tab";
 
 const TabMenu = ({ workspace, children }: { workspace: Workspace; children: React.ReactNode }) => {
   const hasSession = useSessionsStore((s) => !!s.byId[workspace.sessionId]);

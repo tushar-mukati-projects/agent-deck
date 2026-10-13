@@ -112,7 +112,7 @@ export const useSettingsStore = create<SettingsState>()(
       set: (patch) => set(patch),
     }),
     {
-      name: "claude-deck-settings",
+      name: "agent-deck-settings",
       version: 1,
       migrate: (persisted, version) => {
         const state = persisted as Partial<SettingsData>;

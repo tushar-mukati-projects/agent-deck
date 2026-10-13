@@ -125,12 +125,12 @@ struct ErrorReply {
 
 #[cfg(not(test))]
 fn cache_file() -> PathBuf {
-    dirs::cache_dir().unwrap_or_else(std::env::temp_dir).join("claude-deck").join("wsl-index.json")
+    dirs::cache_dir().unwrap_or_else(std::env::temp_dir).join(crate::legacy_data::CACHE_DIR).join("wsl-index.json")
 }
 
 #[cfg(test)]
 fn cache_file() -> PathBuf {
-    std::env::temp_dir().join("claude-deck-test").join("wsl-index.json")
+    std::env::temp_dir().join("agent-deck-test").join("wsl-index.json")
 }
 
 fn load_cache() -> Cache {

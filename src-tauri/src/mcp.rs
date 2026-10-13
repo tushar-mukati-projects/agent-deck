@@ -169,7 +169,7 @@ fn answer_server_request(message: &Value, stdin: &Mutex<ChildStdin>) {
     let reply = if method == "ping" {
         json!({ "jsonrpc": "2.0", "id": id, "result": {} })
     } else {
-        json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32601, "message": format!("{method} isn't supported by Claude Deck") } })
+        json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32601, "message": format!("{method} isn't supported by Agent Deck") } })
     };
     let mut stdin = stdin.lock();
     let _ = writeln!(stdin, "{reply}").and_then(|_| stdin.flush());
@@ -362,7 +362,7 @@ impl Client {
         let params = json!({
             "protocolVersion": PROTOCOL_VERSION,
             "capabilities": {},
-            "clientInfo": { "name": "claude-deck", "version": env!("CARGO_PKG_VERSION") },
+            "clientInfo": { "name": "agent-deck", "version": env!("CARGO_PKG_VERSION") },
         });
         let info = self.send_request("initialize", params, INIT_TIMEOUT)?;
         *self.info.lock() = Some(info);

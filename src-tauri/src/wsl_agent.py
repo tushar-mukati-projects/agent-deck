@@ -769,7 +769,7 @@ def watch(root):
     watches = {}
 
     def noisy(path):
-        return any(part in NOISY_DIRS for part in path.split("/")) or path.endswith(".claude-deck-tmp")
+        return any(part in NOISY_DIRS for part in path.split("/")) or path.endswith(".agent-deck-tmp")
 
     def add(path):
         for directory, dirs, _ in os.walk(path):

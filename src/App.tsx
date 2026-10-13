@@ -96,7 +96,12 @@ export const App = () => {
 
   return (
     <TooltipProvider>
-      <div id={DESKTOP_AGENT_OPT_IN_ID} role="group" aria-label="Claude Deck" className="flex h-full flex-col">
+      <div
+        id={DESKTOP_AGENT_OPT_IN_ID}
+        role="group"
+        aria-label="Agent Deck"
+        className="flex h-full flex-col"
+      >
         <TitleBar />
         <Group orientation="horizontal" className="min-h-0 flex-1">
           <Panel

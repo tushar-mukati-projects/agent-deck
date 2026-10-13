@@ -27,6 +27,6 @@ describe("hide mode", () => {
   it("uses a theme that exists and the disguised name", () => {
     expect(findTheme(HIDE_MODE_THEME).id).toBe(HIDE_MODE_THEME);
     expect(appName(true)).toBe("Warp");
-    expect(appName(false)).toBe("Claude Deck");
+    expect(appName(false)).toBe("Agent Deck");
   });
 });

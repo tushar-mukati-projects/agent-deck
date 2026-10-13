@@ -6,6 +6,7 @@ mod file_protocol;
 mod fsx;
 mod git;
 mod hide_mode;
+mod legacy_data;
 mod mcp;
 mod notes;
 mod phone;
@@ -30,6 +31,8 @@ const IDLE_SWEEP: std::time::Duration = std::time::Duration::from_secs(60);
 const IDLE_LIMIT: std::time::Duration = std::time::Duration::from_secs(15 * 60);
 
 pub fn run() {
+    let context = tauri::generate_context!();
+    legacy_data::carry_over(&context.config().identifier);
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
@@ -110,8 +113,8 @@ pub fn run() {
             commands::notes_folder,
             commands::phone_ping,
         ])
-        .build(tauri::generate_context!())
-        .expect("error while building Claude Deck");
+        .build(context)
+        .expect("error while building Agent Deck");
 
     app.run(|handle, event| {
         if let RunEvent::Exit = event {

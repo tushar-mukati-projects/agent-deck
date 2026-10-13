@@ -365,7 +365,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       };
     },
     {
-      name: "claude-deck-workspaces",
+      name: "agent-deck-workspaces",
       version: 3,
       partialize: (s) => ({ workspaces: s.workspaces, activeId: s.activeId }),
       migrate: migrateSaved,

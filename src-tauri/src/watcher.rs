@@ -62,7 +62,7 @@ const CODEX_RETRY: Duration = Duration::from_secs(30);
 
 fn is_noise(path: &Path) -> bool {
     path.components().any(|c| NOISY_DIRS.iter().any(|dir| c.as_os_str() == *dir))
-        || path.to_string_lossy().ends_with(".claude-deck-tmp")
+        || path.to_string_lossy().ends_with(".agent-deck-tmp")
 }
 
 fn debounced<F>(delay: Duration, on_batch: F) -> mpsc::Sender<Signal>
@@ -247,7 +247,7 @@ mod tests {
     #[test]
     fn ignores_noise() {
         assert!(is_noise(Path::new(r"C:\w\node_modules\x\index.js")));
-        assert!(is_noise(Path::new(r"C:\w\.a.txt.claude-deck-tmp")));
+        assert!(is_noise(Path::new(r"C:\w\.a.txt.agent-deck-tmp")));
         assert!(!is_noise(Path::new(r"C:\w\src\main.rs")));
     }
 }

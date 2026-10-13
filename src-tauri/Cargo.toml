@@ -1,10 +1,10 @@
 [package]
-name = "claude-deck"
+name = "agent-deck"
 version = "0.1.0"
 edition = "2021"
 
 [lib]
-name = "claude_deck_lib"
+name = "agent_deck_lib"
 crate-type = ["rlib"]
 
 [build-dependencies]

@@ -1,4 +1,4 @@
-# Claude Deck
+# Agent Deck
 
 A fast desktop home for every Claude Code session on this machine — browse, preview, resume, fork and run them side by side, each with its own shells and a live file explorer.
 
@@ -13,7 +13,7 @@ Built with **Tauri 2** (Rust backend, system WebView2) + **React 19 / TypeScript
 - **All sessions, every folder** — indexes `~/.claude/projects/**/*.jsonl` (incrementally, by byte offset), grouped by real working folder. Filter to one folder (with or without subfolders) or browse to any folder.
 - **Preview before resuming** — read a conversation (markdown rendered, tool calls summarized) without starting a process.
 - **Resume / fork / new** — runs `claude --resume <id>`, `--fork-session`, or `--session-id <uuid>` in a real ConPTY. Sessions keep running in the background while you switch tabs; tabs show *working* (pulsing) and *done while you were away* (blue) states.
-- **WSL sessions too** — every running WSL distro's `~/.claude` is indexed by a small Python agent that runs *inside* Linux (reading over `\\wsl.localhost` is ~9 MB/s, far too slow for large histories); results are cached incrementally in `%LOCALAPPDATA%\claude-deck\wsl-index.json`. WSL sessions resume with the distro's own `claude`, and their shells are real Linux shells (`wsl.exe -d <distro> --cd <path>`). Stopped distros show a *Start* button instead of being booted silently.
+- **WSL sessions too** — every running WSL distro's `~/.claude` is indexed by a small Python agent that runs *inside* Linux (reading over `\\wsl.localhost` is ~9 MB/s, far too slow for large histories); results are cached incrementally in `%LOCALAPPDATA%\agent-deck\wsl-index.json`. WSL sessions resume with the distro's own `claude`, and their shells are real Linux shells (`wsl.exe -d <distro> --cd <path>`). Stopped distros show a *Start* button instead of being booted silently.
 - **Delete sessions** — right-click → *Delete session…* (or the Delete button in the preview). Windows sessions go to the Recycle Bin; WSL sessions are deleted permanently. Running sessions can't be deleted.
 - **Detects sessions open elsewhere** (from `~/.claude/sessions`) and warns before double-resuming; *Close there, resume here* ends the other process (only when its live record and start time match) and resumes it in Deck.
 - **Shells per session** — any number of PowerShell tabs in the session folder (`Ctrl+\``). Background shells the agent starts (`run_in_background`) appear as read-only tabs with live output when you open them.

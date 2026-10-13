@@ -13,7 +13,7 @@ import { useUiStore } from "@/stores/ui-store";
 import type { PgOutput } from "@/types";
 
 const DEFAULT_SQL = "select now();";
-const draftKey = (serverId: string) => `claude-deck:sql:${serverId}`;
+const draftKey = (serverId: string) => `agent-deck:sql:${serverId}`;
 
 const useSqlDraft = (serverId: string) => {
   const [sql, setSql] = useState(() => {

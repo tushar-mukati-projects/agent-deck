@@ -170,7 +170,7 @@ fn replace_atomically(target: &Path, data: &[u8]) -> io::Result<()> {
     use std::os::windows::ffi::OsStrExt;
     use windows_sys::Win32::Storage::FileSystem::{ReplaceFileW, REPLACEFILE_IGNORE_MERGE_ERRORS};
     let name = target.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
-    let tmp = target.with_file_name(format!(".{name}.claude-deck-tmp"));
+    let tmp = target.with_file_name(format!(".{name}.agent-deck-tmp"));
     fs::write(&tmp, data)?;
     let wide = |p: &Path| p.as_os_str().encode_wide().chain(Some(0)).collect::<Vec<u16>>();
     let (target_w, tmp_w) = (wide(target), wide(&tmp));
@@ -311,7 +311,7 @@ pub fn open_path(path: &str) -> anyhow::Result<()> {
     let target = existing(path)?;
     anyhow::ensure!(
         target.is_dir() || !(is_blocked_extension(&target) || is_blocked_extension(Path::new(path))),
-        "Claude Deck doesn't launch programs or scripts. Use Reveal in File Explorer instead."
+        "Agent Deck doesn't launch programs or scripts. Use Reveal in File Explorer instead."
     );
     tauri_plugin_opener::open_path(path, None::<&str>).map_err(|e| anyhow::anyhow!("{e}"))
 }

@@ -117,7 +117,7 @@ fn finish(mut config: Config, verify: Verify) -> Target {
     };
     config.options(options).connect_timeout(CONNECT_TIMEOUT);
     if config.get_application_name().is_none() {
-        config.application_name("claude-deck");
+        config.application_name("agent-deck");
     }
     #[allow(unreachable_patterns)]
     let host = config.get_hosts().iter().find_map(|h| match h {
