@@ -114,8 +114,14 @@ struct Lines {
     end: u64,
 }
 
+#[cfg(not(test))]
 fn cache_file() -> PathBuf {
     dirs::cache_dir().unwrap_or_else(std::env::temp_dir).join(CACHE_DIR).join("wsl-index.json")
+}
+
+#[cfg(test)]
+fn cache_file() -> PathBuf {
+    std::env::temp_dir().join(format!("{CACHE_DIR}-test")).join("wsl-index.json")
 }
 
 fn load_cache() -> Cache {
