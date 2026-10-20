@@ -1,4 +1,4 @@
-import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, memo, useEffect, useMemo, useRef, useState } from "react";
 import { Eye, EyeOff, GitCompare, RefreshCw } from "lucide-react";
 
 import { EmptyState, Hint, LoadingState } from "@/components/ui/feedback";
@@ -6,6 +6,7 @@ import { IconButton } from "@/components/ui/icon-button";
 import { Chevron, CollapsibleSection, PanelHeader } from "@/components/ui/panel";
 import { useAsync, useThrottledCallback } from "@/hooks/useAsync";
 import { useSessionFile } from "@/hooks/useSessionFile";
+import { useToggleSet } from "@/hooks/useToggleSet";
 import { buildChangeTree, type ChangeFolder, type ChangeNode } from "@/lib/change-tree";
 import { changeDiffSource, gitChangeStatus, gitMessage } from "@/lib/changes";
 import { encodeDiffTab } from "@/lib/diff-tabs";
@@ -20,7 +21,6 @@ import {
   isWithin,
   sameJson,
   shortenHome,
-  toggled,
 } from "@/lib/utils";
 import { agentName } from "@/stores/agents";
 import { useSessionsStore } from "@/stores/sessions-store";
@@ -127,12 +127,6 @@ const FolderRow = ({
   );
 };
 
-const useCollapsed = () => {
-  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set());
-  const toggle = useCallback((key: string) => setCollapsed((current) => toggled(current, key)), []);
-  return [collapsed, toggle] as const;
-};
-
 interface ChangeTreeProps<T> {
   nodes: ChangeNode<T>[];
   depth?: number;
@@ -198,7 +192,7 @@ const SessionChanges = memo(
     sessionFile: string | null;
   }) => {
     const [open, setOpen] = useState(true);
-    const [collapsed, toggleFolder] = useCollapsed();
+    const [collapsed, toggleFolder] = useToggleSet<string>();
     const agent = useSessionsStore((s) => s.byId[workspace.sessionId]?.agent ?? workspace.agent);
     const visible = useMemo(
       () => files.filter((f) => showUnchanged || f.status !== "unchanged"),
@@ -269,7 +263,7 @@ SessionChanges.displayName = "SessionChanges";
 const RepoChanges = memo(
   ({ workspace, git, error }: { workspace: Workspace; git: GitChange[]; error: string | null }) => {
     const [open, setOpen] = useState(true);
-    const [collapsed, toggleFolder] = useCollapsed();
+    const [collapsed, toggleFolder] = useToggleSet<string>();
     const tree = useMemo(
       () => buildChangeTree(git, (c) => c.path, workspace.cwd),
       [git, workspace.cwd],

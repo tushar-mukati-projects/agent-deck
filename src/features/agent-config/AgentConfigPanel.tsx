@@ -9,7 +9,8 @@ import { useOverview } from "@/features/agent-config/overview-store";
 import { PROFILES, type SectionKey } from "@/features/agent-config/profiles";
 import { SECTIONS } from "@/features/agent-config/sections";
 import { StartDistroButton } from "@/features/sidebar/WslStatus";
-import { basename, cn, toggled } from "@/lib/utils";
+import { useToggleSet } from "@/hooks/useToggleSet";
+import { basename, cn } from "@/lib/utils";
 import { parseWslPath } from "@/lib/wsl";
 import { agentName, getAgent } from "@/stores/agents";
 import { useSessionsStore } from "@/stores/sessions-store";
@@ -32,10 +33,9 @@ const Sections = memo(
     query: string;
     reload: () => void;
   }) => {
-    const [open, setOpen] = useState<Set<SectionKey>>(() => new Set(DEFAULT_OPEN));
+    const [open, toggle] = useToggleSet<SectionKey>(DEFAULT_OPEN);
     const data = useMemo(() => filterOverview(overview, query), [overview, query]);
     const profile = PROFILES[agent];
-    const toggle = (key: SectionKey) => setOpen((current) => toggled(current, key));
 
     return (
       <>
