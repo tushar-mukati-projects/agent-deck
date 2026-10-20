@@ -1,5 +1,6 @@
 import { format } from "date-fns";
 
+import { neighborAt } from "@/lib/utils";
 import type { Note } from "@/types";
 
 export interface NoteEntry extends Note {
@@ -48,7 +49,7 @@ export const withoutNote = (notes: NoteEntry[], activeId: string | null, id: str
   const remaining = rest.length ? rest : [draftNote()];
   const nextActive =
     activeId === id || !remaining.some((note) => note.id === activeId)
-      ? remaining[Math.min(Math.max(index, 0), remaining.length - 1)].id
+      ? (neighborAt(remaining, index)?.id ?? null)
       : activeId;
   return { notes: remaining, activeId: nextActive };
 };

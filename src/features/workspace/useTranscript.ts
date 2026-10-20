@@ -1,5 +1,6 @@
 import { useAsync } from "@/hooks/useAsync";
 import { api } from "@/lib/tauri/commands";
+import { lruSet } from "@/lib/utils";
 import type { TranscriptItem } from "@/types";
 
 const CACHE_LIMIT = 24;
@@ -12,20 +13,14 @@ interface Cached {
 
 const cache = new Map<string, Cached>();
 
-const remember = (filePath: string, entry: Cached) => {
-  const current = cache.get(filePath);
-  if (current && current.stamp > entry.stamp) return;
-  cache.delete(filePath);
-  cache.set(filePath, entry);
-  while (cache.size > CACHE_LIMIT) cache.delete(cache.keys().next().value!);
-};
-
 const fetchTranscript = async (filePath: string, distro: string | null, stamp: number) => {
   const hit = cache.get(filePath);
   if (hit && hit.stamp === stamp) return hit.items;
   const page = await api.sessionTranscript(filePath, distro, hit?.offset ?? 0);
   const items = page.reset || !hit ? page.items : [...hit.items, ...page.items];
-  remember(filePath, { stamp, offset: page.offset, items });
+  const latest = cache.get(filePath);
+  if (!latest || latest.stamp <= stamp)
+    lruSet(cache, filePath, { stamp, offset: page.offset, items }, CACHE_LIMIT);
   return items;
 };
 

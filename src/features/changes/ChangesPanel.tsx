@@ -13,7 +13,15 @@ import { subscribeFileChanges } from "@/lib/file-events";
 import { FileIcon, folderIcon } from "@/lib/file-icons";
 import { api } from "@/lib/tauri/commands";
 import { DECK_PATH_MIME } from "@/lib/terminal/input";
-import { basename, cn, errorMessage, isWithin, shortenHome, toggled } from "@/lib/utils";
+import {
+  basename,
+  cn,
+  errorMessage,
+  isWithin,
+  sameJson,
+  shortenHome,
+  toggled,
+} from "@/lib/utils";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useActiveWorkspace, useWorkspaceStore } from "@/stores/workspace-store";
 import type { ChangedFile, ChangeStatus, GitChange, Workspace } from "@/types";
@@ -317,7 +325,7 @@ const WorkspaceChanges = ({ workspace }: { workspace: Workspace }) => {
   const previous = useRef<Changes | null>(null);
   const { data, loading, reload } = useAsync(async () => {
     const next = await loadChanges(cwd, filePath, distro);
-    if (previous.current && JSON.stringify(previous.current) === JSON.stringify(next))
+    if (previous.current && sameJson(previous.current, next))
       return previous.current;
     previous.current = next;
     return next;

@@ -3,7 +3,7 @@ import { create } from "zustand";
 import { liveSignature, mergeSessions, reuseSessions } from "@/lib/sessions";
 import { singleFlight } from "@/lib/single-flight";
 import { api } from "@/lib/tauri/commands";
-import { errorMessage } from "@/lib/utils";
+import { errorMessage, sameJson } from "@/lib/utils";
 import { useSettingsStore } from "@/stores/settings-store";
 import type { AppEnvironment, LiveSession, SessionInfo, WslDistro } from "@/types";
 
@@ -80,7 +80,7 @@ export const useSessionsStore = create<SessionsState>((set, get) => {
   });
 
   const setWslErrors = (wslErrors: Record<string, string>) => {
-    if (JSON.stringify(wslErrors) !== JSON.stringify(get().wslErrors)) set({ wslErrors });
+    if (!sameJson(wslErrors, get().wslErrors)) set({ wslErrors });
   };
 
   const clearWsl = () => {
@@ -94,8 +94,7 @@ export const useSessionsStore = create<SessionsState>((set, get) => {
     if (!wslIndexed) set({ wslLoading: true });
     try {
       const index = await api.listWslSessions();
-      if (JSON.stringify(index.distros) !== JSON.stringify(get().distros))
-        set({ distros: index.distros });
+      if (!sameJson(index.distros, get().distros)) set({ distros: index.distros });
       wslIndexed = true;
       if (!index.distros.some((d) => d.running)) return clearWsl();
       setWslErrors(index.errors);

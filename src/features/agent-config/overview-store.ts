@@ -4,7 +4,7 @@ import { create } from "zustand";
 import { singleFlight } from "@/lib/single-flight";
 import { api } from "@/lib/tauri/commands";
 import { appWindow } from "@/lib/tauri/system";
-import { errorMessage, normalizePath } from "@/lib/utils";
+import { errorMessage, normalizePath, sameJson } from "@/lib/utils";
 import type { AgentOverview, ConfigAgent } from "@/types";
 
 const FOCUS_REFRESH_MS = 30_000;
@@ -42,8 +42,7 @@ const useOverviewStore = create<OverviewState>((set, get) => {
           try {
             const next = await api.agentOverview(cwd, agent);
             const current = get().entries[key]?.overview;
-            const overview =
-              current && JSON.stringify(current) === JSON.stringify(next) ? current : next;
+            const overview = current && sameJson(current, next) ? current : next;
             patch(key, { overview, error: null });
           } catch (error) {
             patch(key, { error: errorMessage(error) });

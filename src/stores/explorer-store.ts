@@ -1,7 +1,15 @@
 import { create } from "zustand";
 
 import { api } from "@/lib/tauri/commands";
-import { dirname, errorMessage, isWithin, normalizePath, omitKey } from "@/lib/utils";
+import {
+  dirname,
+  errorMessage,
+  filterKeys,
+  isWithin,
+  normalizePath,
+  omitKey,
+  sameJson,
+} from "@/lib/utils";
 import type { DirEntry } from "@/types";
 
 interface ExplorerState {
@@ -28,9 +36,6 @@ const requests = new Map<string, number>();
 let lastRequest = 0;
 let revealRequest = 0;
 
-const keepOutside = <T>(record: Record<string, T>, root: string) =>
-  Object.fromEntries(Object.entries(record).filter(([k]) => !isWithin(k, root)));
-
 export const useExplorerStore = create<ExplorerState>((set, get) => ({
   children: {},
   paths: {},
@@ -55,8 +60,7 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
       !current.loading[k] &&
       !(k in current.errors) &&
       current.paths[k] === dir &&
-      current.children[k] !== undefined &&
-      JSON.stringify(current.children[k]) === JSON.stringify(result.entries);
+      sameJson(current.children[k], result.entries);
     if (unchanged) return;
     set((s) => ({
       loading: omitKey(s.loading, k),
@@ -82,11 +86,7 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
 
   collapseAll: (root) =>
     set((s) => ({
-      expanded: Object.fromEntries(
-        Object.keys(s.expanded)
-          .filter((k) => !isWithin(k, root) || k === key(root))
-          .map((k) => [k, true as const]),
-      ),
+      expanded: filterKeys(s.expanded, (k) => !isWithin(k, root) || k === key(root)),
     })),
 
   select: (path) => set({ selected: path }),
@@ -121,12 +121,13 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
 
   forget: (root) => {
     for (const k of requests.keys()) if (isWithin(k, root)) requests.delete(k);
+    const outside = (k: string) => !isWithin(k, root);
     set((s) => ({
-      children: keepOutside(s.children, root),
-      paths: keepOutside(s.paths, root),
-      errors: keepOutside(s.errors, root),
-      expanded: keepOutside(s.expanded, root),
-      loading: keepOutside(s.loading, root),
+      children: filterKeys(s.children, outside),
+      paths: filterKeys(s.paths, outside),
+      errors: filterKeys(s.errors, outside),
+      expanded: filterKeys(s.expanded, outside),
+      loading: filterKeys(s.loading, outside),
       selected: s.selected && isWithin(s.selected, root) ? null : s.selected,
     }));
   },

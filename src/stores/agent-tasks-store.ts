@@ -1,5 +1,6 @@
 import { create } from "zustand";
 
+import { sameJson } from "@/lib/utils";
 import type { AgentTask, SessionTasks, Subagent } from "@/types";
 
 interface AgentTasksState {
@@ -15,11 +16,9 @@ export const useAgentTasksStore = create<AgentTasksState>((set, get) => ({
   agentsBySession: {},
   selected: {},
   setTasks: (sessionId, { shells, agents }) => {
-    const same = <T>(current: T | undefined, next: T) =>
-      current !== undefined && JSON.stringify(current) === JSON.stringify(next);
     const state = get();
-    const sameShells = same(state.bySession[sessionId], shells);
-    const sameAgents = same(state.agentsBySession[sessionId], agents);
+    const sameShells = sameJson(state.bySession[sessionId], shells);
+    const sameAgents = sameJson(state.agentsBySession[sessionId], agents);
     if (sameShells && sameAgents) return;
     set((s) => ({
       bySession: sameShells ? s.bySession : { ...s.bySession, [sessionId]: shells },

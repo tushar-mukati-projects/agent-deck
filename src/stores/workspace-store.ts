@@ -21,7 +21,7 @@ import {
   startTerminal,
   type TerminalSpec,
 } from "@/lib/terminal/registry";
-import { newId, samePath } from "@/lib/utils";
+import { neighborAt, newId, samePath } from "@/lib/utils";
 import { parseWslPath } from "@/lib/wsl";
 import {
   blankWorkspace,
@@ -201,7 +201,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           const workspace = workspaces[index];
           if (!workspace) return;
           const remaining = workspaces.filter((w) => w.id !== workspaceId);
-          const neighbor = remaining[Math.min(index, remaining.length - 1)] ?? null;
+          const neighbor = neighborAt(remaining, index) ?? null;
           const closingActive = activeId === workspaceId;
           set((s) => ({
             workspaces: remaining,
@@ -270,7 +270,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           const shells = workspace.shells.filter((s) => s.id !== shellId);
           const activeShellId =
             workspace.activeShellId === shellId
-              ? (shells[Math.min(index, shells.length - 1)]?.id ?? null)
+              ? (neighborAt(shells, index)?.id ?? null)
               : workspace.activeShellId;
           const shellPanelOpen = shells.length > 0 && workspace.shellPanelOpen;
           patch(workspaceId, () => ({ shells, activeShellId, shellPanelOpen }));
@@ -320,7 +320,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             return {
               openFiles,
               activeFile: wasActive
-                ? (openFiles[Math.min(index, openFiles.length - 1)] ?? null)
+                ? (neighborAt(openFiles, index) ?? null)
                 : w.activeFile,
             };
           }),

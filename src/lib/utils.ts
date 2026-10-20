@@ -128,6 +128,25 @@ export const omitKey = <T>(record: Record<string, T>, key: string): Record<strin
   return rest;
 };
 
+export const filterKeys = <T>(
+  record: Record<string, T>,
+  keep: (key: string) => boolean,
+): Record<string, T> => Object.fromEntries(Object.entries(record).filter(([key]) => keep(key)));
+
+export const sameJson = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+
+export const neighborAt = <T>(remaining: T[], removedIndex: number): T | undefined =>
+  remaining[Math.min(Math.max(removedIndex, 0), remaining.length - 1)];
+
+export const lruSet = <K, V>(cache: Map<K, V>, key: K, value: V, limit: number) => {
+  cache.delete(key);
+  cache.set(key, value);
+  for (const oldest of cache.keys()) {
+    if (cache.size <= limit) return;
+    cache.delete(oldest);
+  }
+};
+
 export const errorMessage = (error: unknown) =>
   error instanceof Error
     ? error.message

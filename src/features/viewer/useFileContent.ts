@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { subscribeFileChanges } from "@/lib/file-events";
 import { api } from "@/lib/tauri/commands";
 import { appWindow } from "@/lib/tauri/system";
-import { errorMessage, normalizePath } from "@/lib/utils";
+import { errorMessage, lruSet, normalizePath } from "@/lib/utils";
 import { isDirty } from "@/stores/viewer-store";
 import type { FileContent } from "@/types";
 
@@ -14,13 +14,6 @@ type State =
 
 const CACHE_LIMIT = 40;
 const cache = new Map<string, FileContent>();
-
-const remember = (path: string, content: FileContent) => {
-  const key = normalizePath(path);
-  cache.delete(key);
-  cache.set(key, content);
-  while (cache.size > CACHE_LIMIT) cache.delete(cache.keys().next().value!);
-};
 
 const initialState = (path: string): State => {
   const cached = cache.get(normalizePath(path));
@@ -36,7 +29,7 @@ export const useFileContent = (path: string, enabled: boolean) => {
       if (!quiet) setState({ status: "loading" });
       try {
         const content = await api.readFile(path);
-        remember(path, content);
+        lruSet(cache, normalizePath(path), content, CACHE_LIMIT);
         setState((current) =>
           current.status === "ready" &&
           current.content.kind === "text" &&

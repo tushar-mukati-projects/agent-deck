@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-import { normalizePath, omitKey } from "@/lib/utils";
+import { filterKeys, normalizePath, omitKey } from "@/lib/utils";
 
 export type MarkdownMode = "preview" | "source";
 
@@ -47,13 +47,12 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
   forget: (paths) =>
     set((s) => {
       const keys = new Set(paths.map(normalizePath));
-      const keep = <T>(record: Record<string, T>) =>
-        Object.fromEntries(Object.entries(record).filter(([k]) => !keys.has(k)));
+      const kept = (k: string) => !keys.has(k);
       return {
-        drafts: keep(s.drafts),
-        editing: keep(s.editing),
-        markdownMode: keep(s.markdownMode),
-        lines: keep(s.lines),
+        drafts: filterKeys(s.drafts, kept),
+        editing: filterKeys(s.editing, kept),
+        markdownMode: filterKeys(s.markdownMode, kept),
+        lines: filterKeys(s.lines, kept),
       };
     }),
 }));
