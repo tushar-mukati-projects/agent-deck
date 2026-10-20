@@ -19,6 +19,7 @@ export type EmptyHintState = {
   query: string;
   searchingChats: boolean;
   chatError: string | null;
+  filesError: string | null;
 };
 
 export const sortTop = <T extends { score: number }>(list: T[], limit: number) =>
@@ -48,9 +49,10 @@ export const emptyHint = ({
   query,
   searchingChats,
   chatError,
+  filesError,
 }: EmptyHintState) => {
   if (mode === "files" && !hasWorkspace) return "Open a session to search its files.";
-  if (mode !== "chats") return "Nothing matches.";
+  if (mode !== "chats") return filesError ?? "Nothing matches.";
   if (query.length < MIN_CHAT_QUERY)
     return `Type at least ${MIN_CHAT_QUERY} characters to search every conversation.`;
   if (searchingChats) return "Searching conversations…";

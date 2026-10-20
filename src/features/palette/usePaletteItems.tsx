@@ -99,13 +99,9 @@ const listFiles = async (root: string) => {
   if (cached && Date.now() - cached.at < maxAge && cached.at > (filesChangedAt.get(key) ?? 0))
     return cached.files;
   const at = Date.now();
-  try {
-    const files = await api.listFiles(root);
-    fileCache.set(key, { at, files });
-    return files;
-  } catch {
-    return cached?.files ?? [];
-  }
+  const files = await api.listFiles(root);
+  fileCache.set(key, { at, files });
+  return files;
 };
 
 const useFileList = (root: string | null, wanted: boolean) => {
@@ -114,8 +110,11 @@ const useFileList = (root: string | null, wanted: boolean) => {
     if (wanted && root) setWantedRoot(root);
   }, [wanted, root]);
   const active = wanted || wantedRoot === root ? root : null;
-  const { data } = useAsync(active ? () => listFiles(active) : null, [active]);
-  return data ?? (active ? (fileCache.get(normalizePath(active))?.files ?? null) : null);
+  const { data, error } = useAsync(active ? () => listFiles(active) : null, [active]);
+  return {
+    files: data ?? (active ? (fileCache.get(normalizePath(active))?.files ?? null) : null),
+    error: error ? failedTo("list this folder's files", error) : null,
+  };
 };
 
 const useChatSearch = (query: string, enabled: boolean) => {
@@ -307,7 +306,7 @@ export const usePaletteItems = (mode: PaletteMode, liveQuery: string) => {
   const commandMode = mode === "all" && rawQuery.startsWith(">");
   const query = (commandMode ? rawQuery.replace(/^>/, "") : rawQuery).trim().toLowerCase();
   const wantFiles = mode === "files" || (mode === "all" && !commandMode && query.length > 0);
-  const files = useFileList(workspace?.cwd ?? null, wantFiles);
+  const { files, error: filesError } = useFileList(workspace?.cwd ?? null, wantFiles);
   const chats = useChatSearch(query, mode === "chats");
 
   const commands = useMemo(() => buildCommands(workspace), [workspace]);
@@ -460,13 +459,15 @@ export const usePaletteItems = (mode: PaletteMode, liveQuery: string) => {
     chats.hits,
   ]);
 
-  const loading = (mode === "files" && !files) || (mode === "chats" && chats.searching);
+  const loading =
+    (mode === "files" && !files && !filesError) || (mode === "chats" && chats.searching);
   const hint = emptyHint({
     mode,
     hasWorkspace: !!workspace,
     query,
     searchingChats: chats.searching,
     chatError: chats.error,
+    filesError: wantFiles ? filesError : null,
   });
 
   return { items, loading, emptyHint: hint };

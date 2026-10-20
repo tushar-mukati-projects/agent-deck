@@ -47,12 +47,21 @@ describe("emptyHint", () => {
     query: "deploy",
     searchingChats: false,
     chatError: null,
+    filesError: null,
   };
 
   it.each<[Partial<EmptyHintState>, string]>([
     [{ mode: "files", hasWorkspace: false }, "Open a session to search its files."],
     [{ mode: "files" }, "Nothing matches."],
     [{ mode: "all" }, "Nothing matches."],
+    [
+      { mode: "files", filesError: "Couldn't list this folder's files: access denied" },
+      "Couldn't list this folder's files: access denied",
+    ],
+    [
+      { mode: "all", filesError: "Couldn't list this folder's files: access denied" },
+      "Couldn't list this folder's files: access denied",
+    ],
     [{ query: "d" }, "Type at least 2 characters to search every conversation."],
     [{ searchingChats: true }, "Searching conversations…"],
     [{}, "No conversation mentions that."],
