@@ -1,5 +1,6 @@
 import { toast } from "sonner";
 
+import { showError } from "@/components/ui/feedback";
 import { agentName } from "@/lib/agents/registry";
 import { candidatePaths, type PathLinkTarget } from "@/lib/terminal/links";
 import { pasteIntoTerminal } from "@/lib/terminal/registry";
@@ -66,30 +67,39 @@ const openFileAt = (workspaceId: string, path: string, line: number | null = nul
 };
 
 export const openTypedPath = async (workspace: Workspace, path: string) => {
-  const stat = await api.statPath(path).catch(() => null);
-  if (!stat) {
-    toast.error(`Can't find ${path}`);
-    return;
+  try {
+    const stat = await api.statPath(path);
+    if (!stat) {
+      toast.error(`Can't find ${path}`);
+      return;
+    }
+    if (stat.kind === "file") {
+      openFileAt(workspace.id, path);
+      return;
+    }
+    if (!isWithin(path, workspace.cwd)) {
+      void revealInExplorer(path);
+      return;
+    }
+    const explorer = useExplorerStore.getState();
+    await explorer.reveal(path, workspace.cwd);
+    explorer.expand(path);
+    useUiStore.getState().showContext("explorer");
+  } catch (error) {
+    showError(error);
   }
-  if (stat.kind === "file") {
-    openFileAt(workspace.id, path);
-    return;
-  }
-  if (!isWithin(path, workspace.cwd)) {
-    void revealInExplorer(path);
-    return;
-  }
-  const explorer = useExplorerStore.getState();
-  await explorer.reveal(path, workspace.cwd);
-  explorer.expand(path);
-  useUiStore.getState().showContext("explorer");
 };
 
 const firstExistingFile = async (paths: string[]) => {
+  let failure: unknown = null;
   for (const path of paths) {
-    const stat = await api.statPath(path).catch(() => null);
-    if (stat?.kind === "file") return path;
+    try {
+      if ((await api.statPath(path))?.kind === "file") return path;
+    } catch (error) {
+      failure ??= error;
+    }
   }
+  if (failure) throw failure;
   return null;
 };
 
@@ -97,10 +107,11 @@ export const openPathFromTerminal = async (workspaceId: string, target: PathLink
   const workspace = findWorkspace(workspaceId);
   if (!workspace) return;
   const recent = useSessionsStore.getState().byId[workspace.sessionId]?.recentCwds ?? [];
-  const path = await firstExistingFile(candidatePaths(target.raw, [...recent, workspace.cwd]));
-  if (!path) {
-    toast.error(`Can't find ${target.raw}`);
-    return;
+  try {
+    const path = await firstExistingFile(candidatePaths(target.raw, [...recent, workspace.cwd]));
+    if (path) openFileAt(workspaceId, path, target.line);
+    else toast.error(`Can't find ${target.raw}`);
+  } catch (error) {
+    showError(error);
   }
-  openFileAt(workspaceId, path, target.line);
 };

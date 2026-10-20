@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from "react";
 
+import { showError } from "@/components/ui/feedback";
 import { useSessionFile } from "@/hooks/useSessionFile";
 import { useExternalLive } from "@/hooks/useWorkspaceStatus";
 import { processStart, runningSubagents, shownTasks } from "@/lib/agent-tasks";
@@ -52,10 +53,14 @@ export const useAgentShellSync = (workspace: Workspace) => {
   useEffect(() => {
     if (!filePath || agent !== CLAUDE || !alive) return;
     let cancelled = false;
-    api
-      .sessionTasks(filePath, distro)
-      .then((tasks) => !cancelled && useAgentTasksStore.getState().setTasks(sessionId, tasks))
-      .catch(() => undefined);
+    api.sessionTasks(filePath, distro).then(
+      (tasks) => {
+        if (!cancelled) useAgentTasksStore.getState().setTasks(sessionId, tasks);
+      },
+      (error: unknown) => {
+        if (!cancelled) showError(error);
+      },
+    );
     return () => {
       cancelled = true;
     };
