@@ -62,12 +62,19 @@ export const resumeWorkspace = async (workspaceId: string, options: ResumeOption
   useWorkspaceStore.getState().launch(workspaceId);
 };
 
+const restartsInFlight = new Set<string>();
+
 export const restartWorkspaceAgent = async (workspaceId: string) => {
   const workspace = findWorkspace(workspaceId);
-  if (!workspace) return;
-  if (parseWslPath(workspace.cwd)) await useSessionsStore.getState().refreshWsl();
-  if (!(await claimSession(workspace.sessionId))) return;
-  useWorkspaceStore.getState().restartAgent(workspaceId);
+  if (!workspace || restartsInFlight.has(workspaceId)) return;
+  restartsInFlight.add(workspaceId);
+  try {
+    if (parseWslPath(workspace.cwd)) await useSessionsStore.getState().refreshWsl();
+    if (await claimSession(workspace.sessionId))
+      useWorkspaceStore.getState().restartAgent(workspaceId);
+  } finally {
+    restartsInFlight.delete(workspaceId);
+  }
 };
 
 export const resumeSession = async (session: SessionInfo) =>
