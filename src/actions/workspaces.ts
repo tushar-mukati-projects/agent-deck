@@ -17,7 +17,7 @@ import { useUiStore } from "@/stores/ui-store";
 import { dirtyPaths, useViewerStore } from "@/stores/viewer-store";
 import { workspaceTerminalIds } from "@/stores/workspace-factory";
 import { getActiveWorkspace, useWorkspaceStore } from "@/stores/workspace-store";
-import type { Workspace } from "@/types";
+import type { ShellTab, Workspace } from "@/types";
 
 const describeRunning = (workspaces: Workspace[]) => {
   const agents = aliveTerminals(workspaces.map((w) => w.agentTerminalId));
@@ -122,6 +122,24 @@ export const focusNextAttention = () => {
   const next = ordered.find((w) => w.agentTerminalId && terminals[w.agentTerminalId]?.attention);
   if (next) activate(next.id);
   else toast("No sessions are waiting for you");
+};
+
+export const killShellWithConfirm = async (workspaceId: string, shell: ShellTab, name: string) => {
+  if (useTerminalStore.getState().terminals[shell.id]?.busy) {
+    const confirmed = await useUiStore.getState().askConfirm({
+      title: `Kill ${name}?`,
+      description: "Something is still running in this shell. Killing it stops that process.",
+      confirmLabel: "Kill shell",
+      destructive: true,
+    });
+    if (!confirmed) return;
+  }
+  useWorkspaceStore.getState().closeShell(workspaceId, shell.id);
+};
+
+export const selectShell = (workspaceId: string, shellId: string) => {
+  useAgentTasksStore.getState().select(workspaceId, null);
+  useWorkspaceStore.getState().setActiveShell(workspaceId, shellId);
 };
 
 export const toggleShellPanel = () => {

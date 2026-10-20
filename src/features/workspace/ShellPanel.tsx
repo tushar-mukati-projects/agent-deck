@@ -1,5 +1,6 @@
 import { Bot, ChevronDown, Eraser, Plus, RotateCw, SquareTerminal, Trash2 } from "lucide-react";
 
+import { killShellWithConfirm, selectShell } from "@/actions/workspaces";
 import { Button } from "@/components/ui/button";
 import { StatusDot, type DotTone } from "@/components/ui/feedback";
 import { IconButton } from "@/components/ui/icon-button";
@@ -11,15 +12,13 @@ import { AgentShellView } from "@/features/workspace/AgentShellView";
 import { useAgentShells, useAgentStart } from "@/hooks/useAgentShells";
 import { terminalTone, useTerminal } from "@/hooks/useWorkspaceStatus";
 import { taskLabel, taskState, type TaskState } from "@/lib/agent-tasks";
+import { shellName, shellPath } from "@/lib/shells";
 import { shortcutLabel } from "@/lib/shortcuts";
 import { dangerHoverClass } from "@/lib/styles";
 import { clearTerminal } from "@/lib/terminal/registry";
 import { basename, cn } from "@/lib/utils";
-import { parseWslPath, shellQuote } from "@/lib/wsl";
 import { useAgentTasksStore } from "@/stores/agent-tasks-store";
 import { agentName } from "@/stores/agents";
-import { useTerminalStore } from "@/stores/terminal-store";
-import { useUiStore } from "@/stores/ui-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import type { AgentTask, ShellTab, Workspace } from "@/types";
 
@@ -30,32 +29,6 @@ const TASK_TONE: Record<TaskState, DotTone> = {
   killed: "exited",
   stopped: "exited",
   ended: "exited",
-};
-
-const shellName = (shell: ShellTab, index: number) =>
-  `${basename(shell.program).replace(/\.exe$/i, "")} ${index + 1}`;
-
-const shellPath = (path: string) => {
-  const wsl = parseWslPath(path);
-  return wsl ? `${shellQuote(wsl.linuxPath)} ` : `"${path}" `;
-};
-
-const killShellWithConfirm = async (workspaceId: string, shell: ShellTab, name: string) => {
-  if (useTerminalStore.getState().terminals[shell.id]?.busy) {
-    const confirmed = await useUiStore.getState().askConfirm({
-      title: `Kill ${name}?`,
-      description: "Something is still running in this shell. Killing it stops that process.",
-      confirmLabel: "Kill shell",
-      destructive: true,
-    });
-    if (!confirmed) return;
-  }
-  useWorkspaceStore.getState().closeShell(workspaceId, shell.id);
-};
-
-const selectShell = (workspaceId: string, shellId: string) => {
-  useAgentTasksStore.getState().select(workspaceId, null);
-  useWorkspaceStore.getState().setActiveShell(workspaceId, shellId);
 };
 
 const ShellTabButton = ({
