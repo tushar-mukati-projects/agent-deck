@@ -20,6 +20,14 @@ export interface Order {
   desc: boolean;
 }
 
+export const orderValue = (order: Order | null) =>
+  order ? `${order.column}:${order.desc ? "desc" : "asc"}` : "";
+
+export const parseOrder = (value: string): Order | null => {
+  const [column, dir] = value.split(/:(?=asc$|desc$)/);
+  return column ? { column, desc: dir === "desc" } : null;
+};
+
 export const TABLES_SQL = `select n.nspname, c.relname,
   case c.relkind when 'v' then 'view' when 'm' then 'matview' when 'f' then 'foreign' else 'table' end,
   greatest(c.reltuples, 0)::bigint

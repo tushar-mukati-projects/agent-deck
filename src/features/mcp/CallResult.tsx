@@ -1,23 +1,13 @@
 import { memo, useMemo } from "react";
 
 import { Alert } from "@/components/ui/panel";
-import { gridFromObjects, ResultGrid } from "@/features/mcp/ResultGrid";
-
-interface ContentItem {
-  type?: string;
-  text?: string;
-  data?: string;
-  mimeType?: string;
-  resource?: { uri?: string; text?: string };
-}
-
-const parseJson = (text: string) => {
-  try {
-    return JSON.parse(text) as unknown;
-  } catch {
-    return undefined;
-  }
-};
+import { ResultGrid } from "@/features/mcp/ResultGrid";
+import {
+  callResultParts,
+  gridFromObjects,
+  parseJson,
+  type ContentItem,
+} from "@/lib/mcp/results";
 
 export const TextResult = memo(({ text }: { text: string }) => {
   const { parsed, grid } = useMemo(() => {
@@ -32,9 +22,6 @@ export const TextResult = memo(({ text }: { text: string }) => {
   );
 });
 TextResult.displayName = "TextResult";
-
-const asItems = (value: unknown): ContentItem[] =>
-  Array.isArray(value) ? value.filter((v): v is ContentItem => !!v && typeof v === "object") : [];
 
 const ContentView = ({ item }: { item: ContentItem }) => {
   if (item.type === "text" && typeof item.text === "string") return <TextResult text={item.text} />;
@@ -52,18 +39,11 @@ const ContentView = ({ item }: { item: ContentItem }) => {
 };
 
 export const CallResult = memo(({ result }: { result: unknown }) => {
-  const value = (result && typeof result === "object" ? result : {}) as {
-    content?: unknown;
-    isError?: boolean;
-    structuredContent?: unknown;
-  };
-  const content = asItems(value.content);
+  const { content, isError, structured } = callResultParts(result);
   return (
     <div className="flex flex-col gap-2">
-      {value.isError && <Alert tone="danger">The tool reported an error.</Alert>}
-      {content.length === 0 && (
-        <TextResult text={JSON.stringify(value.structuredContent ?? result ?? null)} />
-      )}
+      {isError && <Alert tone="danger">The tool reported an error.</Alert>}
+      {content.length === 0 && <TextResult text={JSON.stringify(structured ?? result ?? null)} />}
       {content.map((item, index) => (
         <ContentView key={index} item={item} />
       ))}
@@ -71,10 +51,3 @@ export const CallResult = memo(({ result }: { result: unknown }) => {
   );
 });
 CallResult.displayName = "CallResult";
-
-export const resourceTexts = (value: unknown) => {
-  const contents = (value && typeof value === "object" ? value : {}) as { contents?: unknown };
-  return asItems(contents.contents).map((c) =>
-    typeof c.text === "string" ? c.text : JSON.stringify(c, null, 2),
-  );
-};

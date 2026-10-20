@@ -8,7 +8,9 @@ import { Alert } from "@/components/ui/panel";
 import { ResultGrid } from "@/features/mcp/ResultGrid";
 import {
   buildSelect,
+  orderValue,
   PAGE_SIZE,
+  parseOrder,
   type Order,
   type PgRunner,
   type TableRef,
@@ -16,14 +18,6 @@ import {
 import { isMutating } from "@/lib/sql";
 import { cn, errorMessage, plural } from "@/lib/utils";
 import type { PgResult } from "@/types";
-
-const orderValue = (order: Order | null) =>
-  order ? `${order.column}:${order.desc ? "desc" : "asc"}` : "";
-
-const parseOrder = (value: string): Order | null => {
-  const [column, dir] = value.split(/:(?=asc$|desc$)/);
-  return column ? { column, desc: dir === "desc" } : null;
-};
 
 type DataPaneProps = PgRunner & {
   table: TableRef;

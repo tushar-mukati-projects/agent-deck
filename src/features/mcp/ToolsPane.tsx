@@ -6,10 +6,11 @@ import { EmptyState, LoadingState, showError, Spinner } from "@/components/ui/fe
 import { IconButton } from "@/components/ui/icon-button";
 import { ListRow } from "@/components/ui/list-row";
 import { Alert, SearchInput, SectionLabel } from "@/components/ui/panel";
-import { resourceTexts, TextResult } from "@/features/mcp/CallResult";
+import { TextResult } from "@/features/mcp/CallResult";
 import { ToolRunner } from "@/features/mcp/ToolRunner";
 import { useAsync } from "@/hooks/useAsync";
 import { matches } from "@/lib/agent-config/filter-overview";
+import { resourceTexts } from "@/lib/mcp/results";
 import { api } from "@/lib/tauri/commands";
 import { errorMessage } from "@/lib/utils";
 import type { McpDescription, McpServer } from "@/types";

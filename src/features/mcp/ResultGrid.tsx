@@ -2,42 +2,12 @@ import { useState } from "react";
 import { Copy } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { toCsv, toJson, type Cell } from "@/lib/mcp/results";
 import { copyText } from "@/lib/tauri/system";
 import { cn, plural } from "@/lib/utils";
 
 const PAGE = 300;
 const CELL_PREVIEW = 160;
-
-type Cell = string | null;
-
-const toCsv = (columns: string[], rows: Cell[][]) => {
-  const escape = (value: Cell) => {
-    if (value === null) return "";
-    return /[",\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
-  };
-  return [columns, ...rows].map((row) => row.map(escape).join(",")).join("\n");
-};
-
-const toJson = (columns: string[], rows: Cell[][]) =>
-  JSON.stringify(
-    rows.map((row) => Object.fromEntries(columns.map((c, i) => [c, row[i]]))),
-    null,
-    2,
-  );
-
-export const gridFromObjects = (value: unknown): { columns: string[]; rows: Cell[][] } | null => {
-  if (!Array.isArray(value) || value.length === 0) return null;
-  if (!value.every((v) => v && typeof v === "object" && !Array.isArray(v))) return null;
-  const columns = [...new Set(value.flatMap((v) => Object.keys(v as object)))];
-  const rows = value.map((v) =>
-    columns.map((c) => {
-      const cell = (v as Record<string, unknown>)[c];
-      if (cell === null || cell === undefined) return null;
-      return typeof cell === "object" ? JSON.stringify(cell) : String(cell);
-    }),
-  );
-  return { columns, rows };
-};
 
 interface ResultGridProps {
   columns: string[];

@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { buildSelect, parseTables, structureSql } from "@/lib/mcp/pg-queries";
+import {
+  buildSelect,
+  orderValue,
+  parseOrder,
+  parseTables,
+  structureSql,
+} from "@/lib/mcp/pg-queries";
 import { isMutating } from "@/lib/sql";
 
 const table = { schema: "public", name: 'we"ird' };
@@ -29,5 +35,16 @@ describe("pg queries", () => {
       parseTables({ columns: [], rows: [["s", "t", null, "12"]], rowCount: 1, truncated: false }),
     ).toEqual([{ schema: "s", name: "t", kind: "table", estimate: 12 }]);
     expect(structureSql({ schema: "o'x", name: "t" })).toContain("'o''x'");
+  });
+});
+
+describe("sort order", () => {
+  it.each([
+    [null, ""],
+    [{ column: "id", desc: false }, "id:asc"],
+    [{ column: "a:desc", desc: true }, "a:desc:desc"],
+  ])("round-trips %j through %s", (order, value) => {
+    expect(orderValue(order)).toBe(value);
+    expect(parseOrder(value)).toEqual(order);
   });
 });
