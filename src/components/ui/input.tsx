@@ -1,5 +1,3 @@
-import { forwardRef } from "react";
-
 import { cn } from "@/lib/utils";
 
 const inputClass =
@@ -8,9 +6,6 @@ const inputClass =
 export const selectClass =
   "h-8 rounded-md border border-border-strong bg-bg px-2 text-xs text-fg outline-none focus:border-accent/70";
 
-export const Input = forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(
-  ({ className, ...props }, ref) => (
-    <input ref={ref} className={cn(inputClass, className)} {...props} />
-  ),
+export const Input = ({ className, ...props }: React.ComponentProps<"input">) => (
+  <input className={cn(inputClass, className)} {...props} />
 );
-Input.displayName = "Input";

@@ -1,4 +1,3 @@
-import { forwardRef } from "react";
 import { X } from "lucide-react";
 
 import { useHorizontalWheel } from "@/hooks/useHorizontalWheel";
@@ -43,7 +42,7 @@ export const TabStrip = ({ label, className, children }: TabStripProps) => {
   );
 };
 
-interface TabProps extends Omit<React.HTMLAttributes<HTMLDivElement>, "onSelect" | "title"> {
+type TabProps = Omit<React.ComponentProps<"div">, "onSelect" | "title"> & {
   selected: boolean;
   onSelect: () => void;
   onClose?: () => void;
@@ -53,82 +52,75 @@ interface TabProps extends Omit<React.HTMLAttributes<HTMLDivElement>, "onSelect"
   tabId?: string;
   controls?: string;
   tabClassName?: string;
-}
+};
 
-export const Tab = forwardRef<HTMLDivElement, TabProps>(
-  (
-    {
-      selected,
-      onSelect,
-      onClose,
-      closeLabel = "Close",
-      closeIcon,
-      title,
-      tabId,
-      controls,
+export const Tab = ({
+  selected,
+  onSelect,
+  onClose,
+  closeLabel = "Close",
+  closeIcon,
+  title,
+  tabId,
+  controls,
+  className,
+  tabClassName,
+  children,
+  ...rest
+}: TabProps) => (
+  <div
+    role="presentation"
+    onMouseDown={(e) => e.button === 1 && e.preventDefault()}
+    onAuxClick={(e) => e.button === 1 && onClose?.()}
+    className={cn(
+      "group relative flex shrink-0 items-center has-[:focus-visible]:ring-1 has-[:focus-visible]:ring-accent/70 has-[:focus-visible]:ring-inset",
       className,
-      tabClassName,
-      children,
-      ...rest
-    },
-    ref,
-  ) => (
-    <div
-      ref={ref}
-      role="presentation"
-      onMouseDown={(e) => e.button === 1 && e.preventDefault()}
-      onAuxClick={(e) => e.button === 1 && onClose?.()}
+    )}
+    {...rest}
+  >
+    <button
+      type="button"
+      role="tab"
+      id={tabId}
+      aria-selected={selected}
+      aria-controls={controls}
+      tabIndex={selected ? 0 : -1}
+      title={title}
+      onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === "Delete" && onClose) {
+          e.preventDefault();
+          onClose();
+        }
+      }}
       className={cn(
-        "group relative flex shrink-0 items-center has-[:focus-visible]:ring-1 has-[:focus-visible]:ring-accent/70 has-[:focus-visible]:ring-inset",
-        className,
+        "flex min-w-0 flex-1 items-center gap-1.5 self-stretch text-left outline-none",
+        tabClassName,
       )}
-      {...rest}
     >
+      {children}
+    </button>
+    {onClose && (
       <button
         type="button"
-        role="tab"
-        id={tabId}
-        aria-selected={selected}
-        aria-controls={controls}
-        tabIndex={selected ? 0 : -1}
-        title={title}
-        onClick={onSelect}
-        onKeyDown={(e) => {
-          if (e.key === "Delete" && onClose) {
-            e.preventDefault();
-            onClose();
-          }
+        tabIndex={-1}
+        aria-label={closeLabel}
+        onClick={(e) => {
+          e.stopPropagation();
+          onClose();
         }}
         className={cn(
-          "flex min-w-0 flex-1 items-center gap-1.5 self-stretch text-left outline-none",
-          tabClassName,
+          "flex size-5 shrink-0 items-center justify-center rounded text-faint hover:bg-active hover:text-fg",
+          !closeIcon &&
+            !selected &&
+            "opacity-0 group-focus-within:opacity-100 group-hover:opacity-100",
         )}
       >
-        {children}
+        {closeIcon ?? <X className="size-3" />}
       </button>
-      {onClose && (
-        <button
-          type="button"
-          tabIndex={-1}
-          aria-label={closeLabel}
-          onClick={(e) => {
-            e.stopPropagation();
-            onClose();
-          }}
-          className={cn(
-            "flex size-5 shrink-0 items-center justify-center rounded text-faint hover:bg-active hover:text-fg",
-            !closeIcon &&
-              !selected &&
-              "opacity-0 group-focus-within:opacity-100 group-hover:opacity-100",
-          )}
-        >
-          {closeIcon ?? <X className="size-3" />}
-        </button>
-      )}
-    </div>
-  ),
+    )}
+  </div>
 );
-Tab.displayName = "Tab";
 
 export const panelTabClass = (active: boolean) =>
   cn(
