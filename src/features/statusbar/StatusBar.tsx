@@ -4,6 +4,7 @@ import { useShallow } from "zustand/react/shallow";
 import { focusNextAttention, toggleShellPanel } from "@/actions/workspaces";
 import { StatusDot } from "@/components/ui/feedback";
 import { DeckPet } from "@/features/statusbar/DeckPet";
+import { agentCounts } from "@/lib/agent-counts";
 import { shortcutLabel } from "@/lib/shortcuts";
 import { copyText } from "@/lib/tauri/system";
 import { plural, shortenHome } from "@/lib/utils";
@@ -13,7 +14,7 @@ import { useTerminalStore } from "@/stores/terminal-store";
 import { useUiStore } from "@/stores/ui-store";
 import { useActiveWorkspace } from "@/stores/workspace-store";
 import { useAgentShells, useSubagents } from "@/hooks/useAgentShells";
-import type { TerminalState, Workspace } from "@/types";
+import type { Workspace } from "@/types";
 
 const Item = ({
   children,
@@ -34,17 +35,6 @@ const Item = ({
     {children}
   </button>
 );
-
-const agentCounts = (terminals: Record<string, TerminalState>) => {
-  const agents = Object.values(terminals).filter(
-    (t) => t.kind === "agent" && t.status === "running",
-  );
-  return [
-    agents.length,
-    agents.filter((t) => t.busy).length,
-    agents.filter((t) => t.attention).length,
-  ];
-};
 
 const ShellItem = ({ workspace }: { workspace: Workspace }) => {
   const agentRunning = useAgentShells(workspace).filter((t) => t.status === "running").length;
