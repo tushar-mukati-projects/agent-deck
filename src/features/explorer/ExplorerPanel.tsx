@@ -3,12 +3,15 @@ import {
   ChevronsDownUp,
   Eye,
   EyeOff,
+  FilePlus,
   FolderOpen,
+  FolderPlus,
   FolderTree,
   RefreshCw,
   Search,
 } from "lucide-react";
 
+import { askNewEntry } from "@/actions/entries";
 import { EmptyState, LoadingState } from "@/components/ui/feedback";
 import { IconButton } from "@/components/ui/icon-button";
 import { PanelHeader } from "@/components/ui/panel-header";
@@ -60,6 +63,12 @@ export const ExplorerPanel = () => {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <PanelHeader title={basename(root)}>
+        <IconButton label="New file" onClick={() => askNewEntry(workspace, root, false)}>
+          <FilePlus />
+        </IconButton>
+        <IconButton label="New folder" onClick={() => askNewEntry(workspace, root, true)}>
+          <FolderPlus />
+        </IconButton>
         <IconButton
           label="Find file or folder"
           shortcut={shortcutLabel("quickOpen")}

@@ -105,6 +105,10 @@ export const api = {
   statPath: (path: string) => invoke<PathStat | null>("stat_path", { path }),
   readTail: (path: string, maxBytes: number) => invoke<FileTail>("read_tail", { path, maxBytes }),
   listFiles: (root: string) => invoke<string[]>("list_files", { root }),
+  createEntry: (dir: string, name: string, isDir: boolean) =>
+    invoke<string>("create_entry", { dir, name, isDir }),
+  renameEntry: (path: string, name: string) => invoke<string>("rename_entry", { path, name }),
+  deleteEntry: (path: string) => invoke<void>("delete_entry", { path }),
   openInEditor: (path: string) => invoke<void>("open_in_editor", { path }),
   openPath: (path: string) => invoke<void>("open_path", { path }),
   revealPath: (path: string) => invoke<void>("reveal_path", { path }),

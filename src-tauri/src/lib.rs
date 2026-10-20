@@ -3,6 +3,7 @@ mod badge;
 mod changes;
 mod codex;
 mod commands;
+mod entries;
 mod file_protocol;
 mod fsx;
 mod git;
@@ -99,6 +100,9 @@ pub fn run() -> tauri::Result<()> {
             commands::read_tail,
             commands::session_tasks,
             commands::list_files,
+            commands::create_entry,
+            commands::rename_entry,
+            commands::delete_entry,
             commands::open_in_editor,
             commands::open_path,
             commands::reveal_path,

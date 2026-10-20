@@ -2,7 +2,7 @@ use serde::Serialize;
 use tauri::{ipc::Channel, AppHandle, Manager};
 
 use crate::{
-    agent_config, badge, changes, fsx, git, hide_mode,
+    agent_config, badge, changes, entries, fsx, git, hide_mode,
     mcp::{self, McpManager},
     notes, phone, process,
     pg::{self, PgManager},
@@ -318,6 +318,21 @@ pub async fn stat_path(path: String) -> CmdResult<Option<fsx::PathStat>> {
 #[tauri::command]
 pub async fn list_files(root: String) -> CmdResult<Vec<String>> {
     blocking(move || on_host(&root, wsl::list_files, || fsx::list_files(&root))).await
+}
+
+#[tauri::command]
+pub async fn create_entry(dir: String, name: String, is_dir: bool) -> CmdResult<String> {
+    blocking(move || entries::create(&dir, &name, is_dir)).await
+}
+
+#[tauri::command]
+pub async fn rename_entry(path: String, name: String) -> CmdResult<String> {
+    blocking(move || entries::rename(&path, &name)).await
+}
+
+#[tauri::command]
+pub async fn delete_entry(path: String) -> CmdResult<()> {
+    blocking(move || entries::delete(&path)).await
 }
 
 #[tauri::command]

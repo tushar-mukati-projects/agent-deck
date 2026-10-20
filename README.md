@@ -16,7 +16,7 @@ You need Windows 10 or 11 (x64) and Claude Code or Codex on your PATH. WSL sessi
 - Sessions from Windows and every running WSL distro, grouped by folder.
 - Read a session without starting it, then resume or fork it. Search inside every conversation.
 - Several sessions at once, one per tab, each in a real terminal with its own shells.
-- A file explorer, a code viewer and editor, and the agent's changes as diffs.
+- A file explorer where you can create, rename and delete files and folders, a code viewer and editor, and the agent's changes as diffs.
 - The agent's config in one place: memory files, MCP servers, skills, hooks, permissions and plugins.
 - Alerts when an agent finishes or needs approval, plus notes, a command palette and 15 themes.
 - Claude Code, Codex and any other CLI agent you add in Settings.

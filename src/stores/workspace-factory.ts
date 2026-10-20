@@ -1,5 +1,6 @@
 import { adoptSessions } from "@/lib/adopt";
-import { basename, neighborAt, samePath } from "@/lib/utils";
+import { movedPath } from "@/lib/entries";
+import { basename, isWithin, neighborAt, samePath } from "@/lib/utils";
 import type { SessionInfo, Workspace } from "@/types";
 
 type WorkspaceSeed = Pick<Workspace, "id" | "sessionId" | "cwd" | "title" | "filePath"> &
@@ -92,6 +93,15 @@ export const openFileFields = (workspace: Workspace, path: string) => ({
     : [...workspace.openFiles, path],
   activeFile: path,
 });
+
+export const withMovedFiles = (workspace: Workspace, from: string, to: string) =>
+  workspace.openFiles.some((f) => isWithin(f, from))
+    ? {
+        ...workspace,
+        openFiles: workspace.openFiles.map((f) => movedPath(f, from, to)),
+        activeFile: workspace.activeFile && movedPath(workspace.activeFile, from, to),
+      }
+    : workspace;
 
 export const closeFileFields = (workspace: Workspace, path: string) => {
   const index = workspace.openFiles.findIndex((f) => samePath(f, path));

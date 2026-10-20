@@ -6,6 +6,7 @@ import { ResizeHandle } from "@/components/ui/resize-handle";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { NotesDialog } from "@/features/notes/NotesDialog";
 import { CommandPalette } from "@/features/palette/CommandPalette";
+import { EntryDialog } from "@/features/explorer/EntryDialog";
 import { ConfirmDialog } from "@/features/settings/ConfirmDialog";
 import { SettingsDialog } from "@/features/settings/SettingsDialog";
 import { ShortcutsDialog } from "@/features/shortcuts/ShortcutsDialog";
@@ -97,6 +98,7 @@ export const App = () => {
       <SettingsDialog />
       <ConfirmDialog />
       <RenameDialog />
+      <EntryDialog />
       <ShortcutsDialog />
       <NotesDialog />
       <Toaster

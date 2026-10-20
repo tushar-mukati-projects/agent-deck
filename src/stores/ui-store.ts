@@ -19,6 +19,10 @@ interface ConfirmRequest {
 
 export type SidePanel = "sessions" | "context";
 
+export type EntryRequest =
+  | { kind: "create"; workspaceId: string; root: string; dir: string; isDir: boolean }
+  | { kind: "rename"; workspaceId: string; path: string; isDir: boolean };
+
 interface UiState {
   sessionsOpen: boolean;
   sessionsWidth: number;
@@ -34,6 +38,7 @@ interface UiState {
   notesOpen: boolean;
   confirm: ConfirmRequest | null;
   renameTarget: SessionInfo | null;
+  entryRequest: EntryRequest | null;
   setSessionsOpen: (open: boolean) => void;
   toggleSessions: () => void;
   setContextOpen: (open: boolean) => void;
@@ -46,6 +51,7 @@ interface UiState {
   setShortcutsOpen: (open: boolean) => void;
   setNotesOpen: (open: boolean) => void;
   setRenameTarget: (session: SessionInfo | null) => void;
+  setEntryRequest: (request: EntryRequest | null) => void;
   askConfirm: (request: Omit<ConfirmRequest, "resolve">) => Promise<boolean>;
   resolveConfirm: (confirmed: boolean) => void;
 }
@@ -68,6 +74,7 @@ export const useUiStore = create<UiState>()(
       notesOpen: false,
       confirm: null,
       renameTarget: null,
+      entryRequest: null,
       setSessionsOpen: (open) => set({ sessionsOpen: open }),
       toggleSessions: () => set((s) => ({ sessionsOpen: !s.sessionsOpen })),
       setContextOpen: (open) => set({ contextOpen: open }),
@@ -85,6 +92,7 @@ export const useUiStore = create<UiState>()(
       setShortcutsOpen: (open) => set({ shortcutsOpen: open }),
       setNotesOpen: (open) => set({ notesOpen: open }),
       setRenameTarget: (session) => set({ renameTarget: session }),
+      setEntryRequest: (request) => set({ entryRequest: request }),
       askConfirm: (request) =>
         new Promise<boolean>((resolve) => {
           get().confirm?.resolve(false);

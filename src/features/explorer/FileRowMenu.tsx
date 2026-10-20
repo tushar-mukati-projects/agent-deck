@@ -9,6 +9,7 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/menu";
+import { entryActions } from "@/features/explorer/entry-actions";
 import { actionItems, copyActions, openActions } from "@/features/viewer/file-actions";
 import { agentName } from "@/stores/agents";
 import { useWorkspaceStore } from "@/stores/workspace-store";
@@ -52,6 +53,8 @@ export const FileRowMenu = ({ entry, workspace, children }: FileRowMenuProps) =>
           </ContextMenuItem>
         </>
       )}
+      <ContextMenuSeparator />
+      {actionItems(entryActions(entry, workspace), ContextMenuItem)}
       <ContextMenuSeparator />
       {actionItems(openActions(entry.path, entry.isDir), ContextMenuItem)}
       <ContextMenuSeparator />

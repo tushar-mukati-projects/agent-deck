@@ -32,6 +32,7 @@ import {
   movedWorkspace,
   openFileFields,
   syncedWorkspaces,
+  withMovedFiles,
   workspaceFromSession,
   workspaceTerminalIds,
 } from "@/stores/workspace-factory";
@@ -59,6 +60,7 @@ interface WorkspaceState {
   collapseShellPanel: (workspaceId: string) => void;
   openFile: (workspaceId: string, path: string) => void;
   closeFile: (workspaceId: string, path: string) => void;
+  movePaths: (from: string, to: string) => void;
   setActiveFile: (workspaceId: string, path: string) => void;
   syncSessions: (byId: Record<string, SessionInfo>) => void;
   restore: () => void;
@@ -300,6 +302,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         openFile: (workspaceId, path) => patch(workspaceId, (w) => openFileFields(w, path)),
 
         closeFile: (workspaceId, path) => patch(workspaceId, (w) => closeFileFields(w, path)),
+
+        movePaths: (from, to) =>
+          set((s) => ({ workspaces: s.workspaces.map((w) => withMovedFiles(w, from, to)) })),
 
         setActiveFile: (workspaceId, path) => patch(workspaceId, () => ({ activeFile: path })),
 
