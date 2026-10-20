@@ -374,8 +374,11 @@ impl PtyManager {
     }
 
     pub fn kill(&self, id: &str) {
+        let slot = self.spawning.lock().get(id).cloned();
+        let spawning = slot.as_ref().map(|slot| slot.lock());
         let removed = self.processes.lock().remove(id);
         self.spawning.lock().remove(id);
+        drop(spawning);
         if let Some(process) = removed {
             process.stop();
         }
