@@ -10,7 +10,7 @@ import {
   type NoteEntry,
 } from "@/lib/notes";
 import { api } from "@/lib/tauri/commands";
-import { errorMessage } from "@/lib/utils";
+import { failedTo } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
 
 interface NotesState {
@@ -30,8 +30,8 @@ let timer: number | undefined;
 let pendingId: string | null = null;
 let queue: Promise<void> = Promise.resolve();
 
-const enqueue = (work: () => Promise<void>, failure: string) => {
-  queue = queue.then(work).catch((error) => void toast.error(`${failure}: ${errorMessage(error)}`));
+const enqueue = (work: () => Promise<void>, action: string) => {
+  queue = queue.then(work).catch((error) => void toast.error(failedTo(action, error)));
   return queue;
 };
 
@@ -48,7 +48,7 @@ const save = (id: string) => {
     const modifiedMs = await api.saveNote(id, text);
     const current = useNotesStore.getState().notes.find((n) => n.id === id);
     patch(id, { stored: true, modifiedMs, dirty: current?.text !== text });
-  }, "Couldn't save the note");
+  }, "save the note");
 };
 
 const cancelPending = () => {
@@ -82,7 +82,7 @@ export const loadNotes = async () => {
     const merged = [...unsaved, ...stored.filter((note) => !unsaved.some((u) => u.id === note.id))];
     showNotes(merged);
   } catch (error) {
-    toast.error(`Couldn't load notes: ${errorMessage(error)}`);
+    toast.error(failedTo("load notes", error));
     showNotes(useNotesStore.getState().notes);
   }
 };
@@ -131,11 +131,11 @@ export const deleteNote = async (id: string) => {
   if (!confirmed) return;
   if (pendingId === id) cancelPending();
   useNotesStore.setState((s) => withoutNote(s.notes, s.activeId, id));
-  await enqueue(() => api.deleteNote(id), "Couldn't delete the note");
+  await enqueue(() => api.deleteNote(id), "delete the note");
 };
 
 export const openNotesFolder = () =>
-  enqueue(async () => api.openPath(await api.notesFolder()), "Couldn't open the notes folder");
+  enqueue(async () => api.openPath(await api.notesFolder()), "open the notes folder");
 
 export const closeNotes = () => {
   void flushNotes();

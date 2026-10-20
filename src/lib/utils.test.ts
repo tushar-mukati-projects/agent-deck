@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  failedTo,
   formatBytes,
   groupBy,
   isWithin,
@@ -95,5 +96,15 @@ describe("groupBy", () => {
 
   it("returns an empty map for no items", () => {
     expect(groupBy([], (id: string) => id).size).toBe(0);
+  });
+});
+
+describe("failedTo", () => {
+  it.each([
+    [new Error("disk full"), "Couldn't save the note: disk full"],
+    ["access denied", "Couldn't save the note: access denied"],
+    [42, "Couldn't save the note: Something went wrong"],
+  ])("describes %j", (error, text) => {
+    expect(failedTo("save the note", error)).toBe(text);
   });
 });

@@ -166,3 +166,6 @@ export const errorMessage = (error: unknown) =>
     : typeof error === "string"
       ? error
       : "Something went wrong";
+
+export const failedTo = (action: string, error: unknown) =>
+  `Couldn't ${action}: ${errorMessage(error)}`;

@@ -6,7 +6,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { CLAUDE } from "@/lib/agents/registry";
 import { api } from "@/lib/tauri/commands";
-import { errorMessage } from "@/lib/utils";
+import { failedTo } from "@/lib/utils";
 import { agentName } from "@/stores/agents";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -36,7 +36,7 @@ const RenameForm = ({
       const sessions = useSessionsStore.getState();
       void (target.distro ? sessions.refreshWsl() : sessions.refresh());
     } catch (error) {
-      toast.error(`Couldn't rename: ${errorMessage(error)}`);
+      toast.error(failedTo("rename", error));
     } finally {
       setSaving(false);
     }

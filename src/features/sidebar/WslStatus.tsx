@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/feedback";
 import { Alert } from "@/components/ui/panel";
-import { errorMessage } from "@/lib/utils";
+import { failedTo } from "@/lib/utils";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore } from "@/stores/settings-store";
 
@@ -17,7 +17,7 @@ const useStartDistro = () => {
       await useSessionsStore.getState().startDistro(name);
       return true;
     } catch (error) {
-      toast.error(`Couldn't start WSL ${name}: ${errorMessage(error)}`);
+      toast.error(failedTo(`start WSL ${name}`, error));
       return false;
     } finally {
       setStarting(null);

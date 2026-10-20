@@ -4,7 +4,7 @@ import { SUBAGENT_NAME } from "@/lib/agents/registry";
 import { openElsewhere, sessionTitle } from "@/lib/sessions";
 import { api } from "@/lib/tauri/commands";
 import { pickFolder } from "@/lib/tauri/system";
-import { errorMessage, plural } from "@/lib/utils";
+import { errorMessage, failedTo, plural } from "@/lib/utils";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { isTerminalAlive, terminalPids } from "@/stores/terminal-store";
@@ -28,7 +28,7 @@ const closeElsewhere = async (live: LiveSession) => {
     await useSessionsStore.getState().refreshLive();
     return true;
   } catch (error) {
-    toast.error(`Couldn't close the other copy: ${errorMessage(error)}`);
+    toast.error(failedTo("close the other copy", error));
     return false;
   }
 };
