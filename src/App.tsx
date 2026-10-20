@@ -2,6 +2,7 @@ import { Group, Panel } from "react-resizable-panels";
 import { Toaster } from "sonner";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { ResizeHandle } from "@/components/ui/resize-handle";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { NotesDialog } from "@/features/notes/NotesDialog";
 import { CommandPalette } from "@/features/palette/CommandPalette";
@@ -14,7 +15,7 @@ import { ContextPanel } from "@/features/sidebar/Sidebar";
 import { StatusBar } from "@/features/statusbar/StatusBar";
 import { TitleBar } from "@/features/titlebar/TitleBar";
 import { Welcome } from "@/features/welcome/Welcome";
-import { ResizeHandle, WorkspaceView } from "@/features/workspace/WorkspaceView";
+import { WorkspaceView } from "@/features/workspace/WorkspaceView";
 import { useAgentThemeSync } from "@/hooks/useAgentThemeSync";
 import { useAppEvents } from "@/hooks/useAppEvents";
 import { useAttentionAlerts } from "@/hooks/useAttentionAlerts";

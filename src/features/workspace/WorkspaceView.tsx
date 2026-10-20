@@ -15,8 +15,6 @@ import { useUiStore } from "@/stores/ui-store";
 import { useWorkspace, useWorkspaceStore } from "@/stores/workspace-store";
 import type { Workspace } from "@/types";
 
-export { ResizeHandle } from "@/components/ui/resize-handle";
-
 const useSavedLayout = (id: string, panelIds: string[]) =>
   useDefaultLayout({ id, panelIds, onlySaveAfterUserInteractions: true });
 
