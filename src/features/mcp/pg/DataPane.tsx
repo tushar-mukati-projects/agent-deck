@@ -3,13 +3,19 @@ import { ArrowDown, ArrowUp, Square } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/feedback";
-import { Input } from "@/components/ui/input";
+import { Input, selectClass } from "@/components/ui/input";
 import { Alert } from "@/components/ui/panel";
 import { ResultGrid } from "@/features/mcp/ResultGrid";
-import { buildSelect, PAGE_SIZE, type Order, type TableRef } from "@/lib/mcp/pg-queries";
+import {
+  buildSelect,
+  PAGE_SIZE,
+  type Order,
+  type PgRunner,
+  type TableRef,
+} from "@/lib/mcp/pg-queries";
 import { isMutating } from "@/lib/sql";
-import { errorMessage, plural } from "@/lib/utils";
-import type { PgOutput, PgResult } from "@/types";
+import { cn, errorMessage, plural } from "@/lib/utils";
+import type { PgResult } from "@/types";
 
 const orderValue = (order: Order | null) =>
   order ? `${order.column}:${order.desc ? "desc" : "asc"}` : "";
@@ -19,15 +25,11 @@ const parseOrder = (value: string): Order | null => {
   return column ? { column, desc: dir === "desc" } : null;
 };
 
-export const DataPane = ({
-  table,
-  run,
-  cancel,
-}: {
+type DataPaneProps = PgRunner & {
   table: TableRef;
-  run: (sql: string) => Promise<PgOutput>;
-  cancel: () => void;
-}) => {
+};
+
+export const DataPane = ({ table, run, cancel }: DataPaneProps) => {
   const [page, setPage] = useState(0);
   const [order, setOrder] = useState<Order | null>(null);
   const [where, setWhere] = useState("");
@@ -93,7 +95,7 @@ export const DataPane = ({
               setPage(0);
               setOrder(parseOrder(e.target.value));
             }}
-            className="h-7 max-w-[200px] rounded-md border border-border bg-bg px-1.5 text-[11.5px] text-fg outline-none"
+            className={cn(selectClass, "h-7 max-w-[200px] border-border px-1.5 text-[11.5px]")}
           >
             <option value="">No sorting</option>
             {result.columns.flatMap((c) => [

@@ -2,18 +2,15 @@ import { LoadingState } from "@/components/ui/feedback";
 import { Alert, SectionLabel } from "@/components/ui/panel";
 import { ResultGrid } from "@/features/mcp/ResultGrid";
 import { useAsync } from "@/hooks/useAsync";
-import { structureSql, type TableRef } from "@/lib/mcp/pg-queries";
-import type { PgOutput } from "@/types";
+import { structureSql, type PgRunner, type TableRef } from "@/lib/mcp/pg-queries";
 
 const TITLES = ["Columns", "Indexes", "Constraints"];
 
-export const StructurePane = ({
-  table,
-  run,
-}: {
+type StructurePaneProps = Pick<PgRunner, "run"> & {
   table: TableRef;
-  run: (sql: string) => Promise<PgOutput>;
-}) => {
+};
+
+export const StructurePane = ({ table, run }: StructurePaneProps) => {
   const { data, error } = useAsync(() => run(structureSql(table)), [table, run]);
 
   if (error)

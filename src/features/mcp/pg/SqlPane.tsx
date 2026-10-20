@@ -11,6 +11,7 @@ import { CodeView } from "@/features/viewer/CodeView";
 import { isMutating } from "@/lib/sql";
 import { errorMessage, failedTo, plural } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
+import type { PgRunner } from "@/lib/mcp/pg-queries";
 import type { PgOutput } from "@/types";
 
 const DEFAULT_SQL = "select now();";
@@ -44,15 +45,11 @@ const confirmMutation = () =>
     destructive: true,
   });
 
-export const SqlPane = ({
-  serverId,
-  run,
-  cancel,
-}: {
+type SqlPaneProps = PgRunner & {
   serverId: string;
-  run: (sql: string) => Promise<PgOutput>;
-  cancel: () => void;
-}) => {
+};
+
+export const SqlPane = ({ serverId, run, cancel }: SqlPaneProps) => {
   const [sql, setSql] = useSqlDraft(serverId);
   const [output, setOutput] = useState<PgOutput | null>(null);
   const [error, setError] = useState<string | null>(null);

@@ -1,5 +1,5 @@
 import { quoteIdent, quoteLiteral } from "@/lib/sql";
-import type { PgResult } from "@/types";
+import type { PgOutput, PgResult } from "@/types";
 
 export const PAGE_SIZE = 100;
 
@@ -9,6 +9,11 @@ export interface TableRef {
   kind: string;
   estimate: number;
 }
+
+export type PgRunner = {
+  run: (sql: string) => Promise<PgOutput>;
+  cancel: () => void;
+};
 
 export interface Order {
   column: string;
