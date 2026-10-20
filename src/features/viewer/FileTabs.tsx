@@ -12,6 +12,7 @@ import {
 import { Tab, TabStrip } from "@/components/ui/tabs";
 import { fileActions } from "@/features/viewer/file-actions";
 import { decodeDiffTab, decodeMcpTab, tabTargetPath } from "@/lib/diff-tabs";
+import { scrollIntoViewNearest } from "@/lib/dom";
 import { FileIcon } from "@/lib/file-icons";
 import { DECK_PATH_MIME } from "@/lib/terminal/input";
 import { basename, cn, normalizePath, samePath } from "@/lib/utils";
@@ -92,7 +93,7 @@ const FileTab = ({ workspace, tab }: { workspace: Workspace; tab: string }) => {
   const label = tabLabel(tab);
 
   useEffect(() => {
-    if (active) ref.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    if (active) scrollIntoViewNearest(ref.current);
   }, [active]);
 
   return (

@@ -5,6 +5,7 @@ import { StatusDot, type DotTone } from "@/components/ui/feedback";
 import { IconButton } from "@/components/ui/icon-button";
 import { Alert } from "@/components/ui/panel";
 import { panelTabClass, Tab, TabStrip } from "@/components/ui/tabs";
+import { Tag } from "@/components/ui/tag";
 import { TerminalView } from "@/features/terminal/TerminalView";
 import { AgentShellView } from "@/features/workspace/AgentShellView";
 import { useAgentShells, useAgentStart } from "@/hooks/useAgentShells";
@@ -108,9 +109,9 @@ const AgentShellTab = ({
     <StatusDot tone={TASK_TONE[state]} className="size-1.5" />
     <Bot className="size-3 shrink-0 text-info" />
     <span className="max-w-[200px] truncate">{taskLabel(task)}</span>
-    <span className="shrink-0 rounded border border-info/35 bg-info/10 px-1 text-[9px] leading-[13px] font-semibold tracking-wide text-info uppercase">
+    <Tag tone="info" className="text-[9px] leading-[13px] uppercase">
       agent
-    </span>
+    </Tag>
   </Tab>
 );
 

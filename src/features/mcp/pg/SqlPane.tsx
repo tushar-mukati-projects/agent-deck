@@ -9,7 +9,7 @@ import { Kbd } from "@/components/ui/kbd";
 import { ResultGrid } from "@/features/mcp/ResultGrid";
 import { CodeView } from "@/features/viewer/CodeView";
 import { isMutating } from "@/lib/sql";
-import { errorMessage, plural } from "@/lib/utils";
+import { errorMessage, failedTo, plural } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
 import type { PgOutput } from "@/types";
 
@@ -25,7 +25,7 @@ const useSqlDraft = (serverId: string) => {
       try {
         localStorage.setItem(draftKey(serverId), value);
       } catch (error) {
-        toast.error(`Couldn't save the SQL draft: ${errorMessage(error)}`, {
+        toast.error(failedTo("save the SQL draft", error), {
           id: draftKey(serverId),
         });
       }

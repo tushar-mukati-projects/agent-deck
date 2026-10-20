@@ -5,20 +5,16 @@ import { Hint } from "@/components/ui/feedback";
 import { Chevron, SearchInput } from "@/components/ui/panel";
 import { useToggleSet } from "@/hooks/useToggleSet";
 import { tableKey, type TableRef } from "@/lib/mcp/pg-queries";
-import { cn } from "@/lib/utils";
+import { cn, groupBy } from "@/lib/utils";
 
 const RENDER_LIMIT = 400;
 
-const groupBySchema = (tables: TableRef[], needle: string) => {
-  const groups = new Map<string, TableRef[]>();
-  for (const table of tables) {
-    if (needle && !tableKey(table).toLowerCase().includes(needle)) continue;
-    const list = groups.get(table.schema);
-    if (list) list.push(table);
-    else groups.set(table.schema, [table]);
-  }
-  return [...groups.entries()];
-};
+const groupBySchema = (tables: TableRef[], needle: string) => [
+  ...groupBy(
+    tables.filter((table) => !needle || tableKey(table).toLowerCase().includes(needle)),
+    (table) => table.schema,
+  ).entries(),
+];
 
 export const TableList = ({
   tables,

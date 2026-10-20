@@ -2,7 +2,7 @@ import { toast } from "sonner";
 
 import type { RemovalRequest } from "@/lib/agent-config/removals";
 import { api } from "@/lib/tauri/commands";
-import { errorMessage, isWithin } from "@/lib/utils";
+import { failedTo, isWithin } from "@/lib/utils";
 import { refreshOverview } from "@/stores/overview-store";
 import { useUiStore } from "@/stores/ui-store";
 import { findWorkspace, useWorkspaceStore } from "@/stores/workspace-store";
@@ -30,7 +30,7 @@ export const removeConfig = async (
   try {
     await api.removeAgentConfig(workspace.cwd, agent, removal);
   } catch (error) {
-    toast.error(`Couldn't remove ${name}: ${errorMessage(error)}`);
+    toast.error(failedTo(`remove ${name}`, error));
     return;
   }
   if (closes) closeTabs(workspace.id, closes);

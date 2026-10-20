@@ -17,7 +17,7 @@ import { useFileContent, useFileVersion } from "@/features/viewer/useFileContent
 import { decodeDiffTab, decodeMcpTab } from "@/lib/diff-tabs";
 import { api } from "@/lib/tauri/commands";
 import { assetUrl, openExternal } from "@/lib/tauri/system";
-import { basename, dirname, errorMessage, normalizePath, samePath } from "@/lib/utils";
+import { basename, dirname, failedTo, normalizePath, samePath } from "@/lib/utils";
 import { isTextKind, viewKind, type ViewKind } from "@/lib/view-kind";
 import { useUiStore } from "@/stores/ui-store";
 import { useViewerStore } from "@/stores/viewer-store";
@@ -36,7 +36,7 @@ const MediaFile = ({ path, kind }: { path: string; kind: MediaKind }) => {
   const version = useFileVersion(path);
   const src = version ? `${assetUrl(path)}?v=${version}` : assetUrl(path);
   if (kind === "pdf")
-    return <iframe title={basename(path)} src={src} className="h-full w-full border-0 bg-white" />;
+    return <iframe title={basename(path)} src={src} className="h-full w-full border-0 bg-paper" />;
   return (
     <MediaFrame>
       {kind === "image" && (
@@ -112,7 +112,7 @@ const DocumentBody = ({ workspace, path }: { workspace: Workspace; path: string 
       if (useViewerStore.getState().drafts[key] === current) setDraft(path, null);
       toast.success(`Saved ${basename(path)}`);
     } catch (error) {
-      toast.error(`Couldn't save: ${errorMessage(error)}`);
+      toast.error(failedTo("save", error));
     } finally {
       savingRef.current = false;
     }
