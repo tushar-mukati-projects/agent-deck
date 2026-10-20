@@ -162,7 +162,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           }
           const launch = launchEnvironment();
           if (!isPersisted(source, launch.sessions)) {
-            toast.error("Nothing to fork yet — send a prompt in this session first.");
+            toast.error("Nothing to fork yet. Send a prompt in this session first.");
             return;
           }
           const plan = planLaunch(source, launch, { fork: true });
