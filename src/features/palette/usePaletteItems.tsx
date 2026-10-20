@@ -47,7 +47,7 @@ import { copyText, revealInExplorer } from "@/lib/tauri/system";
 import { resumeCommandLine } from "@/lib/agents/launch";
 import { THEMES } from "@/lib/themes";
 import { parseTypedPath } from "@/lib/typed-path";
-import { basename, joinPath, normalizePath, shortenHome, timeAgo } from "@/lib/utils";
+import { basename, groupBy, joinPath, normalizePath, shortenHome, timeAgo } from "@/lib/utils";
 import { agentName, findAgent, listAgents } from "@/stores/agents";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -302,16 +302,6 @@ const topFiles = (files: PreparedFile[], query: string, limit: number) => {
   return { top, matched };
 };
 
-const groupBySession = (hits: SearchHit[]) => {
-  const groups = new Map<string, SearchHit[]>();
-  for (const hit of hits) {
-    const group = groups.get(hit.sessionId);
-    if (group) group.push(hit);
-    else groups.set(hit.sessionId, [hit]);
-  }
-  return [...groups.values()].flat();
-};
-
 export const usePaletteItems = (mode: PaletteMode, liveQuery: string) => {
   const rawQuery = useDeferredValue(liveQuery);
   const sessions = useSessionsStore((s) => s.sessions);
@@ -376,7 +366,8 @@ export const usePaletteItems = (mode: PaletteMode, liveQuery: string) => {
     };
 
     const chatItems = (): PaletteItem[] =>
-      groupBySession(chats.hits ?? [])
+      [...groupBy(chats.hits ?? [], (hit) => hit.sessionId).values()]
+        .flat()
         .slice(0, CHAT_HIT_LIMIT)
         .flatMap((hit, index) => {
           const session = byId[hit.sessionId];

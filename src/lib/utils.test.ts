@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   formatBytes,
+  groupBy,
   isWithin,
   normalizePath,
   relativePath,
@@ -79,5 +80,20 @@ describe("shortTimeAgo", () => {
     expect(ago(65 * 86_400_000)).toBe("2mo");
     expect(ago(800 * 86_400_000)).toBe("2y");
     expect(shortTimeAgo(now + 5_000, now)).toBe("now");
+  });
+});
+
+describe("groupBy", () => {
+  it("keeps the first-seen order of keys and of items within a key", () => {
+    const groups = groupBy(["b1", "a1", "b2", "c1", "a2"], (id) => id[0]);
+    expect([...groups.entries()]).toEqual([
+      ["b", ["b1", "b2"]],
+      ["a", ["a1", "a2"]],
+      ["c", ["c1"]],
+    ]);
+  });
+
+  it("returns an empty map for no items", () => {
+    expect(groupBy([], (id: string) => id).size).toBe(0);
   });
 });
