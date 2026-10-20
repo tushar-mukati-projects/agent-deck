@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { FileText, Power, Wrench } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { ErrorAlert } from "@/components/ui/error-alert";
 import { EmptyState, LoadingState, showError, Spinner } from "@/components/ui/feedback";
 import { IconButton } from "@/components/ui/icon-button";
 import { ListRow } from "@/components/ui/list-row";
@@ -83,16 +83,10 @@ export const ToolsPane = ({ cwd, server }: { cwd: string; server: McpServer }) =
   if (!description)
     return (
       <div className="p-4">
-        <Alert
-          tone="danger"
-          action={
-            <Button size="sm" variant="ghost" onClick={() => void connect()}>
-              Retry
-            </Button>
-          }
-        >
-          <span className="whitespace-pre-wrap">{error ?? "Couldn't connect to the server."}</span>
-        </Alert>
+        <ErrorAlert
+          message={error ?? "Couldn't connect to the server."}
+          onRetry={() => void connect()}
+        />
       </div>
     );
 

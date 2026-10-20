@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Database, FileText, Plug, RefreshCw, Wrench } from "lucide-react";
+import { Database, FileText, Plug, Wrench } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { ErrorAlert } from "@/components/ui/error-alert";
 import { EmptyState, LoadingState } from "@/components/ui/feedback";
 import { IconButton } from "@/components/ui/icon-button";
 import { Alert, ScopeBadge, Segmented } from "@/components/ui/panel";
@@ -91,21 +91,13 @@ export const McpView = ({ workspace, serverId }: { workspace: Workspace; serverI
 
   if (server)
     return <ServerView workspace={workspace} server={server} agentName={PROFILES[agent].name} />;
-  if (!overview && !error) return <LoadingState className="flex-1" />;
   if (!overview)
-    return (
+    return error ? (
       <div className="p-4">
-        <Alert
-          tone="danger"
-          action={
-            <Button size="sm" variant="ghost" disabled={loading} onClick={() => void reload()}>
-              <RefreshCw /> Retry
-            </Button>
-          }
-        >
-          <span className="whitespace-pre-wrap">{error}</span>
-        </Alert>
+        <ErrorAlert message={error} retrying={loading} onRetry={() => void reload()} />
       </div>
+    ) : (
+      <LoadingState className="flex-1" />
     );
   return (
     <EmptyState

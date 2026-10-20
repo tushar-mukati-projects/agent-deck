@@ -1,10 +1,10 @@
 import { useCallback, useState } from "react";
 import { Database, RefreshCw } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { ErrorAlert } from "@/components/ui/error-alert";
 import { Hint, LoadingState, showError } from "@/components/ui/feedback";
 import { IconButton } from "@/components/ui/icon-button";
-import { Alert, Segmented } from "@/components/ui/panel";
+import { Segmented } from "@/components/ui/panel";
 import { DataPane } from "@/features/mcp/pg/DataPane";
 import { parseTables, TABLES_SQL, tableKey, type TableRef } from "@/features/mcp/pg/queries";
 import { SqlPane } from "@/features/mcp/pg/SqlPane";
@@ -75,16 +75,7 @@ export const PgBrowser = ({ cwd, serverId }: { cwd: string; serverId: string }) 
       </div>
       {tables.error && !list ? (
         <div className="p-3">
-          <Alert
-            tone="danger"
-            action={
-              <Button size="sm" variant="ghost" onClick={() => void tables.reload()}>
-                Retry
-              </Button>
-            }
-          >
-            <span className="whitespace-pre-wrap">{tables.error}</span>
-          </Alert>
+          <ErrorAlert message={tables.error} onRetry={() => void tables.reload()} />
         </div>
       ) : !list ? (
         <LoadingState />

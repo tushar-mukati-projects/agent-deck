@@ -3,9 +3,9 @@ import { Play, Square } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { ErrorAlert } from "@/components/ui/error-alert";
 import { Spinner } from "@/components/ui/feedback";
 import { Kbd } from "@/components/ui/kbd";
-import { Alert } from "@/components/ui/panel";
 import { ResultGrid } from "@/features/mcp/ResultGrid";
 import { CodeView } from "@/features/viewer/CodeView";
 import { isMutating } from "@/lib/sql";
@@ -131,11 +131,7 @@ export const SqlPane = ({
         )}
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
-        {error && (
-          <Alert tone="danger" className="mb-2">
-            <span className="whitespace-pre-wrap">{error}</span>
-          </Alert>
-        )}
+        {error && <ErrorAlert message={error} className="mb-2" />}
         {grids}
       </div>
     </div>

@@ -2,9 +2,10 @@ import { useCallback, useRef, useState } from "react";
 import { Play, Wrench } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { ErrorAlert } from "@/components/ui/error-alert";
 import { Spinner } from "@/components/ui/feedback";
 import { Kbd } from "@/components/ui/kbd";
-import { Alert, ScopeBadge } from "@/components/ui/panel";
+import { ScopeBadge } from "@/components/ui/panel";
 import { CallResult } from "@/features/mcp/CallResult";
 import { confirmReason, exampleArguments } from "@/features/mcp/schema";
 import { CodeView } from "@/features/viewer/CodeView";
@@ -150,11 +151,7 @@ export const ToolRunner = ({
         )}
       </div>
       <div className="mt-3">
-        {error && (
-          <Alert tone="danger">
-            <span className="whitespace-pre-wrap">{error}</span>
-          </Alert>
-        )}
+        {error && <ErrorAlert message={error} />}
         {outcome && "result" in outcome && <CallResult result={outcome.result} />}
       </div>
     </div>
