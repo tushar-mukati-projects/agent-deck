@@ -46,11 +46,9 @@ const Parameters = ({ schema }: ParametersProps) => {
   );
 };
 
-interface Outcome {
-  result?: unknown;
-  error?: string;
-  elapsedMs: number;
-}
+type Outcome =
+  | { kind: "result"; result: unknown; elapsedMs: number }
+  | { kind: "error"; error: string; elapsedMs: number };
 
 type ToolRunnerProps = {
   cwd: string;
@@ -94,9 +92,9 @@ export const ToolRunner = ({ cwd, serverId, tool }: ToolRunnerProps) => {
       const elapsed = () => Math.round(performance.now() - started);
       try {
         const result = await api.mcpCall(cwd, serverId, tool.name, parsed);
-        setOutcome({ result, elapsedMs: elapsed() });
+        setOutcome({ kind: "result", result, elapsedMs: elapsed() });
       } catch (e) {
-        setOutcome({ error: errorMessage(e), elapsedMs: elapsed() });
+        setOutcome({ kind: "error", error: errorMessage(e), elapsedMs: elapsed() });
       }
     } finally {
       runningRef.current = false;
@@ -104,7 +102,7 @@ export const ToolRunner = ({ cwd, serverId, tool }: ToolRunnerProps) => {
     }
   }, [cwd, serverId, tool]);
 
-  const error = parseError ?? outcome?.error ?? null;
+  const error = parseError ?? (outcome?.kind === "error" ? outcome.error : null);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4">
@@ -154,7 +152,7 @@ export const ToolRunner = ({ cwd, serverId, tool }: ToolRunnerProps) => {
       </div>
       <div className="mt-3">
         {error && <ErrorAlert message={error} />}
-        {outcome && "result" in outcome && <CallResult result={outcome.result} />}
+        {outcome?.kind === "result" && <CallResult result={outcome.result} />}
       </div>
     </div>
   );

@@ -154,7 +154,7 @@ const loadChanges = async (cwd: string, filePath: string | null, distro: string 
   return {
     files: changes.status === "fulfilled" ? changes.value : [],
     filesError: changes.status === "rejected" ? errorMessage(changes.reason) : null,
-    git: status.status === "fulfilled" ? status.value : ([] as GitChange[]),
+    git: status.status === "fulfilled" ? status.value : [],
     gitError: status.status === "rejected" ? errorMessage(status.reason) : null,
   };
 };
