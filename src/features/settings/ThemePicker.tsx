@@ -4,15 +4,13 @@ import { findTheme, THEMES, type Theme } from "@/lib/themes";
 import { cn } from "@/lib/utils";
 import { useSettingsStore } from "@/stores/settings-store";
 
-const ThemeCard = ({
-  theme,
-  selected,
-  onSelect,
-}: {
+type ThemeCardProps = {
   theme: Theme;
   selected: boolean;
   onSelect: () => void;
-}) => {
+};
+
+const ThemeCard = ({ theme, selected, onSelect }: ThemeCardProps) => {
   const { bg, panel, chrome, accent, fg, code } = theme.swatch;
   return (
     <button

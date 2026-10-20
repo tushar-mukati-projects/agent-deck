@@ -11,6 +11,10 @@ const itemClass =
 
 const destructiveClass = "text-danger data-[highlighted]:bg-danger/15 [&_svg]:text-danger";
 
+type ChildrenProps = {
+  children: React.ReactNode;
+};
+
 interface ItemProps {
   icon?: React.ReactNode;
   shortcut?: string;
@@ -35,7 +39,7 @@ const ItemBody = ({
 export const ContextMenu = ContextMenuPrimitive.Root;
 export const ContextMenuTrigger = ContextMenuPrimitive.Trigger;
 
-export const ContextMenuContent = ({ children }: { children: React.ReactNode }) => (
+export const ContextMenuContent = ({ children }: ChildrenProps) => (
   <ContextMenuPrimitive.Portal>
     <ContextMenuPrimitive.Content className={contentClass}>{children}</ContextMenuPrimitive.Content>
   </ContextMenuPrimitive.Portal>
@@ -89,7 +93,7 @@ export const DropdownMenuSeparator = () => (
   <DropdownPrimitive.Separator className="mx-1 my-1 h-px bg-border" />
 );
 
-export const DropdownMenuLabel = ({ children }: { children: React.ReactNode }) => (
+export const DropdownMenuLabel = ({ children }: ChildrenProps) => (
   <DropdownPrimitive.Label className="px-2 pt-1.5 pb-1 text-[10.5px] font-semibold tracking-wider text-faint uppercase">
     {children}
   </DropdownPrimitive.Label>

@@ -20,6 +20,10 @@ import { useActiveWorkspace } from "@/stores/workspace-store";
 
 const RECENT_FOLDER_LIMIT = 7;
 
+type NewSessionMenuProps = {
+  children: React.ReactNode;
+};
+
 const NewSessionItems = () => {
   const folders = useFolders();
   const active = useActiveWorkspace();
@@ -75,7 +79,7 @@ const NewSessionItems = () => {
   );
 };
 
-export const NewSessionMenu = ({ children }: { children: React.ReactNode }) => (
+export const NewSessionMenu = ({ children }: NewSessionMenuProps) => (
   <DropdownMenu>
     <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
     <DropdownMenuContent className="w-[340px]">

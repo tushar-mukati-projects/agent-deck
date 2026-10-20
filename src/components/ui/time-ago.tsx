@@ -21,17 +21,15 @@ const subscribe = (listener: () => void) => {
   };
 };
 
-const useClock = () => useSyncExternalStore(subscribe, () => now);
-
-export const TimeAgo = ({
-  ms,
-  compact,
-  className,
-}: {
+type TimeAgoProps = {
   ms: number;
   compact?: boolean;
   className?: string;
-}) => {
+};
+
+const useClock = () => useSyncExternalStore(subscribe, () => now);
+
+export const TimeAgo = ({ ms, compact, className }: TimeAgoProps) => {
   useClock();
   return (
     <span title={new Date(ms).toLocaleString()} className={className}>

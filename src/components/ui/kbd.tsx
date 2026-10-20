@@ -1,6 +1,11 @@
 import { cn } from "@/lib/utils";
 
-export const Kbd = ({ keys, className }: { keys: string; className?: string }) => (
+type KbdProps = {
+  keys: string;
+  className?: string;
+};
+
+export const Kbd = ({ keys, className }: KbdProps) => (
   <span className={cn("inline-flex items-center gap-0.5", className)}>
     {keys.split(" ").map((key) => (
       <kbd

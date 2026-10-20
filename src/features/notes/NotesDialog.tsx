@@ -23,7 +23,19 @@ import { cn } from "@/lib/utils";
 import { useNotesStore } from "@/stores/notes-store";
 import { useUiStore } from "@/stores/ui-store";
 
-const NameInput = ({ title, onDone }: { title: string; onDone: (name: string | null) => void }) => {
+type NameInputProps = {
+  title: string;
+  onDone: (name: string | null) => void;
+};
+
+type NoteRowProps = {
+  note: NoteEntry;
+  active: boolean;
+  onSelect: (id: string) => void;
+  onRename: () => void;
+};
+
+const NameInput = ({ title, onDone }: NameInputProps) => {
   const [value, setValue] = useState(title);
   const cancelled = useRef(false);
   return (
@@ -46,17 +58,7 @@ const NameInput = ({ title, onDone }: { title: string; onDone: (name: string | n
 };
 
 const NoteRow = memo(
-  ({
-    note,
-    active,
-    onSelect,
-    onRename,
-  }: {
-    note: NoteEntry;
-    active: boolean;
-    onSelect: (id: string) => void;
-    onRename: () => void;
-  }) => (
+  ({ note, active, onSelect, onRename }: NoteRowProps) => (
     <button
       type="button"
       title="Double-click to rename"

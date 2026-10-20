@@ -39,7 +39,21 @@ import type { Workspace } from "@/types";
 
 const TAB_DRAG_TYPE = "application/x-agent-deck-tab";
 
-const TabMenu = ({ workspace, children }: { workspace: Workspace; children: React.ReactNode }) => {
+type TabMenuProps = {
+  workspace: Workspace;
+  children: React.ReactNode;
+};
+
+type TabBodyProps = {
+  workspace: Workspace;
+  isActive: boolean;
+};
+
+type WorkspaceTabProps = {
+  workspaceId: string;
+};
+
+const TabMenu = ({ workspace, children }: TabMenuProps) => {
   const hasSession = useSessionsStore((s) => !!s.byId[workspace.sessionId]);
   const canFork = findAgent(workspace.agent).canFork && hasSession;
   return (
@@ -111,7 +125,7 @@ const TabMenu = ({ workspace, children }: { workspace: Workspace; children: Reac
   );
 };
 
-const TabBody = ({ workspace, isActive }: { workspace: Workspace; isActive: boolean }) => {
+const TabBody = ({ workspace, isActive }: TabBodyProps) => {
   const tone = useWorkspaceTone(workspace);
   const hidden = useSettingsStore((s) => s.hideMode);
   const ref = useRef<HTMLDivElement>(null);
@@ -157,7 +171,7 @@ const TabBody = ({ workspace, isActive }: { workspace: Workspace; isActive: bool
   );
 };
 
-export const WorkspaceTab = memo(({ workspaceId }: { workspaceId: string }) => {
+export const WorkspaceTab = memo(({ workspaceId }: WorkspaceTabProps) => {
   const workspace = useWorkspace(workspaceId);
   const isActive = useWorkspaceStore((s) => s.activeId === workspaceId);
   return workspace ? <TabBody workspace={workspace} isActive={isActive} /> : null;

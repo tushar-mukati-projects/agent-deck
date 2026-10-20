@@ -17,24 +17,24 @@ const placeholders: Record<PaletteMode, string> = {
 
 const PAGE_STEP = 8;
 
+type PaletteRowProps = {
+  item: PaletteItem;
+  index: number;
+  selected: boolean;
+  showGroup: boolean;
+  mode: PaletteMode;
+  onHover: (index: number) => void;
+  onRun: (item: PaletteItem) => void;
+};
+
+type PaletteListProps = {
+  mode: PaletteMode;
+  onClose: () => void;
+  inputRef: React.RefObject<HTMLInputElement | null>;
+};
+
 const PaletteRow = memo(
-  ({
-    item,
-    index,
-    selected,
-    showGroup,
-    mode,
-    onHover,
-    onRun,
-  }: {
-    item: PaletteItem;
-    index: number;
-    selected: boolean;
-    showGroup: boolean;
-    mode: PaletteMode;
-    onHover: (index: number) => void;
-    onRun: (item: PaletteItem) => void;
-  }) => (
+  ({ item, index, selected, showGroup, mode, onHover, onRun }: PaletteRowProps) => (
     <div role="presentation">
       {showGroup && (
         <div
@@ -80,15 +80,7 @@ const PaletteRow = memo(
 );
 PaletteRow.displayName = "PaletteRow";
 
-const PaletteList = ({
-  mode,
-  onClose,
-  inputRef,
-}: {
-  mode: PaletteMode;
-  onClose: () => void;
-  inputRef: React.RefObject<HTMLInputElement | null>;
-}) => {
+const PaletteList = ({ mode, onClose, inputRef }: PaletteListProps) => {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(0);
   const [enterQueued, setEnterQueued] = useState(false);

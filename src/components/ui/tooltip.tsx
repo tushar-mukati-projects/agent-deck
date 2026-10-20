@@ -1,12 +1,16 @@
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 
+type TooltipProviderProps = {
+  children: React.ReactNode;
+};
+
 interface TooltipProps {
   content: React.ReactNode;
   shortcut?: string;
   children: React.ReactNode;
 }
 
-export const TooltipProvider = ({ children }: { children: React.ReactNode }) => (
+export const TooltipProvider = ({ children }: TooltipProviderProps) => (
   <TooltipPrimitive.Provider delayDuration={450} skipDelayDuration={150}>
     {children}
   </TooltipPrimitive.Provider>

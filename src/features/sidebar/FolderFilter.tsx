@@ -14,7 +14,11 @@ import { basename, cn, samePath, shortenHome } from "@/lib/utils";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore } from "@/stores/settings-store";
 
-const FolderMenu = ({ onClose }: { onClose: () => void }) => {
+type FolderMenuProps = {
+  onClose: () => void;
+};
+
+const FolderMenu = ({ onClose }: FolderMenuProps) => {
   const folders = useFolders();
   const home = useSessionsStore((s) => s.environment?.home ?? "");
   const folderFilter = useSettingsStore((s) => s.folderFilter);

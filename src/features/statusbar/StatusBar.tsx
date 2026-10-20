@@ -18,15 +18,17 @@ import type { Workspace } from "@/types";
 
 const SHORT_SESSION_ID_LENGTH = 8;
 
-const Item = ({
-  children,
-  title,
-  onClick,
-}: {
+type ItemProps = {
   children: React.ReactNode;
   title?: string;
   onClick?: () => void;
-}) => (
+};
+
+type WorkspaceItemProps = {
+  workspace: Workspace;
+};
+
+const Item = ({ children, title, onClick }: ItemProps) => (
   <button
     type="button"
     title={title}
@@ -38,7 +40,7 @@ const Item = ({
   </button>
 );
 
-const ShellItem = ({ workspace }: { workspace: Workspace }) => {
+const ShellItem = ({ workspace }: WorkspaceItemProps) => {
   const agentRunning = useAgentShells(workspace).filter((t) => t.status === "running").length;
   const own = workspace.shells.length;
   const parts = [own > 0 && plural(own, "shell"), agentRunning > 0 && `${agentRunning} by agent`];
@@ -50,7 +52,7 @@ const ShellItem = ({ workspace }: { workspace: Workspace }) => {
   );
 };
 
-const SubagentsItem = ({ workspace }: { workspace: Workspace }) => {
+const SubagentsItem = ({ workspace }: WorkspaceItemProps) => {
   const running = useSubagents(workspace).length;
   const open = useUiStore((s) => s.subagentsOpen);
   if (running === 0) return null;

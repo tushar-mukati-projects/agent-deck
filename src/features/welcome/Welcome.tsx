@@ -31,6 +31,10 @@ const TIPS: { action: ShortcutAction; label: string }[] = [
 
 const RECENT_COUNT = 6;
 
+type RecentCardProps = {
+  session: SessionInfo;
+};
+
 const MissingAgent = () => {
   const environment = useSessionsStore((s) => s.environment);
   const defaultAgent = useSettingsStore((s) => s.defaultAgent);
@@ -50,7 +54,7 @@ const MissingAgent = () => {
   );
 };
 
-const RecentCard = ({ session }: { session: SessionInfo }) => (
+const RecentCard = ({ session }: RecentCardProps) => (
   <div className="group relative rounded-lg border border-border bg-panel transition-colors hover:border-border-strong hover:bg-elevated">
     <button
       type="button"

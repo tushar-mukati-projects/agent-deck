@@ -5,6 +5,25 @@ import { cn, errorMessage } from "@/lib/utils";
 
 export type DotTone = "running" | "busy" | "attention" | "external" | "exited" | "error";
 
+type StatusDotProps = {
+  tone: DotTone;
+  className?: string;
+};
+
+type SpinnerProps = {
+  className?: string;
+};
+
+type LoadingStateProps = {
+  label?: string;
+  className?: string;
+};
+
+type HintProps = {
+  children: React.ReactNode;
+  className?: string;
+};
+
 const toneClass: Record<DotTone, string> = {
   running: "bg-success",
   busy: "bg-accent animate-pulse-dot",
@@ -23,7 +42,7 @@ const TONE_LABEL: Record<DotTone, string> = {
   error: "Failed to start",
 };
 
-export const StatusDot = ({ tone, className }: { tone: DotTone; className?: string }) => (
+export const StatusDot = ({ tone, className }: StatusDotProps) => (
   <span
     role="img"
     aria-label={TONE_LABEL[tone]}
@@ -34,11 +53,11 @@ export const StatusDot = ({ tone, className }: { tone: DotTone; className?: stri
 
 export const showError = (error: unknown) => toast.error(errorMessage(error));
 
-export const Spinner = ({ className }: { className?: string }) => (
+export const Spinner = ({ className }: SpinnerProps) => (
   <Loader2 className={cn("size-4 animate-spin text-faint", className)} />
 );
 
-export const LoadingState = ({ label, className }: { label?: string; className?: string }) => (
+export const LoadingState = ({ label, className }: LoadingStateProps) => (
   <div
     role="status"
     className={cn("flex items-center justify-center gap-2 py-10 text-xs text-faint", className)}
@@ -48,13 +67,7 @@ export const LoadingState = ({ label, className }: { label?: string; className?:
   </div>
 );
 
-export const Hint = ({
-  children,
-  className,
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) => (
+export const Hint = ({ children, className }: HintProps) => (
   <p className={cn("px-3 py-2 text-[11.5px] leading-relaxed text-faint", className)}>{children}</p>
 );
 

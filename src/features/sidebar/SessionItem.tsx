@@ -42,6 +42,14 @@ import { useUiStore } from "@/stores/ui-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import type { SessionInfo } from "@/types";
 
+type SessionMenuProps = {
+  session: SessionInfo;
+  isOpen: boolean;
+  live: boolean;
+  pinned: boolean;
+  archived: boolean;
+};
+
 interface SessionItemProps {
   session: SessionInfo;
   number: number;
@@ -52,19 +60,7 @@ interface SessionItemProps {
 
 const LIVE_TONES = new Set<DotTone>(["running", "busy", "attention", "external"]);
 
-const SessionMenu = ({
-  session,
-  isOpen,
-  live,
-  pinned,
-  archived,
-}: {
-  session: SessionInfo;
-  isOpen: boolean;
-  live: boolean;
-  pinned: boolean;
-  archived: boolean;
-}) => {
+const SessionMenu = ({ session, isOpen, live, pinned, archived }: SessionMenuProps) => {
   const { togglePinned, toggleArchived } = useSettingsStore.getState();
   const agent = findAgent(session.agent);
 

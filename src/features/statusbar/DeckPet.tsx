@@ -13,6 +13,21 @@ const SPARKS = [
   { x: 21, y: 14, delay: "0.6s" },
 ];
 
+type LayerProps = {
+  className?: string;
+  style?: React.CSSProperties;
+  children: React.ReactNode;
+};
+
+type MoodProps = {
+  mood: PetMood;
+};
+
+type DeckPetProps = {
+  busy: number;
+  waiting: number;
+};
+
 const useCelebration = () => {
   const [celebrating, setCelebrating] = useState(false);
   useEffect(() => {
@@ -31,15 +46,7 @@ const useCelebration = () => {
   return celebrating;
 };
 
-const Layer = ({
-  className,
-  style,
-  children,
-}: {
-  className?: string;
-  style?: React.CSSProperties;
-  children: React.ReactNode;
-}) => (
+const Layer = ({ className, style, children }: LayerProps) => (
   <span className={cn("absolute inset-0", className)} style={style}>
     <svg viewBox="0 0 24 24" className="size-full overflow-visible">
       {children}
@@ -47,7 +54,7 @@ const Layer = ({
   </span>
 );
 
-const ClosedEyes = ({ mood }: { mood: PetMood }) => (
+const ClosedEyes = ({ mood }: MoodProps) => (
   <path
     d={
       mood === "sleeping"
@@ -61,7 +68,7 @@ const ClosedEyes = ({ mood }: { mood: PetMood }) => (
   />
 );
 
-const Pet = ({ mood }: { mood: PetMood }) => {
+const Pet = ({ mood }: MoodProps) => {
   const open = mood === "working" || mood === "waiting";
   const r = mood === "waiting" ? 1.6 : 1.25;
   return (
@@ -116,7 +123,7 @@ const Pet = ({ mood }: { mood: PetMood }) => {
   );
 };
 
-export const DeckPet = ({ busy, waiting }: { busy: number; waiting: number }) => {
+export const DeckPet = ({ busy, waiting }: DeckPetProps) => {
   const celebrating = useCelebration();
   const [hops, setHops] = useState(0);
   const mood = petMood(busy, waiting, celebrating);
