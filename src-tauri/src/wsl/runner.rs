@@ -3,7 +3,7 @@ use std::{
     process::Command,
     sync::{Arc, LazyLock},
     thread,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use anyhow::{anyhow, Context};
@@ -16,12 +16,38 @@ use crate::util::{run_with_timeout, sh_quote, wslenv_with};
 const BOOTSTRAP: &str = "import sys,base64;exec(base64.b64decode(sys.stdin.readline()))";
 const AGENT_TIMEOUT: Duration = Duration::from_secs(30);
 const LOGIN_TIMEOUT: Duration = Duration::from_secs(20);
+const LOGIN_RETRY_AFTER: Duration = Duration::from_secs(60);
 const FORWARDED_VARS: [&str; 2] = ["CLAUDE_CONFIG_DIR", "CODEX_HOME"];
 const ENCODING_SAMPLE_BYTES: usize = 256;
 
 type LoginEnv = Arc<HashMap<String, String>>;
-type LoginSlot = Arc<Mutex<Option<LoginEnv>>>;
+type LoginSlot = Arc<Mutex<Login>>;
 static LOGIN_ENV: LazyLock<Mutex<HashMap<String, LoginSlot>>> = LazyLock::new(Mutex::default);
+
+#[derive(Default)]
+enum Login {
+    #[default]
+    Unknown,
+    Found(LoginEnv),
+    Failed(Instant),
+}
+
+impl Login {
+    fn needs_lookup(&self) -> bool {
+        match self {
+            Login::Unknown => true,
+            Login::Found(_) => false,
+            Login::Failed(at) => at.elapsed() >= LOGIN_RETRY_AFTER,
+        }
+    }
+
+    fn env(&self) -> Option<LoginEnv> {
+        match self {
+            Login::Found(env) => Some(env.clone()),
+            _ => None,
+        }
+    }
+}
 
 #[derive(Deserialize)]
 struct ErrorReply {
@@ -87,11 +113,11 @@ fn login_slot(distro: &str) -> LoginSlot {
 
 pub(super) fn known_login_env(distro: &str) -> Option<LoginEnv> {
     let slot = login_slot(distro);
-    let value = slot.try_lock()?;
-    if let Some(env) = value.as_ref() {
-        return Some(env.clone());
+    let state = slot.try_lock()?;
+    if !state.needs_lookup() {
+        return state.env();
     }
-    drop(value);
+    drop(state);
     let distro = distro.to_string();
     thread::spawn(move || login_env(&distro));
     None
@@ -99,9 +125,9 @@ pub(super) fn known_login_env(distro: &str) -> Option<LoginEnv> {
 
 fn login_env(distro: &str) -> Option<LoginEnv> {
     let slot = login_slot(distro);
-    let mut value = slot.lock();
-    if let Some(env) = value.as_ref() {
-        return Some(env.clone());
+    let mut state = slot.lock();
+    if !state.needs_lookup() {
+        return state.env();
     }
     #[derive(Deserialize)]
     struct Reply {
@@ -110,9 +136,15 @@ fn login_env(distro: &str) -> Option<LoginEnv> {
     }
     let reply = run_agent_raw(agent_command(distro, &["loginenv"]), distro, None, LOGIN_TIMEOUT)
         .ok()
-        .and_then(|bytes| serde_json::from_slice::<Reply>(&bytes).ok())?;
+        .and_then(|bytes| serde_json::from_slice::<Reply>(&bytes).ok());
+    let Some(reply) = reply else {
+        *state = Login::Failed(Instant::now());
+        return None;
+    };
     CACHE.lock().distros.entry(distro.to_string()).or_default().shell = Some(reply.shell);
-    Some(value.insert(Arc::new(reply.env)).clone())
+    let env = Arc::new(reply.env);
+    *state = Login::Found(env.clone());
+    Some(env)
 }
 
 pub fn login_var(distro: &str, name: &str) -> Option<String> {
@@ -144,6 +176,20 @@ fn login_shell(distro: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn retries_a_failed_login_lookup_only_after_a_while() {
+        let long_ago = Instant::now().checked_sub(LOGIN_RETRY_AFTER).unwrap();
+        let cases = [
+            ("unknown", Login::Unknown, true),
+            ("found", Login::Found(LoginEnv::default()), false),
+            ("just failed", Login::Failed(Instant::now()), false),
+            ("failed long ago", Login::Failed(long_ago), true),
+        ];
+        for (name, state, lookup) in cases {
+            assert_eq!(state.needs_lookup(), lookup, "{name}");
+        }
+    }
 
     #[test]
     fn decodes_both_wsl_output_encodings() {
