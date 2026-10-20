@@ -30,7 +30,7 @@ const RenameForm = ({
     try {
       if (target.agent === CLAUDE) await api.renameSession(target.filePath, target.distro, next);
       else useSettingsStore.getState().setSessionTitle(target.id, next);
-      useSessionsStore.getState().patchSession(target.id, { title: next, customTitle: next });
+      useSessionsStore.getState().patchSession(target.id, { title: next });
       close();
       const sessions = useSessionsStore.getState();
       void (target.distro ? sessions.refreshWsl() : sessions.refresh());

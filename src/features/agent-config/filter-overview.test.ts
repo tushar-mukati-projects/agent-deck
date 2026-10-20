@@ -8,6 +8,7 @@ const settings = (extra: Partial<SettingsFile>): SettingsFile => ({
   label: "User settings",
   path: "C:\\u\\.claude\\settings.json",
   exists: true,
+  error: null,
   model: null,
   defaultMode: null,
   allow: [],

@@ -4,19 +4,28 @@ import type { SessionInfo, Workspace } from "@/types";
 const ADOPT_BEFORE_MS = 20_000;
 export const ADOPT_AFTER_MS = 10 * 60_000;
 
+type PendingTab = {
+  workspace: Workspace;
+  since: number;
+};
+
 const startedMs = (session: SessionInfo) => Date.parse(session.startedAt ?? "");
 
-const fits = (workspace: Workspace, session: SessionInfo, started: number) =>
+const fits = ({ workspace, since }: PendingTab, session: SessionInfo, started: number) =>
   workspace.agent === session.agent &&
   samePath(workspace.cwd, session.cwd) &&
-  started >= workspace.pendingSince! - ADOPT_BEFORE_MS &&
-  started <= workspace.pendingSince! + ADOPT_AFTER_MS;
+  started >= since - ADOPT_BEFORE_MS &&
+  started <= since + ADOPT_AFTER_MS;
 
 export const adoptSessions = (workspaces: Workspace[], byId: Record<string, SessionInfo>) => {
-  const pending = workspaces.filter((w) => w.pendingSince !== null && !byId[w.sessionId]);
+  const pending = workspaces.flatMap((workspace): PendingTab[] =>
+    workspace.pendingSince !== null && !byId[workspace.sessionId]
+      ? [{ workspace, since: workspace.pendingSince }]
+      : [],
+  );
   if (!pending.length) return workspaces;
   const taken = new Set(workspaces.map((w) => w.sessionId));
-  const earliest = Math.min(...pending.map((w) => w.pendingSince!)) - ADOPT_BEFORE_MS;
+  const earliest = Math.min(...pending.map((p) => p.since)) - ADOPT_BEFORE_MS;
   const candidates = Object.values(byId)
     .filter((s) => !taken.has(s.id) && startedMs(s) >= earliest)
     .sort((a, b) => startedMs(a) - startedMs(b));
@@ -24,9 +33,9 @@ export const adoptSessions = (workspaces: Workspace[], byId: Record<string, Sess
   for (const session of candidates) {
     const started = startedMs(session);
     const closest = pending
-      .filter((w) => !adopted.has(w.id) && fits(w, session, started))
-      .sort((a, b) => Math.abs(started - a.pendingSince!) - Math.abs(started - b.pendingSince!))[0];
-    if (closest) adopted.set(closest.id, session);
+      .filter((p) => !adopted.has(p.workspace.id) && fits(p, session, started))
+      .sort((a, b) => Math.abs(started - a.since) - Math.abs(started - b.since))[0];
+    if (closest) adopted.set(closest.workspace.id, session);
   }
   if (!adopted.size) return workspaces;
   return workspaces.map((w) => {

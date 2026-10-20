@@ -35,8 +35,10 @@ export interface LiveSession {
   startedAt: number | null;
 }
 
+export type MessageRole = "user" | "assistant";
+
 export interface TranscriptItem {
-  role: "user" | "assistant";
+  role: MessageRole;
   kind: "text" | "tool";
   text: string;
 }
@@ -144,7 +146,7 @@ export interface GitChange {
 
 export interface SearchHit {
   sessionId: string;
-  role: "user" | "assistant";
+  role: MessageRole;
   snippet: string;
 }
 
@@ -197,7 +199,7 @@ export interface SettingsFile {
   label: string;
   path: string;
   exists: boolean;
-  error?: string | null;
+  error: string | null;
   model: string | null;
   defaultMode: string | null;
   allow: string[];

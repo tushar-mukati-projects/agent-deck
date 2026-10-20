@@ -32,18 +32,16 @@ import { findTheme } from "@/lib/themes";
 import { errorMessage } from "@/lib/utils";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useTerminalStore } from "@/stores/terminal-store";
-import type { AgentId, PtyEvent, TerminalKind } from "@/types";
+import type { AgentId, PtyEvent } from "@/types";
 
-export interface TerminalSpec {
+export type TerminalSpec = {
   id: string;
-  kind: TerminalKind;
-  agent?: AgentId;
   workspaceId: string;
   cwd: string;
   root: string;
   program: string;
   args: string[];
-}
+} & ({ kind: "agent"; agent: AgentId } | { kind: "shell" });
 
 interface Entry {
   spec: TerminalSpec;
@@ -183,7 +181,7 @@ const createEntry = (spec: TerminalSpec): Entry => {
 
   const owner = {
     get agent() {
-      return entry.spec.kind === "agent" ? (entry.spec.agent ?? null) : null;
+      return entry.spec.kind === "agent" ? entry.spec.agent : null;
     },
     term,
     send: (data: string) => send(entry, data),

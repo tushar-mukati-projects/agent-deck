@@ -138,7 +138,7 @@ const defineTheme = (input: ThemeInput): Theme => {
   const accent = fillFor(input.accent);
   const accentStrong = fillFor(input.accentStrong ?? input.accent);
 
-  const syntaxInput: Syntax = {
+  const syntax: Syntax = {
     comment: input.faint,
     keyword: rawMagenta,
     string: rawGreen,
@@ -153,12 +153,10 @@ const defineTheme = (input: ThemeInput): Theme => {
     link: rawBlue,
     ...input.syntax,
   };
-  const syntax = Object.fromEntries(
-    Object.entries(syntaxInput).map(([key, color]) => [
-      key,
-      ensureContrast(color, codeBg, key === "comment" ? floor.comment : floor.syntax),
-    ]),
-  ) as unknown as Syntax;
+  for (const key of Object.keys(syntax) as (keyof Syntax)[]) {
+    const contrast = key === "comment" ? floor.comment : floor.syntax;
+    syntax[key] = ensureContrast(syntax[key], codeBg, contrast);
+  }
 
   const shadow = input.kind === "dark" ? "rgb(0 0 0 / 0.55)" : "rgb(15 23 42 / 0.16)";
   const scrim = input.kind === "dark" ? "rgb(0 0 0 / 0.5)" : "rgb(15 23 42 / 0.22)";

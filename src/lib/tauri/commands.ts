@@ -29,8 +29,8 @@ import type {
 } from "@/types";
 
 interface WriteOptions {
-  encoding?: FileEncoding;
-  expectedModifiedMs?: number | null;
+  encoding: FileEncoding;
+  expectedModifiedMs: number | null;
 }
 
 const createChannel = (onEvent: (event: PtyEvent) => void) => {
@@ -101,12 +101,7 @@ export const api = {
   listDir: (path: string) => invoke<DirEntry[]>("list_dir", { path }),
   readFile: (path: string) => invoke<FileContent>("read_file", { path }),
   writeFile: (path: string, contents: string, options: WriteOptions) =>
-    invoke<WriteOutcome>("write_file", {
-      path,
-      contents,
-      encoding: options.encoding ?? null,
-      expectedModifiedMs: options.expectedModifiedMs ?? null,
-    }),
+    invoke<WriteOutcome>("write_file", { path, contents, ...options }),
   statPath: (path: string) => invoke<PathStat | null>("stat_path", { path }),
   readTail: (path: string, maxBytes: number) => invoke<FileTail>("read_tail", { path, maxBytes }),
   listFiles: (root: string) => invoke<string[]>("list_files", { root }),

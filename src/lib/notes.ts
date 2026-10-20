@@ -5,7 +5,7 @@ import type { Note } from "@/types";
 
 export interface NoteEntry extends Note {
   stored: boolean;
-  dirty?: boolean;
+  dirty: boolean;
 }
 
 const LINE_MARKER = /^(?:#+\s*|[-*+>]\s+(?:\[[ xX]\]\s+)?|\d+[.)]\s+)/;
@@ -37,6 +37,7 @@ export const draftNote = (): NoteEntry => {
     text: "",
     modifiedMs: date.getTime(),
     stored: false,
+    dirty: false,
   };
 };
 

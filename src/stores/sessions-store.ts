@@ -31,9 +31,7 @@ interface SessionsState {
 
 const withTitles = (sessions: SessionInfo[]) => {
   const titles = useSettingsStore.getState().sessionTitles;
-  return sessions.map((s) =>
-    titles[s.id] ? { ...s, title: titles[s.id], customTitle: titles[s.id] } : s,
-  );
+  return sessions.map((s) => (titles[s.id] ? { ...s, title: titles[s.id] } : s));
 };
 
 export const useSessionsStore = create<SessionsState>((set, get) => {

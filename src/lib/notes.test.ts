@@ -15,6 +15,7 @@ const note = (id: string, text = id, stored = true): NoteEntry => ({
   text,
   modifiedMs: 0,
   stored,
+  dirty: false,
 });
 
 describe("noteTitle", () => {

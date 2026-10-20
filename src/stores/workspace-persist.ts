@@ -9,19 +9,21 @@ interface SavedWorkspaces {
 
 const withDefaults = (saved: Workspace): Workspace => {
   const workspace = { ...blankWorkspace(saved), ...saved };
-  const activeFile =
-    workspace.activeFile && workspace.openFiles.some((f) => samePath(f, workspace.activeFile!))
-      ? workspace.activeFile
-      : (workspace.openFiles[0] ?? null);
-  return { ...workspace, activeFile };
+  const { activeFile, openFiles } = workspace;
+  return {
+    ...workspace,
+    activeFile:
+      activeFile && openFiles.some((f) => samePath(f, activeFile))
+        ? activeFile
+        : (openFiles[0] ?? null),
+  };
 };
 
 export const restoreSaved = (persisted: unknown): SavedWorkspaces => {
   const saved = (persisted ?? {}) as Partial<SavedWorkspaces>;
   const workspaces = (saved.workspaces ?? []).map(withDefaults);
-  const activeId = workspaces.some((w) => w.id === saved.activeId)
-    ? saved.activeId!
-    : (workspaces[0]?.id ?? null);
+  const activeId =
+    workspaces.find((w) => w.id === saved.activeId)?.id ?? workspaces[0]?.id ?? null;
   return { workspaces, activeId };
 };
 

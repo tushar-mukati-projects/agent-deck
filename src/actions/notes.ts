@@ -75,7 +75,7 @@ export const loadNotes = async () => {
   useNotesStore.setState({ loaded: false });
   await flushNotes();
   try {
-    const stored = (await api.listNotes()).map((note) => ({ ...note, stored: true }));
+    const stored = (await api.listNotes()).map((note) => ({ ...note, stored: true, dirty: false }));
     const unsaved = useNotesStore
       .getState()
       .notes.filter((note) => note.dirty || (!note.stored && note.text));
