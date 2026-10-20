@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+import { customAgentId } from "@/lib/agents/registry";
 import { DEFAULT_THEME_ID } from "@/lib/themes";
 import { omitKey } from "@/lib/utils";
 import type { AgentId, CustomAgent } from "@/types";
@@ -115,7 +116,7 @@ export const useSettingsStore = create<SettingsState>()(
           sessionTitles: omitKey(get().sessionTitles, sessionId),
         }),
       removeCustomAgent: (agentId) => {
-        const id = `custom:${agentId}`;
+        const id = customAgentId(agentId);
         const { customAgents, defaultAgent, agentFilter } = get();
         set({
           customAgents: customAgents.filter((a) => a.id !== agentId),

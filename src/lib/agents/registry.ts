@@ -29,6 +29,8 @@ interface AgentDefinition {
 export const CLAUDE: AgentId = "claude";
 export const CODEX: AgentId = "codex";
 
+export const customAgentId = (id: string): AgentId => `custom:${id}`;
+
 const claudeThemeArgs = ({ matchAgentTheme, claudeArgs, themeId }: AgentSettings) => {
   if (!matchAgentTheme || /(^|\s)--settings(\s|=|$)/.test(claudeArgs)) return [];
   return ["--settings", JSON.stringify({ theme: `${findTheme(themeId).kind}-ansi` })];
@@ -76,7 +78,7 @@ const codex = (settings: AgentSettings): AgentDefinition => ({
 });
 
 const fromCustom = (agent: CustomAgent): AgentDefinition => ({
-  id: `custom:${agent.id}`,
+  id: customAgentId(agent.id),
   name: agent.name.trim() || parseArgs(agent.command)[0] || "Agent",
   command: parseArgs(agent.command),
   history: false,
