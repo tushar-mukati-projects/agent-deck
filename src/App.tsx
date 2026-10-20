@@ -26,6 +26,13 @@ import { findTheme } from "@/lib/themes";
 import { useSettingsStore } from "@/stores/settings-store";
 import { activeWorkspaceOf, useWorkspaceStore } from "@/stores/workspace-store";
 
+const SESSIONS_MIN_PX = 220;
+const SESSIONS_MAX_PX = 520;
+const CONTENT_MIN_PX = 420;
+const CONTEXT_MIN_PX = 240;
+const CONTEXT_MAX_PX = 640;
+const TOAST_OFFSET_PX = 36;
+
 export const App = () => {
   const activeId = useWorkspaceStore((s) => activeWorkspaceOf(s)?.id ?? null);
   const themeKind = useSettingsStore((s) => findTheme(s.themeId).kind);
@@ -51,8 +58,8 @@ export const App = () => {
             id="sessions"
             panelRef={sessions.panelRef}
             defaultSize={sessions.initialWidth}
-            minSize={220}
-            maxSize={520}
+            minSize={SESSIONS_MIN_PX}
+            maxSize={SESSIONS_MAX_PX}
             collapsible
             groupResizeBehavior="preserve-pixel-size"
             onResize={sessions.onResize}
@@ -64,7 +71,7 @@ export const App = () => {
             </ErrorBoundary>
           </Panel>
           <ResizeHandle orientation="horizontal" />
-          <Panel id="content" minSize={420}>
+          <Panel id="content" minSize={CONTENT_MIN_PX}>
             <ErrorBoundary key={activeId ?? "welcome"}>
               {activeId ? <WorkspaceView workspaceId={activeId} /> : <Welcome />}
             </ErrorBoundary>
@@ -74,8 +81,8 @@ export const App = () => {
             id="context"
             panelRef={context.panelRef}
             defaultSize={context.initialWidth}
-            minSize={240}
-            maxSize={640}
+            minSize={CONTEXT_MIN_PX}
+            maxSize={CONTEXT_MAX_PX}
             collapsible
             groupResizeBehavior="preserve-pixel-size"
             onResize={context.onResize}
@@ -94,7 +101,7 @@ export const App = () => {
       <Toaster
         theme={themeKind}
         position="bottom-right"
-        offset={36}
+        offset={TOAST_OFFSET_PX}
         toastOptions={{
           className: "!bg-overlay !border-border-strong !text-fg !text-[12.5px] !shadow-2xl",
         }}

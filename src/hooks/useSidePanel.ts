@@ -7,6 +7,7 @@ import { useUiStore, type SidePanel } from "@/stores/ui-store";
 const FLAG = { sessions: "sessionsOpen", context: "contextOpen" } as const;
 const WIDTH = { sessions: "sessionsWidth", context: "contextWidth" } as const;
 const PANEL_ANIMATION_MS = 180;
+const PANEL_ANIMATION_SLACK_MS = 20;
 
 let panelTimer: number | undefined;
 const animatePanels = () => {
@@ -17,7 +18,7 @@ const animatePanels = () => {
   window.clearTimeout(panelTimer);
   panelTimer = window.setTimeout(
     () => root.classList.remove("panels-animating"),
-    PANEL_ANIMATION_MS + 20,
+    PANEL_ANIMATION_MS + PANEL_ANIMATION_SLACK_MS,
   );
 };
 
@@ -25,7 +26,8 @@ let draggingSeparator = false;
 window.addEventListener(
   "pointerdown",
   (event) => {
-    draggingSeparator = !!(event.target as Element | null)?.closest?.("[data-separator]");
+    draggingSeparator =
+      event.target instanceof Element && !!event.target.closest("[data-separator]");
   },
   true,
 );
