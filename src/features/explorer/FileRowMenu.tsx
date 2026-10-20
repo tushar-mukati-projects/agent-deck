@@ -9,7 +9,7 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/menu";
-import { fileActions } from "@/features/viewer/file-actions";
+import { copyActions, openActions, type FileAction } from "@/features/viewer/file-actions";
 import { agentName } from "@/stores/agents";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import type { DirEntry, Workspace } from "@/types";
@@ -19,6 +19,12 @@ type FileRowMenuProps = {
   workspace: Workspace;
   children: React.ReactNode;
 };
+
+const menuItem = ({ label, icon, run }: FileAction) => (
+  <ContextMenuItem key={label} icon={icon} onSelect={run}>
+    {label}
+  </ContextMenuItem>
+);
 
 export const FileRowMenu = ({ entry, workspace, children }: FileRowMenuProps) => (
   <ContextMenu>
@@ -53,11 +59,9 @@ export const FileRowMenu = ({ entry, workspace, children }: FileRowMenuProps) =>
         </>
       )}
       <ContextMenuSeparator />
-      {fileActions(entry.path, workspace.cwd, entry.isDir).map(({ label, icon, run }) => (
-        <ContextMenuItem key={label} icon={icon} onSelect={run}>
-          {label}
-        </ContextMenuItem>
-      ))}
+      {openActions(entry.path, entry.isDir).map(menuItem)}
+      <ContextMenuSeparator />
+      {copyActions(entry.path, workspace.cwd).map(menuItem)}
     </ContextMenuContent>
   </ContextMenu>
 );
