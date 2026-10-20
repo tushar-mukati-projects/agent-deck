@@ -12,7 +12,7 @@ use super::{preview, session_files, session_id_of, transcript::line_items};
 use crate::util::raw_lines;
 
 const SEARCH_HITS_PER_SESSION: usize = 3;
-const SNIPPET_RADIUS: usize = 90;
+const SNIPPET_RADIUS_CHARS: usize = 90;
 
 static SEARCH_GENERATION: AtomicU64 = AtomicU64::new(0);
 
@@ -58,11 +58,11 @@ fn snippet_around(text: &str, needle_lower: &str) -> Option<String> {
     let lower: Vec<char> = chars.iter().flat_map(|c| c.to_lowercase()).collect();
     let needle: Vec<char> = needle_lower.chars().collect();
     if lower.len() != chars.len() || needle.is_empty() {
-        return text.to_lowercase().contains(needle_lower).then(|| preview(text, SNIPPET_RADIUS * 2));
+        return text.to_lowercase().contains(needle_lower).then(|| preview(text, SNIPPET_RADIUS_CHARS * 2));
     }
     let index = lower.windows(needle.len()).position(|w| w == needle.as_slice())?;
-    let start = index.saturating_sub(SNIPPET_RADIUS);
-    let end = (index + needle.len() + SNIPPET_RADIUS).min(chars.len());
+    let start = index.saturating_sub(SNIPPET_RADIUS_CHARS);
+    let end = (index + needle.len() + SNIPPET_RADIUS_CHARS).min(chars.len());
     let body = preview(&chars[start..end].iter().collect::<String>(), usize::MAX);
     Some(format!("{}{}{}", if start > 0 { "…" } else { "" }, body, if end < chars.len() { "…" } else { "" }))
 }

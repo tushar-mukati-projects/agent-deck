@@ -174,15 +174,15 @@ struct Terminal {
 
 fn open_terminal(req: &SpawnRequest) -> anyhow::Result<Terminal> {
     let command = build_command(req)?;
-    let pair = native_pty_system().openpty(size(req.cols, req.rows)).context("Could not open a terminal")?;
-    let mut child = pair.slave.spawn_command(command).with_context(|| format!("Could not start {}", req.program))?;
+    let pair = native_pty_system().openpty(size(req.cols, req.rows)).context("Couldn't open a terminal")?;
+    let mut child = pair.slave.spawn_command(command).with_context(|| format!("Couldn't start {}", req.program))?;
     drop(pair.slave);
     let pipes = pair.master.try_clone_reader().and_then(|reader| pair.master.take_writer().map(|writer| (reader, writer)));
     match pipes {
         Ok((reader, writer)) => Ok(Terminal { child, master: pair.master, reader, writer }),
         Err(error) => {
             let _ = child.kill();
-            Err(error.context("Could not connect to the terminal"))
+            Err(error.context("Couldn't connect to the terminal"))
         }
     }
 }

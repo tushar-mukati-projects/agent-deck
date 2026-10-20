@@ -14,7 +14,7 @@ use crate::{codex, util::lenient};
 
 const TOOL_DETAIL_CHARS: usize = 160;
 const TRANSCRIPT_TEXT_CHARS: usize = 24_000;
-const AGENT_ID_MAX_LEN: usize = 64;
+const AGENT_ID_MAX_CHARS: usize = 64;
 
 #[derive(Serialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -155,7 +155,7 @@ pub fn transcript(file_path: &str, from_offset: u64) -> anyhow::Result<Transcrip
 }
 
 pub fn is_agent_id(id: &str) -> bool {
-    !id.is_empty() && id.len() <= AGENT_ID_MAX_LEN && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+    !id.is_empty() && id.len() <= AGENT_ID_MAX_CHARS && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
 }
 
 fn subagent_file(dir: &Path, id: &str) -> Option<PathBuf> {

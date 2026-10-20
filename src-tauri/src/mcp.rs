@@ -113,7 +113,7 @@ impl Client {
         let connection = match &launch.transport {
             Transport::Stdio => Connection::Stdio(spawn_stdio(server, &launch)?),
             Transport::Http => Connection::Http(http_transport(&launch)?),
-            Transport::Sse => bail!("Legacy SSE servers aren't supported here yet. Claude Code can still use it."),
+            Transport::Sse => bail!("Legacy SSE servers aren't supported here yet. Claude Code can still use them."),
             Transport::Unknown(other) => bail!("Unknown MCP transport \"{other}\""),
         };
         Ok(Self { connection, next_id: AtomicU64::new(1), info: Mutex::new(None), last_used: Mutex::new(Instant::now()) })
