@@ -60,8 +60,9 @@ const ROOT_DEBOUNCE: Duration = Duration::from_millis(120);
 const HOME_DEBOUNCE: Duration = Duration::from_millis(700);
 const CODEX_RETRY: Duration = Duration::from_secs(30);
 
-fn is_noise(path: &Path) -> bool {
-    path.components().any(|c| NOISY_DIRS.iter().any(|dir| c.as_os_str() == *dir))
+fn is_noise(roots: &[PathBuf], path: &Path) -> bool {
+    let below = roots.iter().find_map(|root| path.strip_prefix(root).ok()).unwrap_or(path);
+    below.components().any(|c| NOISY_DIRS.iter().any(|dir| c.as_os_str() == *dir))
         || path.to_string_lossy().ends_with(".agent-deck-tmp")
 }
 
@@ -97,7 +98,7 @@ where
     tx
 }
 
-fn make_watcher(tx: mpsc::Sender<Signal>) -> notify::Result<notify::RecommendedWatcher> {
+fn make_watcher(tx: mpsc::Sender<Signal>, roots: Vec<PathBuf>) -> notify::Result<notify::RecommendedWatcher> {
     notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
         let Ok(event) = res else {
             let _ = tx.send(Signal::Rescan);
@@ -109,7 +110,7 @@ fn make_watcher(tx: mpsc::Sender<Signal>) -> notify::Result<notify::RecommendedW
         if event.need_rescan() {
             let _ = tx.send(Signal::Rescan);
         }
-        for path in event.paths.into_iter().filter(|p| !is_noise(p)) {
+        for path in event.paths.into_iter().filter(|p| !is_noise(&roots, p)) {
             let _ = tx.send(Signal::Path(path));
         }
     })
@@ -169,7 +170,7 @@ impl Watchers {
         let handle = match wsl::parse_host_path(&root) {
             Some((distro, linux)) => WatchHandle::Wsl(start_wsl(tx, &distro, &linux)?),
             None => {
-                let mut watcher = make_watcher(tx)?;
+                let mut watcher = make_watcher(tx, vec![PathBuf::from(&root)])?;
                 watcher.watch(Path::new(&root), RecursiveMode::Recursive)?;
                 WatchHandle::Native { _watcher: watcher }
             }
@@ -198,9 +199,11 @@ pub fn watch_claude_home(app: AppHandle) -> Arc<HomeWatcher> {
     let tx = debounced(HOME_DEBOUNCE, move |_, _| {
         let _ = app.emit("sessions-changed", ());
     });
-    let mut watcher = make_watcher(tx).ok();
+    let dirs = [crate::sessions::projects_dir(), crate::sessions::live_dir()];
+    let roots = dirs.iter().cloned().chain([crate::codex::sessions_dir()]).collect();
+    let mut watcher = make_watcher(tx, roots).ok();
     if let Some(watcher) = watcher.as_mut() {
-        for dir in [crate::sessions::projects_dir(), crate::sessions::live_dir()] {
+        for dir in dirs {
             let _ = std::fs::create_dir_all(&dir);
             let _ = watcher.watch(&dir, RecursiveMode::Recursive);
         }
@@ -245,9 +248,18 @@ mod tests {
     }
 
     #[test]
-    fn ignores_noise() {
-        assert!(is_noise(Path::new(r"C:\w\node_modules\x\index.js")));
-        assert!(is_noise(Path::new(r"C:\w\.a.txt.agent-deck-tmp")));
-        assert!(!is_noise(Path::new(r"C:\w\src\main.rs")));
+    fn ignores_noise_below_the_watched_root() {
+        const CASES: &[(&str, &str, bool)] = &[
+            (r"C:\w", r"C:\w\node_modules\x\index.js", true),
+            (r"C:\w", r"C:\w\.a.txt.agent-deck-tmp", true),
+            (r"C:\w", r"C:\w\src\main.rs", false),
+            (r"C:\repo\target\app", r"C:\repo\target\app\src\main.rs", false),
+            (r"C:\repo\.git\app", r"C:\repo\.git\app\README.md", false),
+            (r"C:\repo\target\app", r"C:\repo\target\app\target\debug\app.exe", true),
+            (r"C:\repo\node_modules\pkg", r"C:\repo\node_modules\pkg\.next\cache", true),
+        ];
+        for (root, path, noise) in CASES {
+            assert_eq!(is_noise(&[PathBuf::from(root)], Path::new(path)), *noise, "root: {root}, path: {path}");
+        }
     }
 }
