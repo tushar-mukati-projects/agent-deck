@@ -1,3 +1,4 @@
+import { JSON_INDENT } from "@/lib/mcp/results";
 import { isMutating } from "@/lib/sql";
 import type { JsonSchema, McpTool } from "@/types";
 
@@ -15,7 +16,11 @@ const exampleValue = (schema: JsonSchema): unknown => {
 export const exampleArguments = (schema?: JsonSchema) => {
   const required = new Set(schema?.required ?? []);
   const entries = Object.entries(schema?.properties ?? {}).filter(([name]) => required.has(name));
-  return JSON.stringify(Object.fromEntries(entries.map(([n, s]) => [n, exampleValue(s)])), null, 2);
+  return JSON.stringify(
+    Object.fromEntries(entries.map(([n, s]) => [n, exampleValue(s)])),
+    null,
+    JSON_INDENT,
+  );
 };
 
 const SQL_START =
