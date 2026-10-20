@@ -1,5 +1,6 @@
 import { adoptSessions } from "@/lib/adopt";
-import { movedPath } from "@/lib/entries";
+import { tabTargetPath } from "@/lib/diff-tabs";
+import { movedTab } from "@/lib/entries";
 import { basename, isWithin, neighborAt, samePath } from "@/lib/utils";
 import type { SessionInfo, Workspace } from "@/types";
 
@@ -95,11 +96,11 @@ export const openFileFields = (workspace: Workspace, path: string) => ({
 });
 
 export const withMovedFiles = (workspace: Workspace, from: string, to: string) =>
-  workspace.openFiles.some((f) => isWithin(f, from))
+  workspace.openFiles.some((f) => isWithin(tabTargetPath(f), from))
     ? {
         ...workspace,
-        openFiles: workspace.openFiles.map((f) => movedPath(f, from, to)),
-        activeFile: workspace.activeFile && movedPath(workspace.activeFile, from, to),
+        openFiles: workspace.openFiles.map((f) => movedTab(f, from, to)),
+        activeFile: workspace.activeFile && movedTab(workspace.activeFile, from, to),
       }
     : workspace;
 

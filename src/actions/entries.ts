@@ -1,9 +1,10 @@
 import { toast } from "sonner";
 
 import { showError } from "@/components/ui/feedback";
+import { whereItGoes } from "@/lib/agent-config/removals";
+import { tabTargetPath } from "@/lib/diff-tabs";
 import { api } from "@/lib/tauri/commands";
 import { basename, dirname, isWithin } from "@/lib/utils";
-import { parseWslPath } from "@/lib/wsl";
 import { useExplorerStore } from "@/stores/explorer-store";
 import { useUiStore, type EntryRequest } from "@/stores/ui-store";
 import { isDirty, useViewerStore } from "@/stores/viewer-store";
@@ -22,14 +23,6 @@ export const askNewEntry = (workspace: Workspace, dir: string, isDir: boolean) =
     isDir,
   });
 
-export const askRename = (workspace: Workspace, entry: DirEntry) =>
-  useUiStore.getState().setEntryRequest({
-    kind: "rename",
-    workspaceId: workspace.id,
-    path: entry.path,
-    isDir: entry.isDir,
-  });
-
 export const createEntry = async (request: CreateRequest, name: string) => {
   try {
     const path = await api.createEntry(request.dir, name, request.isDir);
@@ -44,11 +37,15 @@ export const createEntry = async (request: CreateRequest, name: string) => {
   }
 };
 
+const openTabsWithin = (path: string) =>
+  useWorkspaceStore.getState().workspaces.flatMap((w) =>
+    w.openFiles
+      .filter((tab) => isWithin(tabTargetPath(tab), path))
+      .map((tab) => ({ id: w.id, tab })),
+  );
+
 const unsavedWithin = (path: string) =>
-  useWorkspaceStore
-    .getState()
-    .workspaces.flatMap((w) => w.openFiles)
-    .find((file) => isWithin(file, path) && isDirty(file));
+  openTabsWithin(path).find(({ tab }) => isDirty(tab))?.tab ?? null;
 
 export const renameEntry = async (request: RenameRequest, name: string) => {
   if (name === basename(request.path)) return true;
@@ -58,8 +55,10 @@ export const renameEntry = async (request: RenameRequest, name: string) => {
     return false;
   }
   try {
+    const moved = openTabsWithin(request.path).map(({ tab }) => tabTargetPath(tab));
     const path = await api.renameEntry(request.path, name);
     useWorkspaceStore.getState().movePaths(request.path, path);
+    useViewerStore.getState().forget(moved);
     const explorer = useExplorerStore.getState();
     if (request.isDir) explorer.forget(request.path);
     await explorer.load(dirname(request.path));
@@ -73,14 +72,9 @@ export const renameEntry = async (request: RenameRequest, name: string) => {
 
 const deleteNotice = (entry: DirEntry) => {
   const unsaved = unsavedWithin(entry.path);
-  return [
-    parseWslPath(entry.path)
-      ? "This permanently deletes it from WSL. It can't be undone."
-      : "It goes to the Recycle Bin, so you can restore it.",
-    unsaved ? `Unsaved changes to ${basename(unsaved)} will be lost.` : "",
-  ]
-    .join(" ")
-    .trim();
+  return unsaved
+    ? `${whereItGoes(entry.path)} Unsaved changes to ${basename(unsaved)} will be lost.`
+    : whereItGoes(entry.path);
 };
 
 export const deleteEntry = async (entry: DirEntry) => {
@@ -93,12 +87,10 @@ export const deleteEntry = async (entry: DirEntry) => {
   if (!confirmed) return;
   try {
     await api.deleteEntry(entry.path);
-    const { workspaces, closeFile } = useWorkspaceStore.getState();
-    const removed = workspaces.flatMap((w) =>
-      w.openFiles.filter((file) => isWithin(file, entry.path)).map((file) => ({ id: w.id, file })),
-    );
-    for (const { id, file } of removed) closeFile(id, file);
-    useViewerStore.getState().forget(removed.map(({ file }) => file));
+    const removed = openTabsWithin(entry.path);
+    const { closeFile } = useWorkspaceStore.getState();
+    for (const { id, tab } of removed) closeFile(id, tab);
+    useViewerStore.getState().forget(removed.map(({ tab }) => tabTargetPath(tab)));
     const explorer = useExplorerStore.getState();
     if (entry.isDir) explorer.forget(entry.path);
     await explorer.load(dirname(entry.path));

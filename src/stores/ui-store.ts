@@ -21,7 +21,7 @@ export type SidePanel = "sessions" | "context";
 
 export type EntryRequest =
   | { kind: "create"; workspaceId: string; root: string; dir: string; isDir: boolean }
-  | { kind: "rename"; workspaceId: string; path: string; isDir: boolean };
+  | { kind: "rename"; path: string; isDir: boolean };
 
 interface UiState {
   sessionsOpen: boolean;

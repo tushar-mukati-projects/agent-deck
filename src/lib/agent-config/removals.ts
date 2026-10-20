@@ -22,7 +22,7 @@ export interface RemovalRequest {
 
 export const canRemove = (scope: ConfigScope) => scope !== "plugin" && scope !== "system";
 
-const whereItGoes = (path: string) =>
+export const whereItGoes = (path: string) =>
   parseWslPath(path)
     ? "It's deleted from WSL for good."
     : "It goes to the Recycle Bin, so you can restore it.";
