@@ -1,5 +1,4 @@
 import { Bell, Bot, FolderOpen, GitBranch, Hash, SquareTerminal } from "lucide-react";
-import { toast } from "sonner";
 import { useShallow } from "zustand/react/shallow";
 
 import { focusNextAttention, toggleShellPanel } from "@/actions/workspaces";
@@ -93,7 +92,7 @@ export const StatusBar = () => {
           <>
             <Item
               title={workspace.cwd}
-              onClick={() => void copyText(workspace.cwd).then(() => toast.success("Path copied"))}
+              onClick={() => void copyText(workspace.cwd, "Path copied")}
             >
               <FolderOpen />
               <span className="truncate">{shortenHome(workspace.cwd, home)}</span>
@@ -107,9 +106,7 @@ export const StatusBar = () => {
             {!hidden && (
               <Item
                 title="Copy session ID"
-                onClick={() =>
-                  void copyText(workspace.sessionId).then(() => toast.success("Session ID copied"))
-                }
+                onClick={() => void copyText(workspace.sessionId, "Session ID copied")}
               >
                 <Hash />
                 <span className="font-mono">{workspace.sessionId.slice(0, 8)}</span>

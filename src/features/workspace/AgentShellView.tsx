@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowDown, Copy, FileText } from "lucide-react";
-import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { LoadingState } from "@/components/ui/feedback";
@@ -87,7 +86,7 @@ export const AgentShellView = ({
           <Button
             size="xs"
             variant="ghost"
-            onClick={() => void copyText(task.command).then(() => toast.success("Command copied"))}
+            onClick={() => void copyText(task.command, "Command copied")}
           >
             <Copy /> Copy command
           </Button>

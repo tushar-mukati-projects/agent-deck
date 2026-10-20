@@ -10,7 +10,6 @@ import {
   RotateCw,
   Save,
 } from "lucide-react";
-import { toast } from "sonner";
 
 import { canMention, mentionInAgent } from "@/actions/files";
 import { Button } from "@/components/ui/button";
@@ -146,16 +145,14 @@ export const FileToolbar = ({
           </DropdownMenuItem>
           <DropdownMenuItem
             icon={<Copy />}
-            onSelect={() => void copyText(path).then(() => toast.success("Path copied"))}
+            onSelect={() => void copyText(path, "Path copied")}
           >
             Copy path
           </DropdownMenuItem>
           <DropdownMenuItem
             icon={<Copy />}
             onSelect={() =>
-              void copyText(relativePath(path, workspace.cwd)).then(() =>
-                toast.success("Relative path copied"),
-              )
+              void copyText(relativePath(path, workspace.cwd), "Relative path copied")
             }
           >
             Copy relative path

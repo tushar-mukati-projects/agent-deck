@@ -1,6 +1,5 @@
 import { useEffect, useRef } from "react";
 import { ArrowRightToLine, Copy, FolderOpen, GitCompare, Plug, X, XCircle } from "lucide-react";
-import { toast } from "sonner";
 
 import { closeFilesWithConfirm, closeFileWithConfirm } from "@/actions/files";
 import {
@@ -75,16 +74,14 @@ const TabMenu = ({
             <ContextMenuSeparator />
             <ContextMenuItem
               icon={<Copy />}
-              onSelect={() => void copyText(path).then(() => toast.success("Path copied"))}
+              onSelect={() => void copyText(path, "Path copied")}
             >
               Copy path
             </ContextMenuItem>
             <ContextMenuItem
               icon={<Copy />}
               onSelect={() =>
-                void copyText(relativePath(path, workspace.cwd)).then(() =>
-                  toast.success("Relative path copied"),
-                )
+                void copyText(relativePath(path, workspace.cwd), "Relative path copied")
               }
             >
               Copy relative path

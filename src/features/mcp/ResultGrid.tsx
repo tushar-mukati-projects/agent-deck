@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Copy } from "lucide-react";
-import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { copyText } from "@/lib/tauri/system";
@@ -49,7 +48,7 @@ interface ResultGridProps {
 }
 
 const copy = (text: string, what: string) =>
-  void copyText(text).then(() => toast.success(`${what} copied`));
+  void copyText(text, `${what} copied`);
 
 export const ResultGrid = ({ columns, rows, footer, rowsLabel, className }: ResultGridProps) => {
   const [paging, setPaging] = useState({ rows, limit: PAGE });
