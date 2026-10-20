@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { ArrowDown, Copy, FileText } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -6,10 +6,10 @@ import { LoadingState } from "@/components/ui/feedback";
 import { Alert } from "@/components/ui/panel";
 import { TimeAgo } from "@/components/ui/time-ago";
 import { useStickToBottom } from "@/features/workspace/useStickToBottom";
+import { usePolling } from "@/hooks/usePolling";
 import { cleanOutput, type TaskState } from "@/lib/agent-tasks";
 import { api } from "@/lib/tauri/commands";
 import { copyText } from "@/lib/tauri/system";
-import { errorMessage } from "@/lib/utils";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import type { AgentTask, FileTail } from "@/types";
 
@@ -27,35 +27,21 @@ const STATE_LABEL: Record<TaskState, string> = {
 
 const useOutput = (path: string | null, live: boolean) => {
   const [tail, setTail] = useState<FileTail | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!path) return;
-    let cancelled = false;
-    let timer: number | undefined;
-    const load = async () => {
-      try {
-        const next = await api.readTail(path, OUTPUT_BYTES);
-        if (!cancelled) {
+  const error = usePolling(
+    path
+      ? () => async (active) => {
+          const next = await api.readTail(path, OUTPUT_BYTES);
+          if (!active()) return;
           setTail((current) =>
             current && current.text === next.text && current.truncated === next.truncated
               ? current
               : next,
           );
-          setError(null);
         }
-      } catch (e) {
-        if (!cancelled) setError(errorMessage(e));
-      }
-      if (!cancelled && live) timer = window.setTimeout(() => void load(), POLL_MS);
-    };
-    void load();
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [path, live]);
-
+      : null,
+    live ? POLL_MS : null,
+    [path, live],
+  );
   return { tail, error };
 };
 
