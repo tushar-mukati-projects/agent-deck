@@ -611,7 +611,7 @@ def claude_changes(session):
             cwd = cwd or text_of(data.get("cwd"))
             if data.get("type") == "file-history-snapshot":
                 backups_map = (data.get("snapshot") or {}).get("trackedFileBackups") if isinstance(data.get("snapshot"), dict) else None
-                for target, backup in (backups_map or {}).items():
+                for target, backup in (backups_map if isinstance(backups_map, dict) else {}).items():
                     entry = tracked.setdefault(target, {"hash": None})
                     name = backup.get("backupFileName") if isinstance(backup, dict) else None
                     if not entry["hash"] and isinstance(name, str):
