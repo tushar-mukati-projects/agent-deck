@@ -9,6 +9,7 @@ import { openPathFromTerminal } from "@/actions/files";
 import { syncHideMode } from "@/actions/hide-mode";
 import { App } from "@/App";
 import { CrashScreen, ErrorBoundary } from "@/components/ErrorBoundary";
+import { showError } from "@/components/ui/feedback";
 import { suppressBrowserChrome } from "@/lib/browser-chrome";
 import { api } from "@/lib/tauri/commands";
 import { appWindow } from "@/lib/tauri/system";
@@ -26,6 +27,12 @@ useSettingsStore.subscribe((state, previous) => {
 });
 setPathLinkHandler((workspaceId, target) => void openPathFromTerminal(workspaceId, target));
 
+const startupErrors: unknown[] = [];
+
+const keepStartupError = (error: unknown) => {
+  startupErrors.push(error);
+};
+
 const loadFonts = () =>
   Promise.all([
     document.fonts.load('13px "JetBrains Mono Variable"'),
@@ -34,7 +41,10 @@ const loadFonts = () =>
   ]).catch(() => undefined);
 
 const reattachTerminals = async () => {
-  const ptys = await api.ptyList().catch(() => []);
+  const ptys = await api.ptyList().catch((error: unknown) => {
+    keepStartupError(error);
+    return [];
+  });
   setRunningPtys(ptys.filter((p) => !p.exited).map((p) => p.id));
   useWorkspaceStore.getState().restore();
   const referenced = referencedTerminalIds();
@@ -44,7 +54,7 @@ const reattachTerminals = async () => {
 };
 
 const render = () =>
-  createRoot(document.getElementById("root")!).render(
+  createRoot(document.getElementById("root") as HTMLElement).render(
     <StrictMode>
       <ErrorBoundary fallback={(error) => <CrashScreen error={error} />}>
         <App />
@@ -57,7 +67,7 @@ const bootstrap = async () => {
   try {
     await Promise.all([
       reattachTerminals(),
-      sessions.loadEnvironment().catch(() => undefined),
+      sessions.loadEnvironment().catch(keepStartupError),
       loadFonts(),
       syncHideMode(useSettingsStore.getState().hideMode),
     ]);
@@ -65,8 +75,9 @@ const bootstrap = async () => {
     render();
     requestAnimationFrame(() => void appWindow.show().then(() => appWindow.setFocus()));
   }
-  await sessions.refresh().catch(() => undefined);
-  await sessions.refreshWsl().catch(() => undefined);
+  await sessions.refresh();
+  startupErrors.forEach(showError);
+  await sessions.refreshWsl();
 };
 
 void bootstrap();
