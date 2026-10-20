@@ -7,8 +7,10 @@ import CodeMirror from "@uiw/react-codemirror";
 
 import { findLanguage } from "@/lib/languages";
 import { findTheme } from "@/lib/themes";
-import { basename, normalizePath } from "@/lib/utils";
+import { basename, lruSet, normalizePath } from "@/lib/utils";
 import { useSettingsStore } from "@/stores/settings-store";
+
+const SCROLL_POSITIONS_LIMIT = 200;
 
 const makeTheme = (kind: "dark" | "light") =>
   createTheme({
@@ -148,7 +150,7 @@ export const CodeView = ({
   useEffect(
     () => () => {
       const scroller = viewRef.current?.scrollDOM;
-      if (scroller) scrollPositions.set(key, scroller.scrollTop);
+      if (scroller) lruSet(scrollPositions, key, scroller.scrollTop, SCROLL_POSITIONS_LIMIT);
     },
     [key],
   );
