@@ -26,7 +26,9 @@ const NewSessionItems = () => {
   const home = useSessionsStore((s) => s.environment?.home ?? "");
   const defaultAgent = useSettingsStore((s) => s.defaultAgent);
   const agents = useAgents();
-  const recent = folders.filter((f) => !active || !samePath(f.cwd, active.cwd)).slice(0, RECENT_FOLDER_LIMIT);
+  const recent = folders
+    .filter((f) => !active || !samePath(f.cwd, active.cwd))
+    .slice(0, RECENT_FOLDER_LIMIT);
 
   return (
     <>

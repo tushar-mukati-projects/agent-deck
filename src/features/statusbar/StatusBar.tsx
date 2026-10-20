@@ -101,7 +101,9 @@ export const StatusBar = () => {
                 onClick={() => void copyText(workspace.sessionId, "Session ID copied")}
               >
                 <Hash />
-                <span className="font-mono">{workspace.sessionId.slice(0, SHORT_SESSION_ID_LENGTH)}</span>
+                <span className="font-mono">
+                  {workspace.sessionId.slice(0, SHORT_SESSION_ID_LENGTH)}
+                </span>
               </Item>
             )}
             <ShellItem workspace={workspace} />
