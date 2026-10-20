@@ -1,4 +1,6 @@
-import { Component, type ErrorInfo, type ReactNode } from "react";
+import { Component, type ReactNode } from "react";
+
+import { Button } from "@/components/ui/button";
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -16,10 +18,6 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     return { error };
   }
 
-  componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error("[deck] render error", error, info.componentStack);
-  }
-
   reset = () => this.setState({ error: null });
 
   render() {
@@ -32,19 +30,19 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
         <p className="max-w-[520px] font-mono text-[11px] break-words text-faint select-text">
           {error.message}
         </p>
-        <button
-          type="button"
-          onClick={this.reset}
-          className="h-7 rounded-md border border-border-strong bg-elevated px-3 text-xs text-fg hover:bg-hover"
-        >
+        <Button size="sm" className="px-3" onClick={this.reset}>
           Try again
-        </button>
+        </Button>
       </div>
     );
   }
 }
 
-export const CrashScreen = ({ error }: { error: Error }) => (
+type CrashScreenProps = {
+  error: Error;
+};
+
+export const CrashScreen = ({ error }: CrashScreenProps) => (
   <div className="flex h-full flex-col items-center justify-center gap-3 bg-bg p-8 text-center">
     <p className="text-[14px] font-medium text-fg">Something went wrong</p>
     <p className="max-w-[560px] font-mono text-[11px] break-words text-faint select-text">
@@ -53,12 +51,8 @@ export const CrashScreen = ({ error }: { error: Error }) => (
     <p className="max-w-[480px] text-[12px] text-muted">
       Your sessions keep running in the background. Reloading reconnects to them.
     </p>
-    <button
-      type="button"
-      onClick={() => location.reload()}
-      className="h-8 rounded-md bg-accent px-4 text-xs font-medium text-on-accent hover:bg-accent-strong"
-    >
+    <Button variant="primary" className="px-4 text-xs" onClick={() => location.reload()}>
       Reload
-    </button>
+    </Button>
   </div>
 );
