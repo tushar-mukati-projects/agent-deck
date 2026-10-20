@@ -1,56 +1,32 @@
+mod http;
+mod stdio;
+
 use std::{
-    collections::{HashMap, VecDeque},
-    io::{BufRead, BufReader, Read, Write},
-    path::Path,
-    process::{ChildStderr, ChildStdin, ChildStdout, Command, Stdio},
+    io::Write,
     sync::{
-        atomic::{AtomicBool, AtomicU64, Ordering},
+        atomic::{AtomicU64, Ordering},
         mpsc, Arc,
     },
-    thread,
     time::{Duration, Instant},
 };
 
-use anyhow::{anyhow, bail, Context};
+use anyhow::bail;
 use parking_lot::Mutex;
 use serde::Serialize;
 use serde_json::{json, Value};
 
 use crate::{
-    agent_config::{self, url_host, Launch, ResolvedServer, Transport},
+    agent_config::{self, ResolvedServer, Transport},
     pool::{server_key, Pool},
-    process::Managed,
-    util::{hidden, http_agent, wslenv_with},
-    wsl,
 };
+use http::{http_transport, HttpReply, HttpTransport};
+use stdio::{spawn_stdio, StdioTransport};
 
 const PROTOCOL_VERSION: &str = "2025-06-18";
 const INIT_TIMEOUT: Duration = Duration::from_secs(60);
 const CALL_TIMEOUT: Duration = Duration::from_secs(120);
-const STDERR_LINES: usize = 30;
-const MAX_BODY_BYTES: u64 = 32 * 1024 * 1024;
-const METHOD_NOT_FOUND: i32 = -32601;
-const ERROR_BODY_BYTES: u64 = 4096;
-const ERROR_BODY_CHARS: usize = 300;
 const MAX_LIST_PAGES: usize = 20;
 const STDERR_TAIL_LINES: usize = 6;
-
-type Pending = Arc<Mutex<HashMap<u64, mpsc::Sender<Value>>>>;
-
-struct StdioTransport {
-    process: Managed,
-    stdin: Arc<Mutex<ChildStdin>>,
-    pending: Pending,
-    stderr: Arc<Mutex<VecDeque<String>>>,
-    closed: Arc<AtomicBool>,
-}
-
-struct HttpTransport {
-    url: String,
-    headers: Vec<(String, String)>,
-    agent: ureq::Agent,
-    session: Mutex<Option<String>>,
-}
 
 enum Connection {
     Stdio(StdioTransport),
@@ -125,211 +101,10 @@ impl McpManager {
     }
 }
 
-fn valid_env_name(name: &str) -> bool {
-    let mut chars = name.chars();
-    chars.next().is_some_and(|c| c.is_ascii_alphabetic() || c == '_') && chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
-}
-
-fn stdio_command(server: &ResolvedServer, launch: &Launch) -> anyhow::Result<Command> {
-    let command = launch.command.clone().filter(|c| !c.is_empty()).context("server has no command")?;
-    Ok(match &server.distro {
-        Some(distro) => {
-            let mut cmd = wsl::login_command(distro, &server.cwd, &command, &launch.args);
-            let names: Vec<&String> = launch.env.keys().filter(|k| valid_env_name(k)).collect();
-            for name in &names {
-                cmd.env(name, &launch.env[*name]);
-            }
-            cmd.env("WSLENV", wslenv_with(names.iter().map(|k| format!("{k}/u"))));
-            cmd
-        }
-        None => {
-            let mut cmd = Command::new(which::which(&command).map(|p| p.to_string_lossy().to_string()).unwrap_or(command));
-            cmd.args(&launch.args).envs(&launch.env);
-            if Path::new(&server.cwd).is_dir() {
-                cmd.current_dir(&server.cwd);
-            }
-            cmd
-        }
-    })
-}
-
 fn is_valid_reply(message: &Value) -> bool {
     message.get("jsonrpc").and_then(Value::as_str) == Some("2.0")
         && message.get("method").is_none()
         && (message.get("result").is_some() || message.get("error").is_some())
-}
-
-fn answer_server_request(message: &Value, stdin: &Mutex<ChildStdin>) {
-    let (Some(method), Some(id)) = (message.get("method").and_then(Value::as_str), message.get("id").filter(|id| !id.is_null())) else {
-        return;
-    };
-    let reply = if method == "ping" {
-        json!({ "jsonrpc": "2.0", "id": id, "result": {} })
-    } else {
-        json!({ "jsonrpc": "2.0", "id": id, "error": { "code": METHOD_NOT_FOUND, "message": format!("{method} isn't supported by Agent Deck") } })
-    };
-    let mut stdin = stdin.lock();
-    let _ = writeln!(stdin, "{reply}").and_then(|_| stdin.flush());
-}
-
-fn spawn_stdio(server: &ResolvedServer, launch: &Launch) -> anyhow::Result<StdioTransport> {
-    let mut cmd = stdio_command(server, launch)?;
-    cmd.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
-    let mut child = hidden(&mut cmd).spawn().with_context(|| format!("Couldn't start `{}`", launch.command.as_deref().unwrap_or_default()))?;
-    let stdin = Arc::new(Mutex::new(child.stdin.take().context("missing stdin")?));
-    let stdout = child.stdout.take().context("missing stdout")?;
-    let stderr_pipe = child.stderr.take().context("missing stderr")?;
-    let process = Managed::new(child)?;
-
-    let pending: Pending = Arc::default();
-    let stderr: Arc<Mutex<VecDeque<String>>> = Arc::default();
-    let closed = Arc::new(AtomicBool::new(false));
-    read_replies(stdout, pending.clone(), stdin.clone(), closed.clone());
-    keep_stderr_tail(stderr_pipe, stderr.clone());
-    Ok(StdioTransport { process, stdin, pending, stderr, closed })
-}
-
-fn read_replies(stdout: ChildStdout, reader_pending: Pending, reader_stdin: Arc<Mutex<ChildStdin>>, reader_closed: Arc<AtomicBool>) {
-    thread::spawn(move || {
-        let mut reader = BufReader::new(stdout);
-        let mut line = Vec::new();
-        while reader.read_until(b'\n', &mut line).is_ok_and(|n| n > 0) {
-            if let Ok(message) = serde_json::from_slice::<Value>(&line) {
-                if is_valid_reply(&message) {
-                    let sender = message.get("id").and_then(Value::as_u64).and_then(|id| reader_pending.lock().remove(&id));
-                    if let Some(sender) = sender {
-                        let _ = sender.send(message);
-                    }
-                } else {
-                    answer_server_request(&message, &reader_stdin);
-                }
-            }
-            line.clear();
-        }
-        reader_closed.store(true, Ordering::SeqCst);
-        reader_pending.lock().clear();
-    });
-}
-
-fn keep_stderr_tail(stderr_pipe: ChildStderr, err_lines: Arc<Mutex<VecDeque<String>>>) {
-    thread::spawn(move || {
-        let mut reader = BufReader::new(stderr_pipe);
-        let mut buf = Vec::new();
-        while reader.read_until(b'\n', &mut buf).is_ok_and(|n| n > 0) {
-            let line = String::from_utf8_lossy(&buf).trim_end().to_string();
-            buf.clear();
-            if line.is_empty() {
-                continue;
-            }
-            let mut lines = err_lines.lock();
-            if lines.len() == STDERR_LINES {
-                lines.pop_front();
-            }
-            lines.push_back(line);
-        }
-    });
-}
-
-fn http_transport(launch: &Launch) -> anyhow::Result<HttpTransport> {
-    let url = launch.url.clone().filter(|u| !u.is_empty()).context("server has no url")?;
-    Ok(HttpTransport { url, headers: launch.headers.clone(), agent: http_agent(CALL_TIMEOUT), session: Mutex::new(None) })
-}
-
-fn sse_message(reader: impl BufRead, id: u64) -> anyhow::Result<Option<Value>> {
-    let mut data = String::new();
-    for line in reader.lines() {
-        let line = line?;
-        if let Some(chunk) = line.strip_prefix("data:") {
-            if !data.is_empty() {
-                data.push('\n');
-            }
-            data.push_str(chunk.strip_prefix(' ').unwrap_or(chunk));
-            continue;
-        }
-        if line.is_empty() && !data.is_empty() {
-            let event = std::mem::take(&mut data);
-            if let Ok(value) = serde_json::from_str::<Value>(&event) {
-                if value.get("id").and_then(Value::as_u64) == Some(id) && is_valid_reply(&value) {
-                    return Ok(Some(value));
-                }
-            }
-        }
-    }
-    if let Ok(value) = serde_json::from_str::<Value>(&data) {
-        if value.get("id").and_then(Value::as_u64) == Some(id) {
-            return Ok(Some(value));
-        }
-    }
-    Ok(None)
-}
-
-enum HttpReply {
-    Message(Option<Value>),
-    SessionExpired,
-}
-
-impl HttpTransport {
-    fn post(&self, message: &Value, id: Option<u64>) -> anyhow::Result<HttpReply> {
-        let host = url_host(&self.url);
-        let mut request = self
-            .agent
-            .post(&self.url)
-            .header("Content-Type", "application/json")
-            .header("Accept", "application/json, text/event-stream")
-            .header("MCP-Protocol-Version", PROTOCOL_VERSION);
-        for (name, value) in &self.headers {
-            request = request.header(name, value);
-        }
-        let session = self.session.lock().clone();
-        if let Some(session) = &session {
-            request = request.header("Mcp-Session-Id", session);
-        }
-        let mut response = request.send(message.to_string()).map_err(|e| anyhow!("Couldn't reach {host}: {}", describe_http_error(&e)))?;
-        let status = response.status().as_u16();
-        if let Some(value) = response.headers().get("mcp-session-id").and_then(|v| v.to_str().ok()) {
-            *self.session.lock() = Some(value.to_string());
-        }
-        if status == 404 && session.is_some() {
-            *self.session.lock() = None;
-            return Ok(HttpReply::SessionExpired);
-        }
-        if status == 401 || status == 403 {
-            bail!("This server needs you to sign in. Connect it once from Claude Code (/mcp), because Deck can't reuse that login.");
-        }
-        let content_type = response.headers().get("content-type").and_then(|v| v.to_str().ok()).unwrap_or_default().to_lowercase();
-        let body = response.body_mut().as_reader().take(MAX_BODY_BYTES);
-        if !(200..300).contains(&status) {
-            let mut text = String::new();
-            let _ = BufReader::new(body).take(ERROR_BODY_BYTES).read_to_string(&mut text);
-            bail!("HTTP {status} from {host}: {}", text.chars().take(ERROR_BODY_CHARS).collect::<String>());
-        }
-        let Some(id) = id else { return Ok(HttpReply::Message(None)) };
-        reply_from(body, &content_type, id)
-    }
-}
-
-fn reply_from(body: impl Read, content_type: &str, id: u64) -> anyhow::Result<HttpReply> {
-    if content_type.contains("text/event-stream") {
-        return match sse_message(BufReader::new(body), id)? {
-            Some(value) => Ok(HttpReply::Message(Some(value))),
-            None => bail!("The server's event stream ended without a response"),
-        };
-    }
-    let mut text = String::new();
-    BufReader::new(body).read_to_string(&mut text)?;
-    if text.trim().is_empty() {
-        return Ok(HttpReply::Message(None));
-    }
-    Ok(HttpReply::Message(Some(serde_json::from_str(&text).context("The server returned invalid JSON")?)))
-}
-
-fn describe_http_error(error: &ureq::Error) -> String {
-    match error {
-        ureq::Error::BadUri(_) => "the address isn't valid".into(),
-        ureq::Error::Timeout(_) => "the connection timed out".into(),
-        ureq::Error::HostNotFound => "the host wasn't found".into(),
-        other => other.to_string(),
-    }
 }
 
 impl Client {
@@ -503,15 +278,6 @@ mod tests {
     }
 
     #[test]
-    fn reads_the_matching_sse_event_without_waiting_for_the_stream_to_end() {
-        let stream = "event: message\ndata: {\"jsonrpc\":\"2.0\",\"method\":\"log\"}\n\ndata: {\"jsonrpc\":\"2.0\",\"id\":7,\n data:\"result\":{\"ok\":true}}\n\n";
-        let stream = stream.replace("\n data:", "\ndata:");
-        let reader = std::io::Cursor::new(format!("{stream}data: never-ending"));
-        let value = sse_message(BufReader::new(reader), 7).unwrap().unwrap();
-        assert_eq!(value["result"]["ok"], true);
-    }
-
-    #[test]
     #[ignore]
     fn talks_to_a_noisy_stdio_server() {
         let script = std::env::temp_dir().join(format!("deck-fake-mcp-{}.cjs", std::process::id()));
@@ -556,9 +322,4 @@ readline.createInterface({ input: process.stdin }).on("line", (line) => {
 });
 "#;
 
-    #[test]
-    fn quotes_for_posix_and_fish_shells() {
-        assert_eq!(crate::util::sh_quote("it's"), r"'it'\''s'");
-        assert!(valid_env_name("API_KEY") && !valid_env_name("1X") && !valid_env_name("A-B"));
-    }
 }
