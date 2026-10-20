@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { subscribeFileChanges } from "@/lib/file-events";
 import { api } from "@/lib/tauri/commands";
-import { appWindow } from "@/lib/tauri/system";
+import { onWindowFocused } from "@/lib/tauri/focus";
 import { errorMessage, lruSet, normalizePath } from "@/lib/utils";
 import { isDirty } from "@/stores/viewer-store";
 import type { FileContent } from "@/types";
@@ -63,12 +63,12 @@ export const useFileContent = (path: string, enabled: boolean) => {
     const unsubscribe = subscribeFileChanges((change) => {
       if (change.paths.some((p) => normalizePath(p) === target)) onChanged();
     });
-    const unlisten = appWindow.onFocusChanged(({ payload: focused }) => {
-      if (focused && !isDirty(path)) void load(true);
+    const stopFocus = onWindowFocused(() => {
+      if (!isDirty(path)) void load(true);
     });
     return () => {
       unsubscribe();
-      void unlisten.then((fn) => fn());
+      stopFocus();
     };
   }, [enabled, path, load]);
 

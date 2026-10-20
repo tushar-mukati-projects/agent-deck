@@ -3,7 +3,7 @@ import { create } from "zustand";
 
 import { singleFlight } from "@/lib/single-flight";
 import { api } from "@/lib/tauri/commands";
-import { appWindow } from "@/lib/tauri/system";
+import { onWindowFocused } from "@/lib/tauri/focus";
 import { errorMessage, normalizePath, sameJson } from "@/lib/utils";
 import type { AgentOverview, ConfigAgent } from "@/types";
 
@@ -68,10 +68,9 @@ export const useOverview = (cwd: string, agent: ConfigAgent) => {
     const { load } = useOverviewStore.getState();
     const age = () => Date.now() - (useOverviewStore.getState().entries[key]?.fetchedAt ?? 0);
     if (age() > MOUNT_REFRESH_MS) void load(cwd, agent);
-    const unlisten = appWindow.onFocusChanged(({ payload: focused }) => {
-      if (focused && age() > FOCUS_REFRESH_MS) void load(cwd, agent);
+    return onWindowFocused(() => {
+      if (age() > FOCUS_REFRESH_MS) void load(cwd, agent);
     });
-    return () => void unlisten.then((fn) => fn());
   }, [cwd, agent, key]);
 
   const reload = useCallback(() => refreshOverview(cwd, agent), [cwd, agent]);
