@@ -27,11 +27,6 @@ interface DiffContent {
   beforeLabel: string;
 }
 
-interface SessionFile {
-  filePath: string | null;
-  distro: string | null;
-}
-
 const readCurrent = async (path: string) => {
   const content = await api.readFile(path).catch(async (error: unknown) => {
     if (await api.statPath(path)) throw error;
@@ -51,7 +46,10 @@ const readHead = async (path: string) => {
   }
 };
 
-const loadDiff = async (tab: DiffTab, session: SessionFile): Promise<DiffContent> => {
+const loadDiff = async (
+  tab: DiffTab,
+  session: ReturnType<typeof useSessionFile>,
+): Promise<DiffContent> => {
   const after = await readCurrent(tab.path);
   if (tab.source === "git") {
     return { before: await readHead(tab.path), after, beforeLabel: "HEAD" };
