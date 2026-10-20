@@ -40,7 +40,13 @@ import { runShortcut } from "@/hooks/useGlobalShortcuts";
 import { subscribeFileChanges, watchedSince } from "@/lib/file-events";
 import { FileIcon } from "@/lib/file-icons";
 import { fuzzyScore, pathKey } from "@/lib/fuzzy";
-import { sortTop, topFiles, type PreparedFile } from "@/lib/palette";
+import {
+  emptyHint,
+  MIN_CHAT_QUERY,
+  sortTop,
+  topFiles,
+  type PreparedFile,
+} from "@/lib/palette";
 import { sessionTitle } from "@/lib/sessions";
 import { shortcutLabel, type ShortcutAction } from "@/lib/shortcuts";
 import { api } from "@/lib/tauri/commands";
@@ -48,7 +54,15 @@ import { copyText, revealInExplorer } from "@/lib/tauri/system";
 import { resumeCommandLine } from "@/lib/agents/launch";
 import { THEMES } from "@/lib/themes";
 import { parseTypedPath } from "@/lib/typed-path";
-import { basename, groupBy, joinPath, normalizePath, shortenHome, timeAgo } from "@/lib/utils";
+import {
+  basename,
+  failedTo,
+  groupBy,
+  joinPath,
+  normalizePath,
+  shortenHome,
+  timeAgo,
+} from "@/lib/utils";
 import { agentName, findAgent, listAgents } from "@/stores/agents";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -107,9 +121,11 @@ const useFileList = (root: string | null, wanted: boolean) => {
 const useChatSearch = (query: string, enabled: boolean) => {
   const includeWsl = useSettingsStore((s) => s.includeWsl);
   const [hits, setHits] = useState<SearchHit[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [searching, setSearching] = useState(false);
   useEffect(() => {
-    if (!enabled || query.length < 2) {
+    setError(null);
+    if (!enabled || query.length < MIN_CHAT_QUERY) {
       setHits(null);
       setSearching(false);
       return;
@@ -120,7 +136,11 @@ const useChatSearch = (query: string, enabled: boolean) => {
       api
         .searchSessions(query, includeWsl)
         .then((result) => !cancelled && setHits(result))
-        .catch(() => !cancelled && setHits([]))
+        .catch((reason: unknown) => {
+          if (cancelled) return;
+          setHits([]);
+          setError(failedTo("search conversations", reason));
+        })
         .finally(() => !cancelled && setSearching(false));
     }, CHAT_SEARCH_DELAY_MS);
     return () => {
@@ -128,7 +148,7 @@ const useChatSearch = (query: string, enabled: boolean) => {
       window.clearTimeout(timer);
     };
   }, [query, enabled, includeWsl]);
-  return { hits, searching };
+  return { hits, error, searching };
 };
 
 interface CommandDef {
@@ -441,16 +461,13 @@ export const usePaletteItems = (mode: PaletteMode, liveQuery: string) => {
   ]);
 
   const loading = (mode === "files" && !files) || (mode === "chats" && chats.searching);
-  const emptyHint =
-    mode === "files" && !workspace
-      ? "Open a session to search its files."
-      : mode === "chats"
-        ? query.length < 2
-          ? "Type at least 2 characters to search every conversation."
-          : chats.searching
-            ? "Searching conversations…"
-            : "No conversation mentions that."
-        : "Nothing matches.";
+  const hint = emptyHint({
+    mode,
+    hasWorkspace: !!workspace,
+    query,
+    searchingChats: chats.searching,
+    chatError: chats.error,
+  });
 
-  return { items, loading, emptyHint };
+  return { items, loading, emptyHint: hint };
 };

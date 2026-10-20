@@ -1,4 +1,7 @@
 import { fuzzyPathKeyScorer, type PathKey } from "@/lib/fuzzy";
+import type { PaletteMode } from "@/stores/ui-store";
+
+export const MIN_CHAT_QUERY = 2;
 
 export type PreparedFile = {
   rel: string;
@@ -8,6 +11,14 @@ export type PreparedFile = {
 export type ScoredFile = {
   rel: string;
   score: number;
+};
+
+export type EmptyHintState = {
+  mode: PaletteMode;
+  hasWorkspace: boolean;
+  query: string;
+  searchingChats: boolean;
+  chatError: string | null;
 };
 
 export const sortTop = <T extends { score: number }>(list: T[], limit: number) =>
@@ -29,4 +40,19 @@ export const topFiles = (files: PreparedFile[], query: string, limit: number) =>
     top.sort((a, b) => b.score - a.score);
   }
   return { top, matched };
+};
+
+export const emptyHint = ({
+  mode,
+  hasWorkspace,
+  query,
+  searchingChats,
+  chatError,
+}: EmptyHintState) => {
+  if (mode === "files" && !hasWorkspace) return "Open a session to search its files.";
+  if (mode !== "chats") return "Nothing matches.";
+  if (query.length < MIN_CHAT_QUERY)
+    return `Type at least ${MIN_CHAT_QUERY} characters to search every conversation.`;
+  if (searchingChats) return "Searching conversations…";
+  return chatError ?? "No conversation mentions that.";
 };

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { pathKey } from "@/lib/fuzzy";
-import { sortTop, topFiles } from "@/lib/palette";
+import { emptyHint, sortTop, topFiles, type EmptyHintState } from "@/lib/palette";
 
 const prepare = (rels: string[]) => rels.map((rel) => ({ rel, key: pathKey(rel) }));
 
@@ -37,5 +37,30 @@ describe("sortTop", () => {
   it("sorts by score and keeps the first ones", () => {
     const items = [{ score: 1 }, { score: 3 }, { score: 2 }];
     expect(sortTop(items, 2)).toEqual([{ score: 3 }, { score: 2 }]);
+  });
+});
+
+describe("emptyHint", () => {
+  const base: EmptyHintState = {
+    mode: "chats",
+    hasWorkspace: true,
+    query: "deploy",
+    searchingChats: false,
+    chatError: null,
+  };
+
+  it.each<[Partial<EmptyHintState>, string]>([
+    [{ mode: "files", hasWorkspace: false }, "Open a session to search its files."],
+    [{ mode: "files" }, "Nothing matches."],
+    [{ mode: "all" }, "Nothing matches."],
+    [{ query: "d" }, "Type at least 2 characters to search every conversation."],
+    [{ searchingChats: true }, "Searching conversations…"],
+    [{}, "No conversation mentions that."],
+    [
+      { chatError: "Couldn't search conversations: disk unreadable" },
+      "Couldn't search conversations: disk unreadable",
+    ],
+  ])("shows the right hint for %j", (state, hint) => {
+    expect(emptyHint({ ...base, ...state })).toBe(hint);
   });
 });
