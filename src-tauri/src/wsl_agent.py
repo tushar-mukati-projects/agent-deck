@@ -129,27 +129,23 @@ def real_folder(home: str, name: str) -> str:
     return os.path.realpath(os.path.join(home, name))
 
 
-def real_files(folder: str, depth: int, prefix: str) -> Iterator[str]:
-    try:
-        with os.scandir(folder) as scanned:
-            entries = [entry for entry in scanned if not entry.is_symlink()]
-    except OSError:
+def unlinked_files(folder: str, depth: int, pattern: str) -> Iterator[str]:
+    if not depth:
+        yield from glob.glob(os.path.join(folder, pattern))
         return
-    for entry in entries:
-        if depth and entry.is_dir():
-            yield from real_files(entry.path, depth - 1, prefix)
-        elif not depth and entry.is_file() and entry.name.startswith(prefix) and entry.name.endswith(".jsonl"):
-            yield entry.path
+    for child in glob.glob(os.path.join(folder, "*")):
+        if not os.path.islink(child):
+            yield from unlinked_files(glob.escape(child), depth - 1, pattern)
 
 
 def claude_files() -> Iterator[str]:
     for home in claude_homes():
-        yield from real_files(real_folder(home, "projects"), 1, "")
+        yield from unlinked_files(os.path.join(home, "projects"), 1, "*.jsonl")
 
 
 def codex_files() -> Iterator[str]:
     for home in codex_homes():
-        yield from real_files(real_folder(home, "sessions"), 3, "rollout-")
+        yield from unlinked_files(os.path.join(home, "sessions"), 3, "rollout-*.jsonl")
 
 
 def session_sources() -> list[tuple[str, bool]]:
