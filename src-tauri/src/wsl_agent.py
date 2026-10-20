@@ -15,7 +15,9 @@ TOOL_CHARS = 1000
 PATCH_CHARS = 1000000
 LONG_LINE = 64 * 1024
 SNIFF_BYTES = 8192
+EDGE_BYTES = 4000
 HUGE_LINE = 16 * 1024 * 1024
+API_MESSAGE_TYPE = b"message"
 INDEX_BUDGET = 1024 * 1024 * 1024
 SEARCH_LINES_PER_FILE = 20
 MAX_LIST = 60000
@@ -142,14 +144,22 @@ def top_level(data, keys):
     return {k: data[k] for k in keys if k in data}
 
 
+def outer_type(first, tail):
+    if first != API_MESSAGE_TYPE:
+        return first
+    kinds = HUGE_FIELDS["type"].findall(tail)
+    return kinds[-1] if kinds else b""
+
+
 def huge_record(line):
-    head, tail = line[:4000], line[-4000:]
+    head, tail = line[:EDGE_BYTES], line[-EDGE_BYTES:]
     record = {}
     for key, pattern in HUGE_FIELDS.items():
         match = pattern.search(head) or pattern.search(tail)
         if match:
+            value = outer_type(match.group(1), tail) if key == "type" else match.group(1)
             try:
-                record[key] = json.loads(b'"' + match.group(1) + b'"')
+                record[key] = json.loads(b'"' + value + b'"')
             except ValueError:
                 pass
     for key, pattern in FLAG_FIELDS.items():
@@ -173,7 +183,7 @@ def is_bulky(line):
         return False
     head = line[:SNIFF_BYTES]
     match = HUGE_FIELDS["type"].search(head)
-    kind = match.group(1) if match else b""
+    kind = outer_type(match.group(1), line[-EDGE_BYTES:]) if match else b""
     return kind == b"assistant" or (kind == b"user" and b'"tool_result"' in head)
 
 
