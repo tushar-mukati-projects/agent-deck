@@ -49,19 +49,33 @@ fn warp_handles(path: &Path) -> Option<[isize; 2]> {
         return Some(*handles);
     }
     let wide: Vec<u16> = path.as_os_str().encode_wide().chain([0]).collect();
-    let loaded = ICON_SLOTS.map(|(_, metric)| load_icon(&wide, metric));
-    if loaded.contains(&0) {
-        for handle in loaded.into_iter().filter(|handle| *handle != 0) {
-            destroy_icon(handle);
-        }
+    let [small, big] = ICON_SLOTS.map(|(_, metric)| LoadedIcon::load(&wide, metric));
+    let (Some(small), Some(big)) = (small, big) else {
         return None;
-    }
-    Some(*WARP.get_or_init(|| loaded))
+    };
+    Some(*WARP.get_or_init(|| [small.into_raw(), big.into_raw()]))
 }
 
-fn load_icon(wide_path: &[u16], metric: SYSTEM_METRICS_INDEX) -> isize {
-    let size = system_metric(metric);
-    unsafe { LoadImageW(std::ptr::null_mut(), wide_path.as_ptr(), IMAGE_ICON, size, size, LR_LOADFROMFILE) as isize }
+struct LoadedIcon(isize);
+
+impl LoadedIcon {
+    fn load(wide_path: &[u16], metric: SYSTEM_METRICS_INDEX) -> Option<Self> {
+        let size = system_metric(metric);
+        let handle = unsafe { LoadImageW(std::ptr::null_mut(), wide_path.as_ptr(), IMAGE_ICON, size, size, LR_LOADFROMFILE) as isize };
+        (handle != 0).then_some(Self(handle))
+    }
+
+    fn into_raw(self) -> isize {
+        let handle = self.0;
+        std::mem::forget(self);
+        handle
+    }
+}
+
+impl Drop for LoadedIcon {
+    fn drop(&mut self) {
+        let _ = unsafe { DestroyIcon(self.0 as HICON) };
+    }
 }
 
 fn system_metric(metric: SYSTEM_METRICS_INDEX) -> i32 {
@@ -74,8 +88,4 @@ fn window_icon(hwnd: HWND, kind: u32) -> isize {
 
 fn set_icon(hwnd: HWND, kind: u32, handle: isize) {
     unsafe { SendMessageW(hwnd, WM_SETICON, kind as usize, handle) };
-}
-
-fn destroy_icon(handle: isize) {
-    unsafe { DestroyIcon(handle as HICON) };
 }

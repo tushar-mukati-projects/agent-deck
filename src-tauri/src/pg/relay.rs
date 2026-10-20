@@ -13,11 +13,13 @@ use parking_lot::Mutex;
 use super::{KEEPALIVE_IDLE, KEEPALIVE_INTERVAL};
 use crate::{process::Managed, util::hidden};
 
+const KEEPALIVE_PROBES: u32 = 3;
+
 const RELAY: &str = r#"import socket, sys, threading
 s = socket.create_connection((sys.argv[1], int(sys.argv[2])), 10)
 s.settimeout(None)
 s.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
-for name, value in (("TCP_KEEPIDLE", int(sys.argv[3])), ("TCP_KEEPINTVL", int(sys.argv[4])), ("TCP_KEEPCNT", 3)):
+for name, value in (("TCP_KEEPIDLE", int(sys.argv[3])), ("TCP_KEEPINTVL", int(sys.argv[4])), ("TCP_KEEPCNT", int(sys.argv[5]))):
     if hasattr(socket, name):
         s.setsockopt(socket.IPPROTO_TCP, getattr(socket, name), value)
 def upstream():
@@ -60,7 +62,7 @@ pub(super) fn wsl_relay(distro: &str, host: &str, port: u16) -> anyhow::Result<(
     let mut command = Command::new("wsl.exe");
     command
         .args(["-d", distro, "-e", "python3", "-c", &script, host, &port.to_string()])
-        .args([KEEPALIVE_IDLE.as_secs().to_string(), KEEPALIVE_INTERVAL.as_secs().to_string()])
+        .args([KEEPALIVE_IDLE.as_secs().to_string(), KEEPALIVE_INTERVAL.as_secs().to_string(), KEEPALIVE_PROBES.to_string()])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());

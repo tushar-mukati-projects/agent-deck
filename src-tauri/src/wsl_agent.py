@@ -129,23 +129,23 @@ def real_folder(home: str, name: str) -> str:
     return os.path.realpath(os.path.join(home, name))
 
 
-def unlinked_files(folder: str, depth: int, pattern: str) -> Iterator[str]:
+def glob_through_real_folders(folder: str, depth: int, pattern: str) -> Iterator[str]:
     if not depth:
         yield from glob.glob(os.path.join(folder, pattern))
         return
     for child in glob.glob(os.path.join(folder, "*")):
         if not os.path.islink(child):
-            yield from unlinked_files(glob.escape(child), depth - 1, pattern)
+            yield from glob_through_real_folders(glob.escape(child), depth - 1, pattern)
 
 
 def claude_files() -> Iterator[str]:
     for home in claude_homes():
-        yield from unlinked_files(os.path.join(home, "projects"), 1, "*.jsonl")
+        yield from glob_through_real_folders(os.path.join(home, "projects"), 1, "*.jsonl")
 
 
 def codex_files() -> Iterator[str]:
     for home in codex_homes():
-        yield from unlinked_files(os.path.join(home, "sessions"), 3, "rollout-*.jsonl")
+        yield from glob_through_real_folders(os.path.join(home, "sessions"), 3, "rollout-*.jsonl")
 
 
 def session_sources() -> list[tuple[str, bool]]:
