@@ -1,9 +1,12 @@
+mod paths;
+mod runner;
+
 use std::{
     collections::{HashMap, HashSet},
     io::Write,
     path::PathBuf,
     process::{Child, Command, Stdio},
-    sync::{Arc, LazyLock},
+    sync::LazyLock,
     thread,
     time::{Duration, Instant},
 };
@@ -11,7 +14,7 @@ use std::{
 use anyhow::{anyhow, Context};
 use base64::Engine;
 use parking_lot::Mutex;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use serde_json::{json, value::RawValue, Value};
 
 use crate::{
@@ -19,22 +22,20 @@ use crate::{
     git::GitChange,
     sessions::{self, Accumulator, LiveSession, Needle, SearchHit, SessionInfo, TranscriptPage},
     tasks,
-    util::{hidden, run_with_timeout, sh_quote, wslenv_with},
+    util::{hidden, run_with_timeout},
 };
+use paths::host_of;
+pub(crate) use paths::{host_path, normalize_path, parse_host_path};
+use runner::{agent_command, known_login_env, run_agent, run_agent_with};
+pub(crate) use runner::{decode_output, env_var, login_command, login_var};
 
 const AGENT: &str = include_str!("wsl_agent.py");
-const BOOTSTRAP: &str = "import sys,base64;exec(base64.b64decode(sys.stdin.readline()))";
 const INDEX_TIMEOUT: Duration = Duration::from_secs(90);
 const INDEX_ROUNDS: Duration = Duration::from_secs(60);
-const AGENT_TIMEOUT: Duration = Duration::from_secs(30);
 const LIST_TIMEOUT: Duration = Duration::from_secs(8);
-const LOGIN_TIMEOUT: Duration = Duration::from_secs(20);
 const RUNNING_TTL: Duration = Duration::from_secs(5);
 const LIVE_TTL: Duration = Duration::from_secs(30);
-const UNC_PREFIX: &str = r"\\wsl.localhost\";
-const FORWARDED_VARS: [&str; 2] = ["CLAUDE_CONFIG_DIR", "CODEX_HOME"];
 const CACHE_DIR: &str = "agent-deck";
-const ENCODING_SAMPLE_BYTES: usize = 256;
 
 static SCRIPT: LazyLock<String> = LazyLock::new(|| base64::engine::general_purpose::STANDARD.encode(AGENT));
 
@@ -84,9 +85,6 @@ static SAVE_LOCK: Mutex<()> = Mutex::new(());
 static INDEX_LOCK: Mutex<()> = Mutex::new(());
 static RUNNING: Mutex<Option<(Instant, Vec<String>)>> = Mutex::new(None);
 static HOMES: LazyLock<Mutex<HashMap<String, String>>> = LazyLock::new(Mutex::default);
-type LoginEnv = Arc<HashMap<String, String>>;
-type LoginSlot = Arc<Mutex<Option<LoginEnv>>>;
-static LOGIN_ENV: LazyLock<Mutex<HashMap<String, LoginSlot>>> = LazyLock::new(Mutex::default);
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -116,11 +114,6 @@ struct Lines {
     end: u64,
 }
 
-#[derive(Deserialize)]
-struct ErrorReply {
-    error: Option<String>,
-}
-
 fn cache_file() -> PathBuf {
     dirs::cache_dir().unwrap_or_else(std::env::temp_dir).join(CACHE_DIR).join("wsl-index.json")
 }
@@ -143,17 +136,6 @@ fn save() {
     let tmp = path.with_extension("tmp");
     if std::fs::write(&tmp, text).is_ok() {
         let _ = std::fs::rename(&tmp, &path);
-    }
-}
-
-pub fn decode_output(bytes: &[u8]) -> String {
-    let sample = &bytes[..bytes.len().min(ENCODING_SAMPLE_BYTES)];
-    let odd_nuls = sample.iter().skip(1).step_by(2).filter(|b| **b == 0).count();
-    if sample.len() >= 2 && odd_nuls * 4 >= sample.len() {
-        let units: Vec<u16> = bytes.as_chunks::<2>().0.iter().map(|c| u16::from_le_bytes(*c)).collect();
-        String::from_utf16_lossy(&units).trim_start_matches('\u{feff}').to_string()
-    } else {
-        String::from_utf8_lossy(bytes).into_owned()
     }
 }
 
@@ -192,123 +174,6 @@ fn distros() -> Vec<Distro> {
 
 pub fn is_running(distro: &str) -> bool {
     running_names(false).iter().any(|name| name == distro)
-}
-
-pub fn host_path(distro: &str, linux_path: &str) -> String {
-    format!("{UNC_PREFIX}{distro}{}", linux_path.replace('/', "\\"))
-}
-
-pub fn normalize_path(path: &str) -> String {
-    match parse_host_path(path) {
-        Some((distro, linux)) => host_path(&distro, &linux),
-        None => path.to_string(),
-    }
-}
-
-fn host_of(distro: &str, path: &str) -> String {
-    if path.starts_with('/') {
-        host_path(distro, path)
-    } else {
-        path.to_string()
-    }
-}
-
-pub fn parse_host_path(path: &str) -> Option<(String, String)> {
-    let lower = path.to_lowercase();
-    let rest = [r"\\wsl.localhost\", r"\\wsl$\", r"\\?\unc\wsl.localhost\", r"\\?\unc\wsl$\", "//wsl.localhost/", "//wsl$/"]
-        .iter()
-        .find(|prefix| lower.starts_with(*prefix))
-        .map(|prefix| &path[prefix.len()..])?;
-    let rest = rest.replace('/', "\\");
-    let (distro, tail) = rest.split_once('\\').unwrap_or((&rest, ""));
-    (!distro.is_empty()).then(|| (distro.to_string(), format!("/{}", tail.replace('\\', "/"))))
-}
-
-fn agent_command(distro: &str, args: &[&str]) -> Command {
-    let mut command = Command::new("wsl.exe");
-    command.args(["-d", distro, "-e", "python3", "-c", BOOTSTRAP]).args(args);
-    command
-}
-
-fn forward_login_vars(command: &mut Command, distro: &str) {
-    let Some(env) = known_login_env(distro) else { return };
-    let forwarded: Vec<&str> = FORWARDED_VARS.iter().copied().filter(|key| env.get(*key).is_some_and(|v| !v.is_empty())).collect();
-    if forwarded.is_empty() {
-        return;
-    }
-    for key in &forwarded {
-        command.env(key, &env[*key]);
-    }
-    command.env("WSLENV", wslenv_with(forwarded.iter().map(|k| format!("{k}/u"))));
-}
-
-fn run_agent_raw(mut command: Command, distro: &str, input: Option<String>, timeout: Duration) -> anyhow::Result<Vec<u8>> {
-    let payload = format!("{}\n{}", *SCRIPT, input.unwrap_or_default());
-    let output = run_with_timeout(&mut command, Some(payload.as_bytes()), timeout).with_context(|| format!("WSL {distro} didn't respond"))?;
-    if let Ok(reply) = serde_json::from_slice::<ErrorReply>(&output.stdout) {
-        if let Some(error) = reply.error {
-            return Err(anyhow!("WSL {distro}: {error}"));
-        }
-        return Ok(output.stdout);
-    }
-    let stderr = decode_output(&output.stderr);
-    Err(anyhow!("WSL {distro}: {}", stderr.trim().lines().last().unwrap_or("agent failed (is python3 installed?)")))
-}
-
-fn run_agent_with<T: DeserializeOwned>(distro: &str, args: &[&str], input: Option<String>, timeout: Duration) -> anyhow::Result<T> {
-    let mut command = agent_command(distro, args);
-    forward_login_vars(&mut command, distro);
-    let bytes = run_agent_raw(command, distro, input, timeout)?;
-    serde_json::from_slice(&bytes).with_context(|| format!("WSL {distro} sent an unexpected reply"))
-}
-
-fn run_agent<T: DeserializeOwned>(distro: &str, args: &[&str], input: Option<String>) -> anyhow::Result<T> {
-    run_agent_with(distro, args, input, AGENT_TIMEOUT)
-}
-
-fn login_slot(distro: &str) -> LoginSlot {
-    LOGIN_ENV.lock().entry(distro.to_string()).or_default().clone()
-}
-
-fn known_login_env(distro: &str) -> Option<LoginEnv> {
-    let slot = login_slot(distro);
-    let value = slot.try_lock()?;
-    if let Some(env) = value.as_ref() {
-        return Some(env.clone());
-    }
-    drop(value);
-    let distro = distro.to_string();
-    thread::spawn(move || login_env(&distro));
-    None
-}
-
-fn login_env(distro: &str) -> Option<LoginEnv> {
-    let slot = login_slot(distro);
-    let mut value = slot.lock();
-    if let Some(env) = value.as_ref() {
-        return Some(env.clone());
-    }
-    #[derive(Deserialize)]
-    struct Reply {
-        shell: String,
-        env: HashMap<String, String>,
-    }
-    let reply = run_agent_raw(agent_command(distro, &["loginenv"]), distro, None, LOGIN_TIMEOUT)
-        .ok()
-        .and_then(|bytes| serde_json::from_slice::<Reply>(&bytes).ok())?;
-    CACHE.lock().distros.entry(distro.to_string()).or_default().shell = Some(reply.shell);
-    Some(value.insert(Arc::new(reply.env)).clone())
-}
-
-pub fn login_var(distro: &str, name: &str) -> Option<String> {
-    login_env(distro)?.get(name).cloned()
-}
-
-pub fn env_var(distro: Option<&str>, name: &str) -> Option<String> {
-    match distro {
-        Some(distro) => login_var(distro, name),
-        None => std::env::var(name).ok(),
-    }
 }
 
 fn session_info(distro: &str, path: &str, entry: &Entry) -> Option<SessionInfo> {
@@ -627,21 +492,6 @@ pub fn home_for(distro: &str, linux_cwd: &str) -> anyhow::Result<String> {
     Ok(home)
 }
 
-pub fn login_command(distro: &str, linux_cwd: &str, program: &str, args: &[impl AsRef<str>]) -> Command {
-    let script = std::iter::once(program).chain(args.iter().map(AsRef::as_ref)).map(sh_quote).collect::<Vec<_>>().join(" ");
-    let mut command = Command::new("wsl.exe");
-    command.args(["-d", distro, "--cd", linux_cwd, "-e", &login_shell(distro), "-lic"]).arg(format!("exec {script}"));
-    command
-}
-
-fn login_shell(distro: &str) -> String {
-    if let Some(shell) = CACHE.lock().distros.get(distro).and_then(|d| d.shell.clone()) {
-        return shell;
-    }
-    login_env(distro);
-    CACHE.lock().distros.get(distro).and_then(|d| d.shell.clone()).unwrap_or_else(|| "bash".into())
-}
-
 pub fn start(distro: &str) -> anyhow::Result<()> {
     let output = run_with_timeout(Command::new("wsl.exe").args(["-d", distro, "-e", "true"]), None, INDEX_TIMEOUT)?;
     anyhow::ensure!(output.status.success(), "Couldn't start WSL distro {distro}");
@@ -667,27 +517,6 @@ pub(crate) fn spawn_watch(distro: &str, linux_root: &str) -> anyhow::Result<Watc
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn converts_between_linux_and_host_paths() {
-        let host = host_path("Debian", "/home/me/work");
-        assert_eq!(host, r"\\wsl.localhost\Debian\home\me\work");
-        assert_eq!(parse_host_path(&host), Some(("Debian".into(), "/home/me/work".into())));
-        assert_eq!(parse_host_path(r"\\wsl$\Ubuntu"), Some(("Ubuntu".into(), "/".into())));
-        assert_eq!(parse_host_path("//wsl.localhost/Debian/tmp/x"), Some(("Debian".into(), "/tmp/x".into())));
-        assert_eq!(parse_host_path(r"\\?\UNC\wsl.localhost\Debian\etc"), Some(("Debian".into(), "/etc".into())));
-        assert_eq!(parse_host_path(r"\\wsl.localhost\"), None);
-        assert_eq!(parse_host_path(r"C:\Users"), None);
-        assert_eq!(host_of("Debian", "src/a.rs"), "src/a.rs");
-    }
-
-    #[test]
-    fn decodes_both_wsl_output_encodings() {
-        let utf16: Vec<u8> = "\u{feff}Debian\r\nUbuntu\r\n".encode_utf16().flat_map(u16::to_le_bytes).collect();
-        assert_eq!(decode_output(&utf16), "Debian\r\nUbuntu\r\n");
-        assert_eq!(decode_output("Debian\nUbuntu\n".as_bytes()), "Debian\nUbuntu\n");
-        assert_eq!(decode_output(b""), "");
-    }
 
     #[test]
     #[ignore]
