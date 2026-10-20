@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { ArrowRightToLine, Copy, FolderOpen, GitCompare, Plug, X, XCircle } from "lucide-react";
+import { ArrowRightToLine, GitCompare, Plug, X, XCircle } from "lucide-react";
 
 import { closeFilesWithConfirm } from "@/actions/files";
 import {
@@ -10,11 +10,11 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/menu";
 import { Tab, TabStrip } from "@/components/ui/tabs";
+import { fileActions } from "@/features/viewer/file-actions";
 import { decodeDiffTab, decodeMcpTab, tabTargetPath } from "@/lib/diff-tabs";
 import { FileIcon } from "@/lib/file-icons";
 import { DECK_PATH_MIME } from "@/lib/terminal/input";
-import { copyText, revealInExplorer } from "@/lib/tauri/system";
-import { basename, cn, normalizePath, relativePath, samePath } from "@/lib/utils";
+import { basename, cn, normalizePath, samePath } from "@/lib/utils";
 import { isDirty, useViewerStore } from "@/stores/viewer-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import type { Workspace } from "@/types";
@@ -72,23 +72,11 @@ const TabMenu = ({
         {isFile && (
           <>
             <ContextMenuSeparator />
-            <ContextMenuItem
-              icon={<Copy />}
-              onSelect={() => void copyText(path, "Path copied")}
-            >
-              Copy path
-            </ContextMenuItem>
-            <ContextMenuItem
-              icon={<Copy />}
-              onSelect={() =>
-                void copyText(relativePath(path, workspace.cwd), "Relative path copied")
-              }
-            >
-              Copy relative path
-            </ContextMenuItem>
-            <ContextMenuItem icon={<FolderOpen />} onSelect={() => void revealInExplorer(path)}>
-              Reveal in File Explorer
-            </ContextMenuItem>
+            {fileActions(path, workspace.cwd, false).map(({ label, icon, run }) => (
+              <ContextMenuItem key={label} icon={icon} onSelect={run}>
+                {label}
+              </ContextMenuItem>
+            ))}
           </>
         )}
       </ContextMenuContent>

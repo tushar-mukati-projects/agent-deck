@@ -1,19 +1,7 @@
-import {
-  AtSign,
-  BookOpen,
-  Code2,
-  Copy,
-  ExternalLink,
-  FolderOpen,
-  MoreHorizontal,
-  Pencil,
-  RotateCw,
-  Save,
-} from "lucide-react";
+import { AtSign, BookOpen, Code2, MoreHorizontal, Pencil, RotateCw, Save } from "lucide-react";
 
 import { canMention, mentionInAgent } from "@/actions/files";
 import { Button } from "@/components/ui/button";
-import { showError } from "@/components/ui/feedback";
 import { IconButton } from "@/components/ui/icon-button";
 import {
   DropdownMenu,
@@ -22,8 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/menu";
 import { Segmented } from "@/components/ui/panel";
-import { api } from "@/lib/tauri/commands";
-import { copyText, openExternal, revealInExplorer } from "@/lib/tauri/system";
+import { fileActions } from "@/features/viewer/file-actions";
 import { cn, formatBytes, relativePath } from "@/lib/utils";
 import { agentName } from "@/stores/agents";
 import type { MarkdownMode } from "@/stores/viewer-store";
@@ -128,35 +115,11 @@ export const FileToolbar = ({
           </IconButton>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem
-            icon={<Code2 />}
-            onSelect={() => void api.openInEditor(path).catch(showError)}
-          >
-            Open in VS Code
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            icon={<ExternalLink />}
-            onSelect={() => void openExternal(path).catch(showError)}
-          >
-            Open with default app
-          </DropdownMenuItem>
-          <DropdownMenuItem icon={<FolderOpen />} onSelect={() => void revealInExplorer(path)}>
-            Reveal in File Explorer
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            icon={<Copy />}
-            onSelect={() => void copyText(path, "Path copied")}
-          >
-            Copy path
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            icon={<Copy />}
-            onSelect={() =>
-              void copyText(relativePath(path, workspace.cwd), "Relative path copied")
-            }
-          >
-            Copy relative path
-          </DropdownMenuItem>
+          {fileActions(path, workspace.cwd, false).map(({ label, icon, run }) => (
+            <DropdownMenuItem key={label} icon={icon} onSelect={run}>
+              {label}
+            </DropdownMenuItem>
+          ))}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

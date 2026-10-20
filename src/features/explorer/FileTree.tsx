@@ -1,17 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import {
-  AtSign,
-  Code2,
-  Copy,
-  ExternalLink,
-  FolderOpen,
-  Sparkles,
-  SquareTerminal,
-} from "lucide-react";
+import { AtSign, Code2, Sparkles, SquareTerminal } from "lucide-react";
 
 import { canMention, mentionInAgent } from "@/actions/files";
 import { startNewSession } from "@/actions/sessions";
-import { showError } from "@/components/ui/feedback";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -20,11 +11,10 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/menu";
 import { Chevron } from "@/components/ui/panel";
+import { fileActions } from "@/features/viewer/file-actions";
 import { fileIcon, folderIcon } from "@/lib/file-icons";
-import { api } from "@/lib/tauri/commands";
-import { copyText, openExternal, revealInExplorer } from "@/lib/tauri/system";
 import { DECK_PATH_MIME } from "@/lib/terminal/input";
-import { cn, normalizePath, relativePath } from "@/lib/utils";
+import { cn, normalizePath } from "@/lib/utils";
 import { agentName } from "@/stores/agents";
 import { useExplorerStore } from "@/stores/explorer-store";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -74,8 +64,6 @@ const RowMenu = ({
   children: React.ReactNode;
 }) => {
   const { entry } = row;
-  const rel = relativePath(entry.path, workspace.cwd);
-  const store = useWorkspaceStore.getState;
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
@@ -83,7 +71,7 @@ const RowMenu = ({
         {!entry.isDir && (
           <ContextMenuItem
             icon={<Code2 />}
-            onSelect={() => store().openFile(workspace.id, entry.path)}
+            onSelect={() => useWorkspaceStore.getState().openFile(workspace.id, entry.path)}
           >
             Open
           </ContextMenuItem>
@@ -99,7 +87,7 @@ const RowMenu = ({
           <>
             <ContextMenuItem
               icon={<SquareTerminal />}
-              onSelect={() => store().openShell(workspace.id, entry.path)}
+              onSelect={() => useWorkspaceStore.getState().openShell(workspace.id, entry.path)}
             >
               Open shell here
             </ContextMenuItem>
@@ -109,30 +97,11 @@ const RowMenu = ({
           </>
         )}
         <ContextMenuSeparator />
-        <ContextMenuItem
-          icon={<Code2 />}
-          onSelect={() => void api.openInEditor(entry.path).catch(showError)}
-        >
-          Open in VS Code
-        </ContextMenuItem>
-        {!entry.isDir && (
-          <ContextMenuItem
-            icon={<ExternalLink />}
-            onSelect={() => void openExternal(entry.path).catch(showError)}
-          >
-            Open with default app
+        {fileActions(entry.path, workspace.cwd, entry.isDir).map(({ label, icon, run }) => (
+          <ContextMenuItem key={label} icon={icon} onSelect={run}>
+            {label}
           </ContextMenuItem>
-        )}
-        <ContextMenuItem icon={<FolderOpen />} onSelect={() => void revealInExplorer(entry.path)}>
-          Reveal in File Explorer
-        </ContextMenuItem>
-        <ContextMenuSeparator />
-        <ContextMenuItem icon={<Copy />} onSelect={() => void copyText(entry.path)}>
-          Copy path
-        </ContextMenuItem>
-        <ContextMenuItem icon={<Copy />} onSelect={() => void copyText(rel)}>
-          Copy relative path
-        </ContextMenuItem>
+        ))}
       </ContextMenuContent>
     </ContextMenu>
   );
