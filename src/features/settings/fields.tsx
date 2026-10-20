@@ -2,7 +2,7 @@ import { useId } from "react";
 
 import { Input } from "@/components/ui/input";
 import { Segmented } from "@/components/ui/segmented";
-import { useSettingsStore, type SettingsData } from "@/stores/settings-store";
+import { useSettingsStore } from "@/stores/settings-store";
 
 type TextKey = "claudeArgs" | "codexArgs" | "shellProgram";
 type ToggleKey = "matchAgentTheme" | "notifications" | "sound" | "speech" | "includeWsl" | "pet";
@@ -39,8 +39,6 @@ type ToggleProps = {
   off?: string;
 };
 
-export const setSetting = (patch: Partial<SettingsData>) => useSettingsStore.getState().set(patch);
-
 export const Field = ({ label, hint, htmlFor, children }: FieldProps) => (
   <div className="py-4 first:pt-1">
     <label htmlFor={htmlFor} className="block text-[12.5px] font-medium text-fg">
@@ -69,7 +67,7 @@ export const TextField = ({ field, label, hint, placeholder }: TextFieldProps) =
         value={value}
         placeholder={placeholder}
         spellCheck={false}
-        onChange={(e) => setSetting({ [field]: e.target.value })}
+        onChange={(e) => useSettingsStore.getState().set({ [field]: e.target.value })}
       />
     </Field>
   );
@@ -91,7 +89,7 @@ export const Toggle = ({ field, on, off }: ToggleProps) => {
   return (
     <OnOffToggle
       value={value}
-      onChange={(next) => setSetting({ [field]: next })}
+      onChange={(next) => useSettingsStore.getState().set({ [field]: next })}
       on={on}
       off={off}
     />

@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { showError } from "@/components/ui/feedback";
 import { Input, selectClass } from "@/components/ui/input";
-import { Field, OnOffToggle, setSetting, Toggle } from "@/features/settings/fields";
+import { Field, OnOffToggle, Toggle } from "@/features/settings/fields";
 import { announcement, newPhoneTopic } from "@/lib/announce";
 import { playChime } from "@/lib/chime";
 import { englishVoices, pickVoice, speak, voiceLabel } from "@/lib/speech";
@@ -16,7 +16,7 @@ const PhonePing = () => {
   const topic = useSettingsStore((s) => s.phoneTopic);
   const [testing, setTesting] = useState(false);
   const turn = (on: boolean) =>
-    setSetting(
+    useSettingsStore.getState().set(
       on
         ? {
             phonePing: true,
@@ -44,7 +44,9 @@ const PhonePing = () => {
             aria-label="ntfy topic"
             value={topic}
             spellCheck={false}
-            onChange={(event) => setSetting({ phoneTopic: event.target.value.trim() })}
+            onChange={(event) =>
+              useSettingsStore.getState().set({ phoneTopic: event.target.value.trim() })
+            }
             className="max-w-[280px] font-mono"
           />
           <Button size="sm" disabled={testing || !topic} onClick={() => void sendTest()}>
@@ -71,7 +73,7 @@ const VoicePicker = () => {
     <select
       aria-label="Voice"
       value={voices.some((v) => v.name === voice) ? voice : ""}
-      onChange={(event) => setSetting({ voice: event.target.value })}
+      onChange={(event) => useSettingsStore.getState().set({ voice: event.target.value })}
       className={selectClass}
     >
       <option value="">Automatic{automatic ? ` (${voiceLabel(automatic.name)})` : ""}</option>

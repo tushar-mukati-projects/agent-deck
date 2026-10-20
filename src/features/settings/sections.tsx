@@ -3,14 +3,7 @@ import { useId } from "react";
 import { toggleHideMode } from "@/actions/hide-mode";
 import { Segmented } from "@/components/ui/segmented";
 import { CustomAgentsEditor, DefaultAgentPicker } from "@/features/settings/AgentSettings";
-import {
-  Field,
-  Group,
-  OnOffToggle,
-  setSetting,
-  TextField,
-  Toggle,
-} from "@/features/settings/fields";
+import { Field, Group, OnOffToggle, TextField, Toggle } from "@/features/settings/fields";
 import { ThemePicker } from "@/features/settings/ThemePicker";
 import { shortcutLabel } from "@/lib/shortcuts";
 import { useSessionsStore } from "@/stores/sessions-store";
@@ -38,7 +31,7 @@ const FontSize = () => {
           min={MIN_FONT_SIZE}
           max={MAX_FONT_SIZE}
           value={fontSize}
-          onChange={(e) => setSetting({ fontSize: Number(e.target.value) })}
+          onChange={(e) => useSettingsStore.getState().set({ fontSize: Number(e.target.value) })}
           className="w-56 accent-[var(--color-accent)]"
         />
         <span className="font-mono text-xs text-muted tabular-nums">{fontSize}px</span>
@@ -123,7 +116,7 @@ export const SessionsSection = () => {
       >
         <Segmented<ClickBehavior>
           value={clickBehavior}
-          onChange={(next) => setSetting({ clickBehavior: next })}
+          onChange={(next) => useSettingsStore.getState().set({ clickBehavior: next })}
           options={[
             { value: "preview", label: "Preview conversation" },
             { value: "resume", label: "Resume immediately" },
