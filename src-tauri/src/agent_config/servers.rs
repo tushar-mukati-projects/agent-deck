@@ -74,7 +74,7 @@ fn transport_of(config: &Map<String, Value>) -> Transport {
     }
 }
 
-pub fn expand(value: &str, lookup: &dyn Fn(&str) -> Option<String>) -> String {
+fn expand(value: &str, lookup: &dyn Fn(&str) -> Option<String>) -> String {
     let mut out = String::with_capacity(value.len());
     let mut rest = value;
     while let Some(start) = rest.find("${") {
@@ -128,7 +128,7 @@ fn resolved(raw: &RawServer, cwd: String, distro: Option<String>) -> ResolvedSer
     ResolvedServer { config: raw.config.clone(), plugin_root: raw.plugin_root.clone(), cwd, distro }
 }
 
-pub fn mentions_postgres(name: &str, config: &Map<String, Value>) -> bool {
+fn mentions_postgres(name: &str, config: &Map<String, Value>) -> bool {
     let text = |v: Option<&Value>| v.map(|v| v.to_string().to_lowercase()).unwrap_or_default();
     let haystack = format!("{} {} {}", name.to_lowercase(), text(config.get("command")), text(config.get("args")));
     haystack.contains("postgres") || haystack.contains("pgsql")

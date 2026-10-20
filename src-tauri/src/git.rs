@@ -26,7 +26,7 @@ fn git(dir: &str, args: &[&str]) -> anyhow::Result<Vec<u8>> {
     Ok(output.stdout)
 }
 
-pub fn parse_porcelain(output: &[u8], to_path: impl Fn(&str) -> String) -> Vec<GitChange> {
+fn parse_porcelain(output: &[u8], to_path: impl Fn(&str) -> String) -> Vec<GitChange> {
     let mut changes = Vec::new();
     let mut entries = output.split(|b| *b == 0).filter(|e| !e.is_empty());
     while let Some(entry) = entries.next() {

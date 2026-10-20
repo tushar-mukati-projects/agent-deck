@@ -71,7 +71,7 @@ fn is_block_indicator(value: &str) -> bool {
     matches!(value, "|" | ">" | "|-" | ">-" | "|+" | ">+")
 }
 
-pub fn frontmatter(text: &str) -> HashMap<String, String> {
+fn frontmatter(text: &str) -> HashMap<String, String> {
     let mut fields = HashMap::new();
     let text = text.trim_start_matches('\u{feff}');
     let Some(rest) = text.strip_prefix("---") else { return fields };

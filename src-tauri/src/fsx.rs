@@ -108,7 +108,7 @@ pub(crate) fn looks_binary(bytes: &[u8]) -> bool {
     bytes[..bytes.len().min(SNIFF_BYTES)].contains(&0)
 }
 
-pub fn decode(bytes: &[u8]) -> Option<(String, Encoding)> {
+fn decode(bytes: &[u8]) -> Option<(String, Encoding)> {
     if let Some(body) = bytes.strip_prefix(UTF16LE_BOM) {
         return Some(decode_utf16(body, u16::from_le_bytes, Encoding::Utf16le));
     }

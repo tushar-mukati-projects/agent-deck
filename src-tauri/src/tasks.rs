@@ -82,7 +82,7 @@ pub struct TaskLog {
 
 static LOGS: LazyLock<Mutex<HashMap<String, TaskLog>>> = LazyLock::new(Mutex::default);
 
-pub fn might_matter(line: &str) -> bool {
+fn might_matter(line: &str) -> bool {
     line.len() <= MAX_LINE && MARKERS.iter().any(|marker| line.contains(marker))
 }
 
@@ -107,10 +107,6 @@ fn id_after(result: &str, label: &str) -> Option<String> {
     let rest = &result[result.find(label)? + label.len()..];
     let id: String = rest.chars().take_while(|c| c.is_ascii_alphanumeric() || *c == '_' || *c == '-').collect();
     (!id.is_empty()).then_some(id)
-}
-
-fn task_id_from(result: &str) -> Option<String> {
-    id_after(result, "with ID: ")
 }
 
 fn result_text(block: &Value) -> String {
@@ -200,7 +196,7 @@ impl TaskLog {
             }
             let Some(started) = block["tool_use_id"].as_str().and_then(|id| self.started.remove(id)) else { continue };
             let result = result_text(block);
-            let Some(id) = text(&record["toolUseResult"]["backgroundTaskId"]).or_else(|| task_id_from(&result)) else {
+            let Some(id) = text(&record["toolUseResult"]["backgroundTaskId"]).or_else(|| id_after(&result, "with ID: ")) else {
                 continue;
             };
             self.tasks.retain(|t| t.id != id);

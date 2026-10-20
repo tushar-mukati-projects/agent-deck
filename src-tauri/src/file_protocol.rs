@@ -20,7 +20,7 @@ pub fn respond(request: &Request<Vec<u8>>) -> Response<Vec<u8>> {
     serve(request).unwrap_or_else(|status| Response::builder().status(status).body(Vec::new()).unwrap_or_default())
 }
 
-pub fn parse_range(header: &str, len: u64) -> Option<(u64, u64)> {
+fn parse_range(header: &str, len: u64) -> Option<(u64, u64)> {
     let last = len.checked_sub(1)?;
     let spec = header.trim().strip_prefix("bytes=")?.split(',').next()?.trim();
     let (from, to) = spec.split_once('-')?;

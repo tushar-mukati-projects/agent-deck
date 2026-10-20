@@ -190,7 +190,7 @@ fn running_names(fresh: bool) -> Vec<String> {
     names
 }
 
-pub fn distros() -> Vec<Distro> {
+fn distros() -> Vec<Distro> {
     let running = running_names(true);
     distro_names(false).into_iter().map(|name| Distro { running: running.contains(&name), name }).collect()
 }
@@ -287,7 +287,7 @@ fn known_login_env(distro: &str) -> Option<LoginEnv> {
     None
 }
 
-pub fn login_env(distro: &str) -> Option<LoginEnv> {
+fn login_env(distro: &str) -> Option<LoginEnv> {
     let slot = login_slot(distro);
     let mut value = slot.lock();
     if let Some(env) = value.as_ref() {
@@ -412,7 +412,7 @@ pub fn index() -> WslIndex {
             }
         }
     }
-    let sessions = {
+    let mut sessions = {
         let mut cache = CACHE.lock();
         for (name, state) in cache.distros.iter_mut() {
             if !running.contains(name) || errors.contains_key(name) {
@@ -430,7 +430,6 @@ pub fn index() -> WslIndex {
     if changed {
         save();
     }
-    let mut sessions = sessions;
     sessions.sort_by_key(|s| std::cmp::Reverse(s.modified_ms));
     WslIndex { sessions, errors, distros }
 }
@@ -633,7 +632,7 @@ pub fn login_command(distro: &str, linux_cwd: &str, program: &str, args: &[impl 
     command
 }
 
-pub fn login_shell(distro: &str) -> String {
+fn login_shell(distro: &str) -> String {
     if let Some(shell) = CACHE.lock().distros.get(distro).and_then(|d| d.shell.clone()) {
         return shell;
     }
@@ -648,12 +647,12 @@ pub fn start(distro: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub struct WatchProcess {
-    pub child: Child,
-    pub stdin: std::process::ChildStdin,
+pub(crate) struct WatchProcess {
+    pub(crate) child: Child,
+    pub(crate) stdin: std::process::ChildStdin,
 }
 
-pub fn spawn_watch(distro: &str, linux_root: &str) -> anyhow::Result<WatchProcess> {
+pub(crate) fn spawn_watch(distro: &str, linux_root: &str) -> anyhow::Result<WatchProcess> {
     let mut command = agent_command(distro, &["watch", linux_root]);
     command.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null());
     let mut child = hidden(&mut command).spawn().context("Couldn't start the WSL file watcher")?;

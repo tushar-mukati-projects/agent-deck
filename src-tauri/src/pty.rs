@@ -147,7 +147,7 @@ pub struct PtyManager {
     spawning: Mutex<HashMap<String, Arc<Mutex<()>>>>,
 }
 
-pub fn drain_utf8(pending: &mut Vec<u8>) -> String {
+fn drain_utf8(pending: &mut Vec<u8>) -> String {
     let mut out = String::with_capacity(pending.len());
     let mut rest: &[u8] = pending;
     loop {
@@ -241,10 +241,6 @@ fn msvc_quote(arg: &str) -> String {
     out
 }
 
-fn is_batch_file(program: &Path) -> bool {
-    program.extension().is_some_and(|e| e.eq_ignore_ascii_case("cmd") || e.eq_ignore_ascii_case("bat"))
-}
-
 fn check_batch_arguments(program: &Path, args: &[String]) -> anyhow::Result<()> {
     let line = std::iter::once(program.to_string_lossy().to_string()).chain(args.iter().cloned()).map(|a| msvc_quote(&a)).collect::<Vec<_>>().join(" ");
     let mut quoted = false;
@@ -266,7 +262,7 @@ fn check_batch_arguments(program: &Path, args: &[String]) -> anyhow::Result<()> 
 fn build_command(req: &SpawnRequest) -> anyhow::Result<CommandBuilder> {
     check_agent_names(&req.args)?;
     let program = resolve_program(&req.program)?;
-    if is_batch_file(&program) {
+    if program.extension().is_some_and(|e| e.eq_ignore_ascii_case("cmd") || e.eq_ignore_ascii_case("bat")) {
         check_batch_arguments(&program, &req.args)?;
     }
     let mut cmd = CommandBuilder::new(program);

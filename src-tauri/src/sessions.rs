@@ -27,7 +27,7 @@ use crate::{
 const PROMPT_PREVIEW_CHARS: usize = 280;
 const TITLE_CHARS: usize = 80;
 const TOOL_DETAIL_CHARS: usize = 160;
-pub const TRANSCRIPT_TEXT_CHARS: usize = 24_000;
+const TRANSCRIPT_TEXT_CHARS: usize = 24_000;
 const TOOL_RESULT: &[u8] = br#""type":"tool_result""#;
 const SYSTEM_PREFIXES: &[&str] = &["Caveat:", "[Request interrupted", "This session is being continued"];
 const SYSTEM_TAGS: &[&str] = &[
@@ -245,7 +245,7 @@ fn truncate_chars(text: &str, max: usize) -> String {
     }
 }
 
-pub fn preview(text: &str, max: usize) -> String {
+fn preview(text: &str, max: usize) -> String {
     let mut out = String::new();
     let chars = text.split_whitespace().enumerate().flat_map(|(i, word)| (i > 0).then_some(' ').into_iter().chain(word.chars()));
     for (count, c) in chars.enumerate() {
@@ -258,7 +258,7 @@ pub fn preview(text: &str, max: usize) -> String {
     out
 }
 
-pub fn is_system_text(text: &str) -> bool {
+fn is_system_text(text: &str) -> bool {
     let trimmed = text.trim_start();
     trimmed.is_empty()
         || SYSTEM_PREFIXES.iter().any(|p| trimmed.starts_with(p))
@@ -790,7 +790,7 @@ impl Needle {
     }
 }
 
-pub fn snippet_around(text: &str, needle_lower: &str) -> Option<String> {
+fn snippet_around(text: &str, needle_lower: &str) -> Option<String> {
     let chars: Vec<char> = text.chars().collect();
     let lower: Vec<char> = chars.iter().flat_map(|c| c.to_lowercase()).collect();
     let needle: Vec<char> = needle_lower.chars().collect();

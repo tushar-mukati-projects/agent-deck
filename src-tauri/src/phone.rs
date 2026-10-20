@@ -8,7 +8,7 @@ use crate::util::http_agent;
 const SERVER: &str = "https://ntfy.sh";
 const TIMEOUT: Duration = Duration::from_secs(10);
 
-pub fn valid_topic(topic: &str) -> bool {
+fn valid_topic(topic: &str) -> bool {
     (8..=64).contains(&topic.len()) && topic.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
 }
 

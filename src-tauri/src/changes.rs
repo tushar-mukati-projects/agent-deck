@@ -54,7 +54,7 @@ fn read_text(path: &Path) -> Option<String> {
     (!looks_binary(&bytes)).then(|| String::from_utf8_lossy(&bytes).into_owned())
 }
 
-pub fn line_stats(before: &str, after: &str) -> (u32, u32) {
+fn line_stats(before: &str, after: &str) -> (u32, u32) {
     if before == after {
         return (0, 0);
     }
@@ -178,7 +178,7 @@ pub fn session_changes(jsonl: &str) -> anyhow::Result<Vec<ChangedFile>> {
     Ok(files)
 }
 
-pub fn valid_backup_name(name: &str) -> bool {
+fn valid_backup_name(name: &str) -> bool {
     let Some((hash, version)) = name.split_once("@v") else { return false };
     !hash.is_empty()
         && hash.chars().all(|c| c.is_ascii_hexdigit())

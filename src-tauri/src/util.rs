@@ -155,7 +155,7 @@ const SENSITIVE_RUNS: &[&[&str]] = &[
     &[".config", "gcloud"],
 ];
 
-pub fn is_sensitive(path: &Path) -> bool {
+fn is_sensitive(path: &Path) -> bool {
     let parts: Vec<String> = path
         .components()
         .filter_map(|c| match c {
@@ -181,13 +181,9 @@ fn unc_host(path: &str) -> Option<String> {
     Some(rest.split('\\').next().unwrap_or_default().to_lowercase())
 }
 
-pub fn is_wsl_host(host: &str) -> bool {
-    host == "wsl.localhost" || host == "wsl$"
-}
-
 pub fn check_remote(path: &Path) -> anyhow::Result<()> {
     match unc_host(&path.to_string_lossy()) {
-        Some(host) if !is_wsl_host(&host) => anyhow::bail!("Agent Deck only opens network paths inside WSL"),
+        Some(host) if host != "wsl.localhost" && host != "wsl$" => anyhow::bail!("Agent Deck only opens network paths inside WSL"),
         _ => Ok(()),
     }
 }

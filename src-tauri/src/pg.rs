@@ -30,6 +30,8 @@ const QUERY_GRACE: Duration = Duration::from_secs(15);
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 const IDLE_CHECK_AFTER: Duration = Duration::from_secs(30);
 const VALIDATE_TIMEOUT: Duration = Duration::from_secs(5);
+const KEEPALIVE_IDLE: Duration = Duration::from_secs(30);
+const KEEPALIVE_INTERVAL: Duration = Duration::from_secs(10);
 
 const URL_KEYS: &[&str] = &[
     "DATABASE_URL",
@@ -77,13 +79,13 @@ pub struct ConnectionInfo {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Verify {
+enum Verify {
     Nothing,
     Chain,
     Full,
 }
 
-pub struct Target {
+pub(crate) struct Target {
     config: Config,
     host: String,
     port: u16,
@@ -124,13 +126,13 @@ fn finish(mut config: Config, verify: Verify) -> Target {
     Target { host: host.unwrap_or_else(|| "localhost".into()), port, verify, config }
 }
 
-pub fn parse_connection(connection: &str) -> anyhow::Result<Target> {
+fn parse_connection(connection: &str) -> anyhow::Result<Target> {
     let (connection, verify) = strip_verification(connection.trim());
     let config = connection.parse::<Config>().context("The connection string isn't valid")?;
     Ok(finish(config, verify))
 }
 
-pub fn detect(launch: &Launch, hinted: bool) -> Option<anyhow::Result<Target>> {
+pub(crate) fn detect(launch: &Launch, hinted: bool) -> Option<anyhow::Result<Target>> {
     let env = &launch.env;
     let url = launch.args.iter().find(|a| is_pg_url(a)).or_else(|| URL_KEYS.iter().filter_map(|k| env.get(*k)).find(|v| is_pg_url(v)));
     if let Some(url) = url {
@@ -242,11 +244,6 @@ fn wsl_relay(distro: &str, host: &str, port: u16) -> anyhow::Result<(StdTcpStrea
     Ok((client, Relay { process, stderr }))
 }
 
-fn keep_alive(stream: &TcpStream) {
-    let keepalive = socket2::TcpKeepalive::new().with_time(Duration::from_secs(30)).with_interval(Duration::from_secs(10));
-    let _ = socket2::SockRef::from(stream).set_tcp_keepalive(&keepalive);
-}
-
 async fn dial(distro: Option<&str>, host: &str, port: u16) -> anyhow::Result<(TcpStream, Option<Relay>)> {
     let address = if host.eq_ignore_ascii_case("localhost") { "127.0.0.1" } else { host };
     match distro {
@@ -260,7 +257,8 @@ async fn dial(distro: Option<&str>, host: &str, port: u16) -> anyhow::Result<(Tc
                 .await
                 .map_err(|_| anyhow!("timed out after {}s", CONNECT_TIMEOUT.as_secs()))??;
             let _ = stream.set_nodelay(true);
-            keep_alive(&stream);
+            let keepalive = socket2::TcpKeepalive::new().with_time(KEEPALIVE_IDLE).with_interval(KEEPALIVE_INTERVAL);
+            let _ = socket2::SockRef::from(&stream).set_tcp_keepalive(&keepalive);
             Ok((stream, None))
         }
     }
@@ -281,7 +279,7 @@ fn tls_for(target: &Target) -> anyhow::Result<TlsConnector> {
     Ok(<MakeTlsConnector as MakeTlsConnect<TcpStream>>::make_tls_connect(&mut maker, &target.host)?)
 }
 
-pub fn describe(error: tokio_postgres::Error) -> anyhow::Error {
+fn describe(error: tokio_postgres::Error) -> anyhow::Error {
     match error.as_db_error() {
         Some(db) => {
             let mut text = db.message().to_string();

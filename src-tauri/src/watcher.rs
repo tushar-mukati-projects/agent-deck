@@ -191,11 +191,11 @@ impl Watchers {
     }
 }
 
-pub struct HomeWatcher {
+pub(crate) struct HomeWatcher {
     watcher: Mutex<Option<notify::RecommendedWatcher>>,
 }
 
-pub fn watch_claude_home(app: AppHandle) -> Arc<HomeWatcher> {
+pub(crate) fn watch_claude_home(app: AppHandle) -> Arc<HomeWatcher> {
     let tx = debounced(HOME_DEBOUNCE, move |_, _| {
         let _ = app.emit("sessions-changed", ());
     });

@@ -188,7 +188,7 @@ fn parse_value<T: DeserializeOwned>(text: &str) -> Option<(T, usize)> {
     Some((value, stream.byte_offset()))
 }
 
-pub fn prefix_rule(line: &str) -> Option<(Vec<String>, String)> {
+fn prefix_rule(line: &str) -> Option<(Vec<String>, String)> {
     let call = line.trim().strip_prefix("prefix_rule(")?.strip_suffix(')')?;
     let start = value_start(call, "pattern")?;
     let (words, length) = parse_value::<Vec<String>>(&call[start..])?;

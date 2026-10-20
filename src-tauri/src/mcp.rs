@@ -120,10 +120,6 @@ impl McpManager {
     }
 }
 
-fn resolve_program(command: &str) -> String {
-    which::which(command).map(|p| p.to_string_lossy().to_string()).unwrap_or_else(|_| command.to_string())
-}
-
 fn valid_env_name(name: &str) -> bool {
     let mut chars = name.chars();
     chars.next().is_some_and(|c| c.is_ascii_alphabetic() || c == '_') && chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
@@ -142,7 +138,7 @@ fn stdio_command(server: &ResolvedServer, launch: &Launch) -> anyhow::Result<Com
             cmd
         }
         None => {
-            let mut cmd = Command::new(resolve_program(&command));
+            let mut cmd = Command::new(which::which(&command).map(|p| p.to_string_lossy().to_string()).unwrap_or(command));
             cmd.args(&launch.args).envs(&launch.env);
             if Path::new(&server.cwd).is_dir() {
                 cmd.current_dir(&server.cwd);

@@ -30,8 +30,7 @@ impl<V> Pool<V> {
         if let Some(value) = current.as_ref().filter(|v| alive(v)) {
             return Ok(value.clone());
         }
-        let stale = current.take();
-        drop(stale);
+        current.take();
         let value = Arc::new(create()?);
         *current = Some(value.clone());
         Ok(value)

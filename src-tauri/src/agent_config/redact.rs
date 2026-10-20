@@ -6,7 +6,7 @@ fn secret_name(name: &str) -> bool {
     SECRET_WORDS.iter().any(|w| name.contains(w))
 }
 
-pub fn looks_secret(text: &str) -> bool {
+fn looks_secret(text: &str) -> bool {
     text.len() >= 20
         && !text.starts_with(['/', '.', '~'])
         && text.chars().all(|c| c.is_ascii_alphanumeric() || "-_.=+/~".contains(c))
@@ -55,7 +55,7 @@ pub fn mask_url(url: &str) -> String {
     out
 }
 
-pub fn mask_header(header: &str) -> String {
+fn mask_header(header: &str) -> String {
     match header.split_once(':') {
         Some((name, _)) if secret_name(name) => format!("{name}: {MASK}"),
         Some((name, value)) => format!("{name}:{}", mask_text(value)),
