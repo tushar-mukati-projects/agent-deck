@@ -36,19 +36,21 @@ const sectionClass =
   "flex h-7 w-full items-center gap-1.5 px-2 text-[11px] font-semibold tracking-wide text-faint";
 const nestedListClass = "mb-1 ml-[13px] flex flex-col gap-px border-l border-border pl-[6px]";
 
-const FolderHeader = ({
-  group,
-  collapsed,
-  hint,
-  tone,
-  onToggle,
-}: {
+type FolderHeaderProps = {
   group: SessionGroup;
   collapsed: boolean;
   hint: string | null;
   tone: DotTone | null;
   onToggle: () => void;
-}) => {
+};
+
+type SessionListProps = {
+  query: string;
+  listRef: React.RefObject<HTMLDivElement | null>;
+  searchRef: React.RefObject<HTMLInputElement | null>;
+};
+
+const FolderHeader = ({ group, collapsed, hint, tone, onToggle }: FolderHeaderProps) => {
   const name = basename(group.cwd);
   const { icon: Icon, color } = folderIcon(name, !collapsed);
   return (
@@ -127,15 +129,7 @@ const RefreshButton = () => {
 };
 
 const SessionList = memo(
-  ({
-    query: deferredQuery,
-    listRef,
-    searchRef,
-  }: {
-    query: string;
-    listRef: React.RefObject<HTMLDivElement | null>;
-    searchRef: React.RefObject<HTMLInputElement | null>;
-  }) => {
+  ({ query: deferredQuery, listRef, searchRef }: SessionListProps) => {
     const sessions = useSessionsStore((s) => s.sessions);
     const loaded = useSessionsStore((s) => s.loaded);
     const loadError = useSessionsStore((s) => s.loadError);

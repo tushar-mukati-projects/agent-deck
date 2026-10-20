@@ -11,6 +11,10 @@ interface ErrorBoundaryState {
   error: Error | null;
 }
 
+type CrashScreenProps = {
+  error: Error;
+};
+
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   state: ErrorBoundaryState = { error: null };
 
@@ -37,10 +41,6 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     );
   }
 }
-
-type CrashScreenProps = {
-  error: Error;
-};
 
 export const CrashScreen = ({ error }: CrashScreenProps) => (
   <div className="flex h-full flex-col items-center justify-center gap-3 bg-bg p-8 text-center">

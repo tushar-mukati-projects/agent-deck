@@ -54,14 +54,17 @@ const reattachTerminals = async () => {
   );
 };
 
-const render = () =>
-  createRoot(document.getElementById("root") as HTMLElement).render(
+const render = () => {
+  const root = document.getElementById("root");
+  if (!root) throw new Error("The page has no root element");
+  createRoot(root).render(
     <StrictMode>
       <ErrorBoundary fallback={(error) => <CrashScreen error={error} />}>
         <App />
       </ErrorBoundary>
     </StrictMode>,
   );
+};
 
 const bootstrap = async () => {
   try {

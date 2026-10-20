@@ -11,13 +11,12 @@ import type { SessionInfo } from "@/types";
 
 const MAX_TITLE_LENGTH = 200;
 
-const RenameForm = ({
-  target,
-  inputRef,
-}: {
+type RenameFormProps = {
   target: SessionInfo;
   inputRef: React.RefObject<HTMLInputElement | null>;
-}) => {
+};
+
+const RenameForm = ({ target, inputRef }: RenameFormProps) => {
   const [title, setTitle] = useState(target.title ?? "");
   const [saving, setSaving] = useState(false);
   const close = () => useUiStore.getState().setRenameTarget(null);

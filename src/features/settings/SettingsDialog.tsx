@@ -30,6 +30,33 @@ type TextKey = "claudeArgs" | "codexArgs" | "shellProgram";
 type ToggleKey = "matchAgentTheme" | "notifications" | "sound" | "speech" | "includeWsl" | "pet";
 type SectionId = "appearance" | "agents" | "sessions" | "terminal" | "notifications";
 
+type FieldProps = {
+  label: string;
+  hint?: string;
+  htmlFor?: string;
+  children: React.ReactNode;
+};
+
+type GroupProps = {
+  title: string;
+  children: React.ReactNode;
+};
+
+type TextFieldProps = {
+  field: TextKey;
+  label: string;
+  hint?: string;
+  placeholder: string;
+};
+
+type Section = {
+  id: SectionId;
+  label: string;
+  description: string;
+  icon: React.ReactNode;
+  Section: React.ComponentType;
+};
+
 type OnOffToggleProps = {
   value: boolean;
   onChange: (on: boolean) => void;
@@ -45,17 +72,7 @@ type ToggleProps = {
 
 const setSetting = (patch: Partial<SettingsData>) => useSettingsStore.getState().set(patch);
 
-const Field = ({
-  label,
-  hint,
-  htmlFor,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  htmlFor?: string;
-  children: React.ReactNode;
-}) => (
+const Field = ({ label, hint, htmlFor, children }: FieldProps) => (
   <div className="py-4 first:pt-1">
     <label htmlFor={htmlFor} className="block text-[12.5px] font-medium text-fg">
       {label}
@@ -65,24 +82,14 @@ const Field = ({
   </div>
 );
 
-const Group = ({ title, children }: { title: string; children: React.ReactNode }) => (
+const Group = ({ title, children }: GroupProps) => (
   <section className="rounded-lg border border-border px-4 py-1">
     <h3 className="pt-3 text-[11px] font-semibold tracking-wider text-muted uppercase">{title}</h3>
     <div className="divide-y divide-border">{children}</div>
   </section>
 );
 
-const TextField = ({
-  field,
-  label,
-  hint,
-  placeholder,
-}: {
-  field: TextKey;
-  label: string;
-  hint?: string;
-  placeholder: string;
-}) => {
+const TextField = ({ field, label, hint, placeholder }: TextFieldProps) => {
   const id = useId();
   const value = useSettingsStore((s) => s[field]);
   return (
@@ -376,13 +383,7 @@ const NotificationsSection = () => (
   </>
 );
 
-const SECTIONS: {
-  id: SectionId;
-  label: string;
-  description: string;
-  icon: React.ReactNode;
-  Section: React.ComponentType;
-}[] = [
+const SECTIONS: Section[] = [
   {
     id: "appearance",
     label: "Appearance",
