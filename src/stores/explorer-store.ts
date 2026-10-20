@@ -28,6 +28,7 @@ interface ExplorerState {
   reveal: (path: string, root: string) => Promise<void>;
   refreshDirs: (dirs: string[]) => void;
   refreshWithin: (root: string) => void;
+  refresh: (root: string) => void;
   forget: (root: string) => void;
 }
 
@@ -117,6 +118,11 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
   refreshWithin: (root) => {
     const { paths } = get();
     for (const [k, path] of Object.entries(paths)) if (isWithin(k, root)) void get().load(path);
+  },
+
+  refresh: (root) => {
+    if (get().children[key(root)]) get().refreshWithin(root);
+    else void get().load(root);
   },
 
   forget: (root) => {

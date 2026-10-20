@@ -73,14 +73,7 @@ export const ExplorerPanel = () => {
         >
           {showHidden ? <Eye /> : <EyeOff />}
         </IconButton>
-        <IconButton
-          label="Refresh"
-          onClick={() => {
-            const explorer = useExplorerStore.getState();
-            if (loaded) explorer.refreshWithin(root);
-            else void explorer.load(root);
-          }}
-        >
+        <IconButton label="Refresh" onClick={() => useExplorerStore.getState().refresh(root)}>
           <RefreshCw />
         </IconButton>
         <IconButton
