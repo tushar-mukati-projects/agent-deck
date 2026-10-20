@@ -6,8 +6,8 @@ import { IconButton } from "@/components/ui/icon-button";
 import { Chevron, CollapsibleSection, PanelHeader } from "@/components/ui/panel";
 import { useAsync, useThrottledCallback } from "@/hooks/useAsync";
 import { useSessionFile } from "@/hooks/useSessionFile";
-import { CLAUDE } from "@/lib/agents/registry";
 import { buildChangeTree, type ChangeFolder, type ChangeNode } from "@/lib/change-tree";
+import { changeDiffSource, gitChangeStatus, gitMessage } from "@/lib/changes";
 import { encodeDiffTab } from "@/lib/diff-tabs";
 import { subscribeFileChanges } from "@/lib/file-events";
 import { FileIcon, folderIcon } from "@/lib/file-icons";
@@ -46,15 +46,6 @@ const INDENT = 12;
 
 const rowClass =
   "relative flex h-[26px] w-full min-w-0 items-center gap-1.5 rounded-md pr-2 text-left text-[12px] hover:bg-hover";
-
-const gitBadge = (code: string) => {
-  if (code === "??" || code.includes("A")) return STATUS_BADGE.added;
-  if (code.includes("D")) return STATUS_BADGE.deleted;
-  return STATUS_BADGE.modified;
-};
-
-const gitMessage = (error: string) =>
-  /not a git repository/i.test(error) ? "Not a git repository." : error;
 
 const indent = (depth: number) => ({ paddingLeft: 8 + depth * INDENT });
 
@@ -222,7 +213,7 @@ const SessionChanges = memo(
       { add: 0, del: 0 },
     );
     const openDiff = (file: ChangedFile) => {
-      const source = file.backup || agent === CLAUDE ? "session" : "git";
+      const source = changeDiffSource(file, agent);
       useWorkspaceStore
         .getState()
         .openFile(workspace.id, encodeDiffTab({ source, path: file.path, backup: file.backup }));
@@ -300,7 +291,7 @@ const RepoChanges = memo(
             <Row
               path={change.path}
               depth={depth}
-              badge={gitBadge(change.code)}
+              badge={STATUS_BADGE[gitChangeStatus(change.code)]}
               onOpen={() =>
                 useWorkspaceStore
                   .getState()
