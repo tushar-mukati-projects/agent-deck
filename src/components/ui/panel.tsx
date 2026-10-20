@@ -160,7 +160,7 @@ export const Segmented = <T extends string>({
 
 interface CollapsibleSectionProps {
   title: string;
-  count?: number | null;
+  count: number | null;
   icon?: React.ReactNode;
   open: boolean;
   onToggle: () => void;
@@ -188,7 +188,7 @@ export const CollapsibleSection = ({
         <Chevron open={open} />
         {icon}
         <span className="truncate">{title}</span>
-        {count !== undefined && count !== null && (
+        {count !== null && (
           <span className="font-normal text-faint tabular-nums">{count}</span>
         )}
         {summary && <span className="ml-auto font-mono font-normal">{summary}</span>}
