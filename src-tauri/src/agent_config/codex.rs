@@ -9,7 +9,7 @@ use serde_json::{Map, Value};
 use toml_edit::{DocumentMut, TableLike};
 
 use super::{
-    ctx::{self, project_dirs, Ctx},
+    ctx::Project,
     files::{folder_name, markdown_items, memory_file, rewrite_lines, skill_dirs, sort_by_name, Items},
     servers::{self, describe_all, RawServer, ResolvedServer},
     Item, MemoryFile, Overview, Plugin, Scope, SettingsFile,
@@ -26,9 +26,7 @@ struct ConfigFile {
 }
 
 struct Snapshot {
-    ctx: Ctx,
-    cwd: PathBuf,
-    dirs: Vec<PathBuf>,
+    project: Project,
     home: PathBuf,
     configs: Vec<ConfigFile>,
 }
@@ -47,26 +45,20 @@ fn config_file(scope: Scope, label: String, path: PathBuf) -> ConfigFile {
 
 impl Snapshot {
     fn load(cwd: &str) -> anyhow::Result<Self> {
-        let cwd = ctx::normalize(cwd);
-        let ctx = Ctx::for_cwd(&cwd)?;
-        let dirs = project_dirs(&ctx, &cwd);
-        let home = ctx.codex_home();
+        let project = Project::load(cwd)?;
+        let home = project.ctx.codex_home();
         let mut configs = vec![config_file(Scope::User, "User config".into(), home.join("config.toml"))];
-        for dir in &dirs {
+        for dir in &project.dirs {
             let path = dir.join(".codex").join("config.toml");
             if path.is_file() {
                 configs.push(config_file(Scope::Project, format!("Project config · {}", folder_name(dir)), path));
             }
         }
-        Ok(Self { ctx, cwd, dirs, home, configs })
+        Ok(Self { project, home, configs })
     }
 
     fn user_config(&self) -> Option<&DocumentMut> {
         self.configs.first().and_then(|c| c.document.as_ref())
-    }
-
-    fn native_cwd(&self) -> String {
-        self.ctx.native(&self.cwd)
     }
 }
 
@@ -143,7 +135,7 @@ fn memory(snapshot: &Snapshot) -> Vec<MemoryFile> {
     if global_override.is_file() {
         files.push(memory_file(Scope::User, "AGENTS.override.md · all folders".into(), global_override));
     }
-    for (index, dir) in snapshot.dirs.iter().enumerate() {
+    for (index, dir) in snapshot.project.dirs.iter().enumerate() {
         let folder = folder_name(dir);
         for name in ["AGENTS.override.md", "AGENTS.md"] {
             let path = dir.join(name);
@@ -157,11 +149,11 @@ fn memory(snapshot: &Snapshot) -> Vec<MemoryFile> {
 
 fn skills(snapshot: &Snapshot) -> Vec<Item> {
     let mut skills = Vec::new();
-    for root in [snapshot.home.join("skills"), snapshot.ctx.home.join(".agents").join("skills")] {
+    for root in [snapshot.home.join("skills"), snapshot.project.ctx.home.join(".agents").join("skills")] {
         skill_dirs(&root, Scope::User, None, &mut skills);
     }
     skill_dirs(&snapshot.home.join("skills").join(".system"), Scope::System, None, &mut skills);
-    for dir in &snapshot.dirs {
+    for dir in &snapshot.project.dirs {
         for root in [dir.join(".codex").join("skills"), dir.join(".agents").join("skills")] {
             skill_dirs(&root, Scope::Project, None, &mut skills);
         }
@@ -286,11 +278,11 @@ fn plugins(snapshot: &Snapshot) -> Vec<Plugin> {
 
 pub fn overview(cwd: &str) -> anyhow::Result<Overview> {
     let snapshot = Snapshot::load(cwd)?;
-    let distro = snapshot.ctx.distro.clone();
+    let distro = snapshot.project.ctx.distro.clone();
     Ok(Overview {
         home: snapshot.home.to_string_lossy().to_string(),
         memory: memory(&snapshot),
-        mcp: describe_all(&raw_servers(&snapshot), &snapshot.native_cwd(), distro.as_deref()),
+        mcp: describe_all(&raw_servers(&snapshot), &snapshot.project.native_cwd(), distro.as_deref()),
         skills: skills(&snapshot),
         agents: Vec::new(),
         commands: prompts(&snapshot),
@@ -302,7 +294,7 @@ pub fn overview(cwd: &str) -> anyhow::Result<Overview> {
 
 pub fn resolve_server(cwd: &str, id: &str) -> anyhow::Result<ResolvedServer> {
     let snapshot = Snapshot::load(cwd)?;
-    servers::resolve(raw_servers(&snapshot), id, snapshot.native_cwd(), snapshot.ctx.distro.clone())
+    servers::resolve(raw_servers(&snapshot), id, snapshot.project.native_cwd(), snapshot.project.ctx.distro.clone())
 }
 
 fn edit_config(path: &Path, change: impl FnOnce(&mut DocumentMut) -> bool) -> anyhow::Result<()> {

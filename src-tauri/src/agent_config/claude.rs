@@ -7,7 +7,7 @@ use std::{
 use serde_json::{Map, Value};
 
 use super::{
-    ctx::{self, project_dirs, project_key, Ctx},
+    ctx::{self, project_key, Ctx, Project},
     files::{auto_memory, folder_name, json_file, markdown_items, memory_file, skill_dirs, sort_by_name, string, strings, Items, JsonFile},
     redact,
     servers::{self, describe_all, RawServer, ResolvedServer},
@@ -30,9 +30,7 @@ pub struct InstalledPlugin {
 }
 
 pub struct Snapshot {
-    pub ctx: Ctx,
-    pub cwd: PathBuf,
-    pub dirs: Vec<PathBuf>,
+    pub project: Project,
     pub claude_json_path: PathBuf,
     pub claude_json: Arc<JsonFile>,
     pub settings: Vec<SettingsEntry>,
@@ -97,18 +95,13 @@ fn installed_plugins(ctx: &Ctx, dirs: &[PathBuf], settings: &[SettingsEntry]) ->
 
 impl Snapshot {
     pub fn load(cwd: &str) -> anyhow::Result<Self> {
-        let cwd = ctx::normalize(cwd);
-        let ctx = Ctx::for_cwd(&cwd)?;
-        let dirs = project_dirs(&ctx, &cwd);
-        let settings = settings_entries(&ctx, &dirs);
-        let plugins = installed_plugins(&ctx, &dirs, &settings);
+        let project = Project::load(cwd)?;
+        let ctx = &project.ctx;
+        let settings = settings_entries(ctx, &project.dirs);
+        let plugins = installed_plugins(ctx, &project.dirs, &settings);
         let config_home = if ctx.claude_home == ctx.home.join(".claude") { &ctx.home } else { &ctx.claude_home };
         let claude_json_path = config_home.join(".claude.json");
-        Ok(Self { claude_json: json_file(&claude_json_path), claude_json_path, settings, plugins, dirs, cwd, ctx })
-    }
-
-    pub fn native_cwd(&self) -> String {
-        self.ctx.native(&self.cwd)
+        Ok(Self { claude_json: json_file(&claude_json_path), claude_json_path, settings, plugins, project })
     }
 }
 
@@ -117,9 +110,9 @@ fn short_plugin_name(name: &str) -> String {
 }
 
 fn memory(snapshot: &Snapshot) -> Vec<MemoryFile> {
-    let ctx = &snapshot.ctx;
+    let ctx = &snapshot.project.ctx;
     let mut files = vec![memory_file(Scope::User, "CLAUDE.md · all folders".into(), ctx.claude_home.join("CLAUDE.md"))];
-    for (index, dir) in snapshot.dirs.iter().enumerate() {
+    for (index, dir) in snapshot.project.dirs.iter().enumerate() {
         let folder = folder_name(dir);
         for (name, scope) in [("CLAUDE.md", Scope::Project), (".claude/CLAUDE.md", Scope::Project), ("CLAUDE.local.md", Scope::Local)] {
             let path = dir.join(name);
@@ -129,8 +122,8 @@ fn memory(snapshot: &Snapshot) -> Vec<MemoryFile> {
         }
     }
     let projects = ctx.claude_home.join("projects");
-    let auto = std::iter::once(&snapshot.cwd)
-        .chain(snapshot.dirs.iter().skip(1))
+    let auto = std::iter::once(&snapshot.project.cwd)
+        .chain(snapshot.project.dirs.iter().skip(1))
         .map(|dir| projects.join(project_key(&ctx.native(dir))).join("memory"))
         .find(|dir| dir.is_dir());
     files.extend(auto.iter().flat_map(|dir| auto_memory(dir)));
@@ -198,10 +191,10 @@ fn plugin_items(plugin: &InstalledPlugin, found: &mut Found) {
 
 pub fn overview(cwd: &str) -> anyhow::Result<Overview> {
     let snapshot = Snapshot::load(cwd)?;
-    let home = &snapshot.ctx.claude_home;
+    let home = &snapshot.project.ctx.claude_home;
 
     let mut found = Found { skills: Vec::new(), agents: Vec::new(), commands: Vec::new(), hooks: Vec::new() };
-    let roots = std::iter::once((home.clone(), Scope::User)).chain(snapshot.dirs.iter().map(|d| (d.join(".claude"), Scope::Project)));
+    let roots = std::iter::once((home.clone(), Scope::User)).chain(snapshot.project.dirs.iter().map(|d| (d.join(".claude"), Scope::Project)));
     for (root, scope) in roots {
         skill_dirs(&root.join("skills"), scope, None, &mut found.skills);
         markdown_items(&root.join("agents"), "", 0, &Items { scope, plugin: None, recursive: false }, &mut found.agents);
@@ -219,12 +212,12 @@ pub fn overview(cwd: &str) -> anyhow::Result<Overview> {
     for list in [&mut skills, &mut agents, &mut commands] {
         sort_by_name(list);
     }
-    let distro = snapshot.ctx.distro.clone();
+    let distro = snapshot.project.ctx.distro.clone();
 
     Ok(Overview {
         home: home.to_string_lossy().to_string(),
         memory: memory(&snapshot),
-        mcp: describe_all(&raw_servers(&snapshot), &snapshot.native_cwd(), distro.as_deref()),
+        mcp: describe_all(&raw_servers(&snapshot), &snapshot.project.native_cwd(), distro.as_deref()),
         skills,
         agents,
         commands,
@@ -251,7 +244,7 @@ fn server_map(value: &Value) -> Option<&Map<String, Value>> {
 }
 
 fn claude_json_project<'a>(snapshot: &Snapshot, root: &'a Value, dir: &Path) -> Option<&'a Value> {
-    root.get("projects")?.as_object()?.iter().find(|(key, _)| ctx::same_path(&snapshot.ctx.host(key), dir)).map(|(_, v)| v)
+    root.get("projects")?.as_object()?.iter().find(|(key, _)| ctx::same_path(&snapshot.project.ctx.host(key), dir)).map(|(_, v)| v)
 }
 
 fn raw_servers(snapshot: &Snapshot) -> Vec<RawServer> {
@@ -282,12 +275,12 @@ fn raw_servers(snapshot: &Snapshot) -> Vec<RawServer> {
     if let Some(map) = claude_json.get("mcpServers").and_then(Value::as_object) {
         push(Scope::User, None, &snapshot.claude_json_path, map, &none);
     }
-    let local = snapshot.dirs.iter().find_map(|d| claude_json_project(snapshot, claude_json, d));
+    let local = snapshot.project.dirs.iter().find_map(|d| claude_json_project(snapshot, claude_json, d));
     if let Some(map) = local.and_then(|p| p.get("mcpServers")).and_then(Value::as_object) {
         push(Scope::Local, None, &snapshot.claude_json_path, map, &none);
     }
     let disabled: HashSet<String> = strings(local.and_then(|p| p.get("disabledMcpjsonServers"))).into_iter().collect();
-    let project = snapshot.dirs.iter().map(|d| d.join(".mcp.json")).find_map(|p| json_file(&p).value.clone().map(|v| (p, v)));
+    let project = snapshot.project.dirs.iter().map(|d| d.join(".mcp.json")).find_map(|p| json_file(&p).value.clone().map(|v| (p, v)));
     if let Some((path, value)) = project {
         if let Some(map) = server_map(&value) {
             push(Scope::Project, None, &path, map, &disabled);
@@ -302,7 +295,7 @@ fn raw_servers(snapshot: &Snapshot) -> Vec<RawServer> {
         let found = json_file(&manifest).value.clone().map(|v| (manifest.clone(), v)).or_else(from_plugin_json);
         if let Some((path, value)) = found {
             if let Some(map) = server_map(&value) {
-                let root = snapshot.ctx.native(&plugin.root);
+                let root = snapshot.project.ctx.native(&plugin.root);
                 push(Scope::Plugin, Some((short_plugin_name(&plugin.name), root)), &path, map, &none);
             }
         }
@@ -312,5 +305,5 @@ fn raw_servers(snapshot: &Snapshot) -> Vec<RawServer> {
 
 pub fn resolve_server(cwd: &str, id: &str) -> anyhow::Result<ResolvedServer> {
     let snapshot = Snapshot::load(cwd)?;
-    servers::resolve(raw_servers(&snapshot), id, snapshot.native_cwd(), snapshot.ctx.distro.clone())
+    servers::resolve(raw_servers(&snapshot), id, snapshot.project.native_cwd(), snapshot.project.ctx.distro.clone())
 }

@@ -7,7 +7,7 @@ use serde_json::Value;
 use super::{codex, files::rewrite_lines, overview, Agent, Item, Scope};
 use crate::{
     pty::resolve_program,
-    util::{run_with_timeout, sh_quote},
+    util::run_with_timeout,
     wsl,
 };
 
@@ -163,8 +163,7 @@ fn claude_cli(dir: &str, args: &[&str]) -> anyhow::Result<()> {
     anyhow::ensure!(Path::new(dir).is_dir(), "{dir} isn't reachable");
     let mut command = match wsl::parse_host_path(dir) {
         Some((distro, linux)) => {
-            let script = std::iter::once("claude").chain(args.iter().copied()).map(sh_quote).collect::<Vec<_>>().join(" ");
-            wsl::login_command(&distro, &linux, &script)
+            wsl::login_command(&distro, &linux, "claude", args)
         }
         None => {
             let mut command = Command::new(resolve_program("claude")?);

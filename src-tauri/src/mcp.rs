@@ -20,14 +20,13 @@ use crate::{
     agent_config::{self, url_host, Launch, ResolvedServer, Transport},
     pool::{server_key, Pool},
     process::Managed,
-    util::{hidden, sh_quote},
+    util::{hidden, http_agent, wslenv_with},
     wsl,
 };
 
 const PROTOCOL_VERSION: &str = "2025-06-18";
 const INIT_TIMEOUT: Duration = Duration::from_secs(60);
 const CALL_TIMEOUT: Duration = Duration::from_secs(120);
-const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 const STDERR_LINES: usize = 30;
 const MAX_BODY_BYTES: u64 = 32 * 1024 * 1024;
 
@@ -134,15 +133,12 @@ fn stdio_command(server: &ResolvedServer, launch: &Launch) -> anyhow::Result<Com
     let command = launch.command.clone().filter(|c| !c.is_empty()).context("server has no command")?;
     Ok(match &server.distro {
         Some(distro) => {
-            let script = std::iter::once(&command).chain(launch.args.iter()).map(|a| sh_quote(a)).collect::<Vec<_>>().join(" ");
-            let mut cmd = wsl::login_command(distro, &server.cwd, &script);
+            let mut cmd = wsl::login_command(distro, &server.cwd, &command, &launch.args);
             let names: Vec<&String> = launch.env.keys().filter(|k| valid_env_name(k)).collect();
             for name in &names {
                 cmd.env(name, &launch.env[*name]);
             }
-            let existing = std::env::var("WSLENV").unwrap_or_default();
-            let forwarded = names.iter().map(|k| format!("{k}/u")).chain((!existing.is_empty()).then_some(existing)).collect::<Vec<_>>();
-            cmd.env("WSLENV", forwarded.join(":"));
+            cmd.env("WSLENV", wslenv_with(names.iter().map(|k| format!("{k}/u"))));
             cmd
         }
         None => {
@@ -229,15 +225,7 @@ fn spawn_stdio(server: &ResolvedServer, launch: &Launch) -> anyhow::Result<Stdio
 
 fn http_transport(launch: &Launch) -> anyhow::Result<HttpTransport> {
     let url = launch.url.clone().filter(|u| !u.is_empty()).context("server has no url")?;
-    let tls = ureq::tls::TlsConfig::builder().root_certs(ureq::tls::RootCerts::PlatformVerifier).build();
-    let agent = ureq::Agent::config_builder()
-        .timeout_global(Some(CALL_TIMEOUT))
-        .timeout_connect(Some(CONNECT_TIMEOUT))
-        .http_status_as_error(false)
-        .tls_config(tls)
-        .build()
-        .into();
-    Ok(HttpTransport { url, headers: launch.headers.clone(), agent, session: Mutex::new(None) })
+    Ok(HttpTransport { url, headers: launch.headers.clone(), agent: http_agent(CALL_TIMEOUT), session: Mutex::new(None) })
 }
 
 fn sse_message(reader: impl BufRead, id: u64) -> anyhow::Result<Option<Value>> {
@@ -559,7 +547,7 @@ readline.createInterface({ input: process.stdin }).on("line", (line) => {
 
     #[test]
     fn quotes_for_posix_and_fish_shells() {
-        assert_eq!(sh_quote("it's"), r"'it'\''s'");
+        assert_eq!(crate::util::sh_quote("it's"), r"'it'\''s'");
         assert!(valid_env_name("API_KEY") && !valid_env_name("1X") && !valid_env_name("A-B"));
     }
 }

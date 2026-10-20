@@ -9,7 +9,7 @@ use serde_json::value::RawValue;
 
 use crate::{
     changes::{ChangeStatus, ChangedFile},
-    util::{is_session_id, jsonl_lines, lenient},
+    util::{config_home, is_session_id, jsonl_lines, lenient},
 };
 
 pub const AGENT: &str = "codex";
@@ -73,14 +73,8 @@ pub fn is_codex_kind(kind: &str) -> bool {
     matches!(kind, "session_meta" | "event_msg" | "response_item" | "turn_context" | "compacted")
 }
 
-pub fn home() -> PathBuf {
-    std::env::var_os("CODEX_HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| dirs::home_dir().unwrap_or_default().join(".codex"))
-}
-
 pub fn sessions_dir() -> PathBuf {
-    home().join("sessions")
+    config_home("CODEX_HOME", ".codex").join("sessions")
 }
 
 pub fn is_rollout(path: &Path) -> bool {
@@ -168,7 +162,11 @@ pub fn parse(line: &str) -> Option<Record> {
     from_parts(line.kind.as_deref()?, line.timestamp, line.payload, true)
 }
 
-pub const PATCH_HEADERS: [&str; 4] = ["*** Add File: ", "*** Update File: ", "*** Delete File: ", "*** Move to: "];
+const ADD_FILE: &str = "*** Add File: ";
+const UPDATE_FILE: &str = "*** Update File: ";
+const DELETE_FILE: &str = "*** Delete File: ";
+const MOVE_TO: &str = "*** Move to: ";
+pub const PATCH_HEADERS: [&str; 4] = [ADD_FILE, UPDATE_FILE, DELETE_FILE, MOVE_TO];
 
 #[derive(Clone)]
 struct FileChange {
@@ -230,13 +228,13 @@ impl Changes {
     fn apply_patch(&mut self, patch: &str, cwd: &str) {
         let mut current: Option<String> = None;
         for line in patch.lines() {
-            if let Some(raw) = line.strip_prefix("*** Move to: ") {
+            if let Some(raw) = line.strip_prefix(MOVE_TO) {
                 if let Some(from) = current.take() {
                     current = Some(self.rename(&from, resolve(cwd, raw.trim())));
                 }
                 continue;
             }
-            let header = [("*** Add File: ", ChangeStatus::Added), ("*** Update File: ", ChangeStatus::Modified), ("*** Delete File: ", ChangeStatus::Deleted)]
+            let header = [(ADD_FILE, ChangeStatus::Added), (UPDATE_FILE, ChangeStatus::Modified), (DELETE_FILE, ChangeStatus::Deleted)]
                 .into_iter()
                 .find_map(|(prefix, status)| line.strip_prefix(prefix).map(|p| (p.trim(), status)));
             if let Some((raw, status)) = header {

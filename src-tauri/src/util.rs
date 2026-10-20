@@ -10,6 +10,9 @@ use std::{
 use anyhow::{anyhow, Context};
 use wait_timeout::ChildExt;
 
+pub const READ_BUFFER_BYTES: usize = 256 * 1024;
+const HTTP_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+
 pub fn hidden(command: &mut Command) -> &mut Command {
     use std::os::windows::process::CommandExt;
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
@@ -94,20 +97,44 @@ pub fn lenient_bool<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result
     Ok(matches!(serde::Deserialize::deserialize(deserializer)?, serde_json::Value::Bool(true)))
 }
 
-pub fn jsonl_lines(file: fs::File) -> impl Iterator<Item = String> {
-    BufReader::with_capacity(256 * 1024, file)
-        .split(b'\n')
-        .map_while(Result::ok)
-        .filter_map(|line| String::from_utf8(line).ok())
+pub fn raw_lines(file: fs::File) -> impl Iterator<Item = Vec<u8>> {
+    BufReader::with_capacity(READ_BUFFER_BYTES, file).split(b'\n').map_while(Result::ok)
 }
 
-pub fn has_parent_components(path: &Path) -> bool {
+pub fn jsonl_lines(file: fs::File) -> impl Iterator<Item = String> {
+    raw_lines(file).filter_map(|line| String::from_utf8(line).ok())
+}
+
+pub fn config_home(variable: &str, default_folder: &str) -> PathBuf {
+    std::env::var_os(variable).map(PathBuf::from).unwrap_or_else(|| dirs::home_dir().unwrap_or_default().join(default_folder))
+}
+
+pub fn wslenv_with(entries: impl IntoIterator<Item = String>) -> String {
+    std::iter::once(std::env::var("WSLENV").unwrap_or_default()).chain(entries).filter(|e| !e.is_empty()).collect::<Vec<_>>().join(":")
+}
+
+pub fn http_agent(timeout: Duration) -> ureq::Agent {
+    let tls = ureq::tls::TlsConfig::builder().root_certs(ureq::tls::RootCerts::PlatformVerifier).build();
+    ureq::Agent::config_builder()
+        .timeout_global(Some(timeout))
+        .timeout_connect(Some(HTTP_CONNECT_TIMEOUT))
+        .http_status_as_error(false)
+        .tls_config(tls)
+        .build()
+        .into()
+}
+
+fn has_parent_components(path: &Path) -> bool {
     path.components().any(|c| matches!(c, Component::ParentDir | Component::CurDir))
 }
 
-pub fn canonical(path: &Path) -> anyhow::Result<PathBuf> {
+fn check_path(path: &Path) -> anyhow::Result<()> {
     anyhow::ensure!(!has_parent_components(path), "Relative path segments are not allowed");
-    check_remote(path)?;
+    check_remote(path)
+}
+
+pub fn canonical(path: &Path) -> anyhow::Result<PathBuf> {
+    check_path(path)?;
     dunce::canonicalize(path).with_context(|| format!("Path not found: {}", path.display()))
 }
 
@@ -173,8 +200,7 @@ fn simplify_unc(path: &Path) -> PathBuf {
 }
 
 pub fn guarded(path: &Path) -> anyhow::Result<PathBuf> {
-    anyhow::ensure!(!has_parent_components(path), "Relative path segments are not allowed");
-    check_remote(path)?;
+    check_path(path)?;
     anyhow::ensure!(path.is_absolute(), "Only absolute paths can be opened: {}", path.display());
     let resolved = dunce::canonicalize(path)
         .ok()

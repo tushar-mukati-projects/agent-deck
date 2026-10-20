@@ -102,10 +102,7 @@ fn env_map(config: &Map<String, Value>) -> HashMap<String, String> {
 
 pub fn launch(server: &ResolvedServer) -> Launch {
     let config = &server.config;
-    let outer = |name: &str| match &server.distro {
-        Some(distro) => wsl::login_var(distro, name),
-        None => std::env::var(name).ok(),
-    };
+    let outer = |name: &str| wsl::env_var(server.distro.as_deref(), name);
     let special = |name: &str| (name == "CLAUDE_PLUGIN_ROOT").then(|| server.plugin_root.clone()).flatten();
     let raw = env_map(config);
     let raw_lookup = |name: &str| special(name).or_else(|| raw.get(name).cloned()).or_else(|| outer(name));

@@ -1,7 +1,6 @@
 use std::{
     collections::BTreeMap,
     fs,
-    io::{BufRead, BufReader},
     path::{Path, PathBuf},
     time::Duration,
 };
@@ -12,7 +11,11 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::sessions::{claude_home, session_file};
+use crate::{
+    fsx::looks_binary,
+    sessions::{claude_home, session_file},
+    util::raw_lines,
+};
 
 const MAX_DIFF_BYTES: u64 = 2 * 1024 * 1024;
 const DIFF_TIMEOUT: Duration = Duration::from_millis(300);
@@ -48,7 +51,7 @@ fn read_text(path: &Path) -> Option<String> {
         return None;
     }
     let bytes = fs::read(path).ok()?;
-    (!bytes[..bytes.len().min(8192)].contains(&0)).then(|| String::from_utf8_lossy(&bytes).into_owned())
+    (!looks_binary(&bytes)).then(|| String::from_utf8_lossy(&bytes).into_owned())
 }
 
 pub fn line_stats(before: &str, after: &str) -> (u32, u32) {
@@ -101,7 +104,7 @@ fn collect_tracked(jsonl: &Path) -> anyhow::Result<(String, BTreeMap<String, Tra
     let cwd_key = Finder::new(b"\"cwd\"");
     let mut cwd = String::new();
     let mut tracked = BTreeMap::new();
-    for line in BufReader::with_capacity(256 * 1024, fs::File::open(jsonl)?).split(b'\n').map_while(Result::ok) {
+    for line in raw_lines(fs::File::open(jsonl)?) {
         let wants_cwd = cwd.is_empty() && cwd_key.find(&line).is_some();
         if snapshot.find(&line).is_none() && tool_use.find(&line).is_none() && !wants_cwd {
             continue;

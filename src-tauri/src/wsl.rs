@@ -19,7 +19,7 @@ use crate::{
     git::GitChange,
     sessions::{self, Accumulator, LiveSession, Needle, SearchHit, SessionInfo, TranscriptPage},
     tasks,
-    util::{hidden, run_with_timeout},
+    util::{hidden, run_with_timeout, sh_quote, wslenv_with},
 };
 
 const AGENT: &str = include_str!("wsl_agent.py");
@@ -203,6 +203,13 @@ pub fn host_path(distro: &str, linux_path: &str) -> String {
     format!("{UNC_PREFIX}{distro}{}", linux_path.replace('/', "\\"))
 }
 
+pub fn normalize_path(path: &str) -> String {
+    match parse_host_path(path) {
+        Some((distro, linux)) => host_path(&distro, &linux),
+        None => path.to_string(),
+    }
+}
+
 fn host_of(distro: &str, path: &str) -> String {
     if path.starts_with('/') {
         host_path(distro, path)
@@ -237,9 +244,7 @@ fn forward_login_vars(command: &mut Command, distro: &str) {
     for key in &forwarded {
         command.env(key, &env[*key]);
     }
-    let existing = std::env::var("WSLENV").unwrap_or_default();
-    let listed = forwarded.iter().map(|k| format!("{k}/u")).collect::<Vec<_>>().join(":");
-    command.env("WSLENV", if existing.is_empty() { listed } else { format!("{existing}:{listed}") });
+    command.env("WSLENV", wslenv_with(forwarded.iter().map(|k| format!("{k}/u"))));
 }
 
 fn run_agent_raw(mut command: Command, distro: &str, input: Option<String>, timeout: Duration) -> anyhow::Result<Vec<u8>> {
@@ -304,6 +309,13 @@ pub fn login_var(distro: &str, name: &str) -> Option<String> {
     login_env(distro)?.get(name).cloned()
 }
 
+pub fn env_var(distro: Option<&str>, name: &str) -> Option<String> {
+    match distro {
+        Some(distro) => login_var(distro, name),
+        None => std::env::var(name).ok(),
+    }
+}
+
 fn session_info(distro: &str, path: &str, entry: &Entry) -> Option<SessionInfo> {
     let mut info = entry.acc.finish_with(entry.mtime, entry.size)?;
     info.cwd = host_of(distro, &info.cwd);
@@ -326,7 +338,7 @@ fn apply_index(distro: &str, response: IndexResponse) -> bool {
                 continue;
             }
             None => {
-                let id = sessions::session_id_for(change.path.rsplit('/').next().unwrap_or_default());
+                let id = sessions::session_id_of(&change.path);
                 Accumulator::with_ids(id, change.path.clone(), &change.project_key, Some(distro.to_string()))
             }
         };
@@ -474,7 +486,7 @@ pub fn subagent_transcript(distro: &str, path: &str, id: &str, from_offset: u64)
 }
 
 pub fn delete_session(distro: &str, path: &str) -> anyhow::Result<()> {
-    let session_id = sessions::session_id_for(path.rsplit('/').next().unwrap_or_default());
+    let session_id = sessions::session_id_of(path);
     anyhow::ensure!(
         !live_sessions().iter().any(|l| l.session_id == session_id),
         "This session is still running in WSL. Close it first."
@@ -586,7 +598,7 @@ pub fn search(needle: &Needle, generation: u64) -> Vec<SearchHit> {
                         .files
                         .iter()
                         .flat_map(|found| {
-                            let id = sessions::session_id_for(found.path.rsplit('/').next().unwrap_or_default());
+                            let id = sessions::session_id_of(&found.path);
                             sessions::search_lines(&id, found.lines.iter().map(|l| l.get()), needle)
                         })
                         .collect::<Vec<_>>()
@@ -614,7 +626,8 @@ pub fn home_for(distro: &str, linux_cwd: &str) -> anyhow::Result<String> {
     Ok(home)
 }
 
-pub fn login_command(distro: &str, linux_cwd: &str, script: &str) -> Command {
+pub fn login_command(distro: &str, linux_cwd: &str, program: &str, args: &[impl AsRef<str>]) -> Command {
+    let script = std::iter::once(program).chain(args.iter().map(AsRef::as_ref)).map(sh_quote).collect::<Vec<_>>().join(" ");
     let mut command = Command::new("wsl.exe");
     command.args(["-d", distro, "--cd", linux_cwd, "-e", &login_shell(distro), "-lic"]).arg(format!("exec {script}"));
     command

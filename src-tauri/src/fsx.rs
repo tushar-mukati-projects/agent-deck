@@ -104,6 +104,10 @@ fn decode_utf16(body: &[u8], unit: fn([u8; 2]) -> u16, encoding: Encoding) -> (S
     (text, if lossy { Encoding::Lossy } else { encoding })
 }
 
+pub(crate) fn looks_binary(bytes: &[u8]) -> bool {
+    bytes[..bytes.len().min(SNIFF_BYTES)].contains(&0)
+}
+
 pub fn decode(bytes: &[u8]) -> Option<(String, Encoding)> {
     if let Some(body) = bytes.strip_prefix(UTF16LE_BOM) {
         return Some(decode_utf16(body, u16::from_le_bytes, Encoding::Utf16le));
@@ -111,7 +115,7 @@ pub fn decode(bytes: &[u8]) -> Option<(String, Encoding)> {
     if let Some(body) = bytes.strip_prefix(UTF16BE_BOM) {
         return Some(decode_utf16(body, u16::from_be_bytes, Encoding::Utf16be));
     }
-    if bytes[..bytes.len().min(SNIFF_BYTES)].contains(&0) {
+    if looks_binary(bytes) {
         return None;
     }
     let body = bytes.strip_prefix(UTF8_BOM).unwrap_or(bytes);

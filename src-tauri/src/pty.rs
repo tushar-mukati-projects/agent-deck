@@ -13,6 +13,8 @@ use portable_pty::{native_pty_system, Child, ChildKiller, CommandBuilder, Master
 use serde::{Deserialize, Serialize};
 use tauri::ipc::Channel;
 
+use crate::util::wslenv_with;
+
 const REPLAY_LIMIT: usize = 2 * 1024 * 1024;
 const LINE_SEARCH_LIMIT: usize = 64 * 1024;
 const SENDER_BATCH_LIMIT: usize = 512 * 1024;
@@ -280,13 +282,7 @@ fn build_command(req: &SpawnRequest) -> anyhow::Result<CommandBuilder> {
     cmd.env("COLORTERM", "truecolor");
     cmd.env("TERM_PROGRAM", "agent-deck");
     if program_stem(&req.program) == "wsl" {
-        let forwarded = std::env::var("WSLENV").unwrap_or_default();
-        let joined = [forwarded.as_str(), "COLORTERM", "TERM_PROGRAM"]
-            .into_iter()
-            .filter(|s| !s.is_empty())
-            .collect::<Vec<_>>()
-            .join(":");
-        cmd.env("WSLENV", joined);
+        cmd.env("WSLENV", wslenv_with(["COLORTERM".to_string(), "TERM_PROGRAM".to_string()]));
     }
     Ok(cmd)
 }

@@ -20,7 +20,8 @@ use serde_json::value::RawValue;
 
 use crate::{
     codex,
-    util::{canonical, is_session_id, lenient, lenient_bool, lenient_u64, mtime_ms, run_with_timeout},
+    process::{is_agent_process, process_start},
+    util::{canonical, config_home, is_session_id, lenient, lenient_bool, lenient_u64, mtime_ms, raw_lines, run_with_timeout, READ_BUFFER_BYTES},
 };
 
 const PROMPT_PREVIEW_CHARS: usize = 280;
@@ -76,13 +77,9 @@ fn default_agent() -> String {
     "claude".into()
 }
 
-pub fn session_id_for(file_name: &str) -> String {
-    let stem = file_name.trim_end_matches(".jsonl");
+pub fn session_id_of(path: &str) -> String {
+    let stem = path.rsplit(['/', '\\']).next().unwrap_or_default().trim_end_matches(".jsonl");
     codex::id_from_name(stem).filter(|_| stem.starts_with("rollout-")).unwrap_or(stem).to_string()
-}
-
-fn file_name_of(path: &str) -> &str {
-    path.rsplit(['/', '\\']).next().unwrap_or_default()
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -230,9 +227,7 @@ static CACHE: LazyLock<Mutex<HashMap<String, CacheEntry>>> = LazyLock::new(Mutex
 static SEARCH_GENERATION: AtomicU64 = AtomicU64::new(0);
 
 pub fn claude_home() -> PathBuf {
-    std::env::var_os("CLAUDE_CONFIG_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| dirs::home_dir().unwrap_or_default().join(".claude"))
+    config_home("CLAUDE_CONFIG_DIR", ".claude")
 }
 
 pub fn projects_dir() -> PathBuf {
@@ -307,7 +302,7 @@ pub(crate) fn ends_line(file: &mut fs::File, offset: u64) -> io::Result<bool> {
 }
 
 pub(crate) fn complete_lines(file: fs::File, start: u64, mut on_line: impl FnMut(&str, u64)) -> io::Result<()> {
-    let mut reader = BufReader::with_capacity(256 * 1024, file);
+    let mut reader = BufReader::with_capacity(READ_BUFFER_BYTES, file);
     reader.seek(SeekFrom::Start(start))?;
     let mut offset = start;
     let mut line = Vec::new();
@@ -324,8 +319,7 @@ pub(crate) fn complete_lines(file: fs::File, start: u64, mut on_line: impl FnMut
 
 impl Accumulator {
     fn new(path: &Path, project_key: &str) -> Self {
-        let name = path.file_name().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
-        Self::with_ids(session_id_for(&name), path.to_string_lossy().to_string(), project_key, None)
+        Self::with_ids(session_id_of(&path.to_string_lossy()), path.to_string_lossy().to_string(), project_key, None)
     }
 
     pub(crate) fn with_ids(id: String, file_path: String, project_key: &str, distro: Option<String>) -> Self {
@@ -347,7 +341,7 @@ impl Accumulator {
 
     fn restarted(&self) -> Self {
         let info = &self.info;
-        Self::with_ids(session_id_for(file_name_of(&info.file_path)), info.file_path.clone(), &info.project_key, info.distro.clone())
+        Self::with_ids(session_id_of(&info.file_path), info.file_path.clone(), &info.project_key, info.distro.clone())
     }
 
     pub(crate) fn offset(&self) -> u64 {
@@ -545,28 +539,6 @@ pub fn list_sessions() -> Vec<SessionInfo> {
     sessions
 }
 
-fn is_agent_process(pid: u32) -> bool {
-    use windows_sys::Win32::{
-        Foundation::{CloseHandle, STILL_ACTIVE},
-        System::Threading::{GetExitCodeProcess, OpenProcess, QueryFullProcessImageNameW, PROCESS_QUERY_LIMITED_INFORMATION},
-    };
-    unsafe {
-        let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
-        if handle.is_null() {
-            return false;
-        }
-        let mut code: u32 = 0;
-        let alive = GetExitCodeProcess(handle, &mut code) != 0 && code == STILL_ACTIVE as u32;
-        let mut buffer = [0u16; 1024];
-        let mut len = buffer.len() as u32;
-        let named = QueryFullProcessImageNameW(handle, 0, buffer.as_mut_ptr(), &mut len) != 0;
-        CloseHandle(handle);
-        let image = String::from_utf16_lossy(&buffer[..len as usize]).to_lowercase();
-        let name = image.rsplit('\\').next().unwrap_or_default();
-        alive && (!named || ["claude", "node", "bun"].iter().any(|n| name.contains(n)))
-    }
-}
-
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct LiveFile {
@@ -599,24 +571,6 @@ pub fn live_sessions() -> Vec<LiveSession> {
             })
         })
         .collect()
-}
-
-fn process_start(pid: u32) -> Option<u64> {
-    use windows_sys::Win32::{
-        Foundation::{CloseHandle, FILETIME},
-        System::Threading::{GetProcessTimes, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION},
-    };
-    unsafe {
-        let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
-        if handle.is_null() {
-            return None;
-        }
-        let zero = FILETIME { dwLowDateTime: 0, dwHighDateTime: 0 };
-        let (mut created, mut exited, mut kernel, mut user) = (zero, zero, zero, zero);
-        let ok = GetProcessTimes(handle, &mut created, &mut exited, &mut kernel, &mut user) != 0;
-        CloseHandle(handle);
-        ok.then(|| (u64::from(created.dwHighDateTime) << 32) | u64::from(created.dwLowDateTime))
-    }
 }
 
 fn end_process_tree(pid: u32) -> anyhow::Result<()> {
@@ -657,9 +611,13 @@ fn summarize_tool(name: &str, input: Option<&RawValue>) -> String {
         .or(input.url)
         .or(input.query)
         .or(input.prompt);
+    tool_text(name.to_string(), detail)
+}
+
+fn tool_text(name: String, detail: Option<String>) -> String {
     match detail {
         Some(d) => format!("{name} · {}", preview(&d, TOOL_DETAIL_CHARS)),
-        None => name.to_string(),
+        None => name,
     }
 }
 
@@ -667,7 +625,7 @@ pub fn session_file(file_path: &str) -> anyhow::Result<(PathBuf, String)> {
     let path = canonical(Path::new(file_path))?;
     if codex::is_rollout(&path) {
         let root = canonical(&codex::sessions_dir())?;
-        let session_id = session_id_for(&path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default());
+        let session_id = session_id_of(&path.to_string_lossy());
         anyhow::ensure!(path.starts_with(&root) && is_session_id(&session_id), "not a Codex session file");
         return Ok((path, session_id));
     }
@@ -724,13 +682,7 @@ fn codex_item(record: codex::Record) -> Option<TranscriptItem> {
         codex::Event::Assistant(text) if !text.trim().is_empty() => {
             item("assistant", "text", truncate_chars(&text, TRANSCRIPT_TEXT_CHARS))
         }
-        codex::Event::Tool { name, detail } => {
-            let text = match detail {
-                Some(d) => format!("{name} · {}", preview(&d, TOOL_DETAIL_CHARS)),
-                None => name,
-            };
-            item("assistant", "tool", text)
-        }
+        codex::Event::Tool { name, detail } => item("assistant", "tool", tool_text(name, detail)),
         codex::Event::Patch(patch) => {
             let files: Vec<&str> =
                 patch.lines().filter_map(|l| codex::PATCH_HEADERS.iter().find_map(|p| l.strip_prefix(p))).collect();
@@ -872,10 +824,8 @@ pub fn search_lines<S: AsRef<str>>(session_id: &str, lines: impl Iterator<Item =
 
 fn search_file(path: &Path, needle: &Needle, generation: u64) -> Vec<SearchHit> {
     let Ok(file) = fs::File::open(path) else { return Vec::new() };
-    let session_id = session_id_for(&path.file_name().map(|s| s.to_string_lossy().to_string()).unwrap_or_default());
-    let candidates = BufReader::with_capacity(256 * 1024, file)
-        .split(b'\n')
-        .map_while(Result::ok)
+    let session_id = session_id_of(&path.to_string_lossy());
+    let candidates = raw_lines(file)
         .take_while(|_| SEARCH_GENERATION.load(Ordering::Relaxed) == generation)
         .filter(|line| needle.may_match(line))
         .filter_map(|line| String::from_utf8(line).ok());

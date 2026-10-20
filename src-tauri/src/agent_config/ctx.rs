@@ -8,10 +8,21 @@ pub struct Ctx {
     pub claude_home: PathBuf,
 }
 
-pub fn normalize(cwd: &str) -> PathBuf {
-    match wsl::parse_host_path(cwd) {
-        Some((distro, linux)) => PathBuf::from(wsl::host_path(&distro, &linux)),
-        None => PathBuf::from(cwd),
+pub struct Project {
+    pub ctx: Ctx,
+    pub cwd: PathBuf,
+    pub dirs: Vec<PathBuf>,
+}
+
+impl Project {
+    pub fn load(cwd: &str) -> anyhow::Result<Self> {
+        let cwd = PathBuf::from(wsl::normalize_path(cwd));
+        let ctx = Ctx::for_cwd(&cwd)?;
+        Ok(Self { dirs: project_dirs(&ctx, &cwd), ctx, cwd })
+    }
+
+    pub fn native_cwd(&self) -> String {
+        self.ctx.native(&self.cwd)
     }
 }
 
@@ -44,15 +55,8 @@ impl Ctx {
         wsl::parse_host_path(&text).map(|(_, linux)| linux).unwrap_or(text)
     }
 
-    pub fn var(&self, name: &str) -> Option<String> {
-        match &self.distro {
-            Some(distro) => wsl::login_var(distro, name),
-            None => std::env::var(name).ok(),
-        }
-    }
-
     pub fn codex_home(&self) -> PathBuf {
-        let custom = self.var("CODEX_HOME").filter(|dir| self.distro.is_none() || dir.starts_with('/'));
+        let custom = wsl::env_var(self.distro.as_deref(), "CODEX_HOME").filter(|dir| self.distro.is_none() || dir.starts_with('/'));
         custom.map(|dir| self.host(&dir)).unwrap_or_else(|| self.home.join(".codex"))
     }
 }
@@ -91,8 +95,8 @@ mod tests {
 
     #[test]
     fn normalizes_wsl_dollar_paths() {
-        assert_eq!(normalize(r"\\wsl$\Debian\home\me\work"), PathBuf::from(r"\\wsl.localhost\Debian\home\me\work"));
-        assert_eq!(normalize(r"C:\work"), PathBuf::from(r"C:\work"));
+        assert_eq!(wsl::normalize_path(r"\\wsl$\Debian\home\me\work"), r"\\wsl.localhost\Debian\home\me\work");
+        assert_eq!(wsl::normalize_path(r"C:\work"), r"C:\work");
     }
 
     #[test]

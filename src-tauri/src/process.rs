@@ -6,14 +6,19 @@ use std::{
 
 use anyhow::Context;
 use windows_sys::Win32::{
-    Foundation::HANDLE,
-    System::JobObjects::{
-        AssignProcessToJobObject, CreateJobObjectW, JobObjectExtendedLimitInformation, SetInformationJobObject, TerminateJobObject,
-        JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+    Foundation::{FILETIME, HANDLE, STILL_ACTIVE},
+    System::{
+        JobObjects::{
+            AssignProcessToJobObject, CreateJobObjectW, JobObjectExtendedLimitInformation, SetInformationJobObject, TerminateJobObject,
+            JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+        },
+        Threading::{GetExitCodeProcess, GetProcessTimes, OpenProcess, QueryFullProcessImageNameW, PROCESS_QUERY_LIMITED_INFORMATION},
     },
 };
 
 const TERMINATED_EXIT_CODE: u32 = 1;
+const IMAGE_PATH_CHARS: usize = 1024;
+const AGENT_IMAGES: [&str; 3] = ["claude", "node", "bun"];
 
 struct Job {
     handle: OwnedHandle,
@@ -65,6 +70,40 @@ fn assign_process(job: HANDLE, process: HANDLE) -> io::Result<()> {
 
 fn terminate_job(job: HANDLE) -> io::Result<()> {
     win32_result(unsafe { TerminateJobObject(job, TERMINATED_EXIT_CODE) })
+}
+
+fn open_process(pid: u32) -> Option<OwnedHandle> {
+    let handle = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid) };
+    (!handle.is_null()).then(|| unsafe { OwnedHandle::from_raw_handle(handle) })
+}
+
+fn still_active(process: &OwnedHandle) -> bool {
+    let mut code = 0u32;
+    let ok = unsafe { GetExitCodeProcess(process.as_raw_handle(), &raw mut code) };
+    ok != 0 && code == STILL_ACTIVE as u32
+}
+
+fn image_name(process: &OwnedHandle) -> Option<String> {
+    let mut buffer = [0u16; IMAGE_PATH_CHARS];
+    let mut len = buffer.len() as u32;
+    let ok = unsafe { QueryFullProcessImageNameW(process.as_raw_handle(), 0, buffer.as_mut_ptr(), &raw mut len) };
+    let image = (ok != 0).then(|| String::from_utf16_lossy(&buffer[..len as usize]).to_lowercase())?;
+    Some(image.rsplit('\\').next().unwrap_or_default().to_string())
+}
+
+fn creation_time(process: &OwnedHandle) -> Option<u64> {
+    let (mut created, mut exited, mut kernel, mut user) = (FILETIME::default(), FILETIME::default(), FILETIME::default(), FILETIME::default());
+    let ok = unsafe { GetProcessTimes(process.as_raw_handle(), &raw mut created, &raw mut exited, &raw mut kernel, &raw mut user) };
+    (ok != 0).then(|| (u64::from(created.dwHighDateTime) << 32) | u64::from(created.dwLowDateTime))
+}
+
+pub(crate) fn is_agent_process(pid: u32) -> bool {
+    let Some(process) = open_process(pid) else { return false };
+    still_active(&process) && image_name(&process).is_none_or(|name| AGENT_IMAGES.iter().any(|agent| name.contains(agent)))
+}
+
+pub(crate) fn process_start(pid: u32) -> Option<u64> {
+    creation_time(&open_process(pid)?)
 }
 
 pub struct Managed {

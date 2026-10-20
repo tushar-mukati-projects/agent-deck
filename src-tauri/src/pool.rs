@@ -15,11 +15,7 @@ impl<V> Default for Pool<V> {
 }
 
 pub fn server_key(cwd: &str, id: &str) -> String {
-    let cwd = match crate::wsl::parse_host_path(cwd) {
-        Some((distro, linux)) => crate::wsl::host_path(&distro, &linux),
-        None => cwd.to_string(),
-    };
-    format!("{}|{id}", cwd.replace('/', "\\").trim_end_matches('\\').to_lowercase())
+    format!("{}|{id}", crate::wsl::normalize_path(cwd).replace('/', "\\").trim_end_matches('\\').to_lowercase())
 }
 
 impl<V> Pool<V> {
