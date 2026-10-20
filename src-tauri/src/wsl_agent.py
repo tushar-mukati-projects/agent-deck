@@ -765,6 +765,10 @@ def emit(message):
     sys.stdout.flush()
 
 
+def noisy(root, path):
+    return any(part in NOISY_DIRS for part in os.path.relpath(path, root).split(os.sep)) or path.endswith(".agent-deck-tmp")
+
+
 def watch(root):
     import ctypes
     import select
@@ -776,9 +780,6 @@ def watch(root):
         raise OSError(ctypes.get_errno(), "inotify is not available")
     mask = 0x2 | 0x8 | 0x40 | 0x80 | 0x100 | 0x200 | 0x400 | 0x800 | 0x1000000 | 0x2000000 | 0x4000000
     watches = {}
-
-    def noisy(path):
-        return any(part in NOISY_DIRS for part in path.split("/")) or path.endswith(".agent-deck-tmp")
 
     def add(path):
         for directory, dirs, _ in os.walk(path):
@@ -818,7 +819,7 @@ def watch(root):
                 if directory is None:
                     continue
                 path = os.path.join(directory, name) if name else directory
-                if noisy(path):
+                if noisy(root, path):
                     continue
                 if event & 0x40000000 and event & (0x100 | 0x80):
                     add(path)
