@@ -12,7 +12,7 @@ import {
 } from "@/actions/workspaces";
 import { matchShortcut, matchTabNumber, type ShortcutAction } from "@/lib/shortcuts";
 import {
-  DEFAULT_FONT_SIZE,
+  DEFAULT_FONT_SIZE_PX,
   MAX_FONT_SIZE_PX,
   MIN_FONT_SIZE_PX,
   useSettingsStore,
@@ -60,7 +60,7 @@ const handlers: Record<ShortcutAction, () => void> = {
   },
   fontBigger: () => setFontSize((size) => size + 1),
   fontSmaller: () => setFontSize((size) => size - 1),
-  fontReset: () => setFontSize(() => DEFAULT_FONT_SIZE),
+  fontReset: () => setFontSize(() => DEFAULT_FONT_SIZE_PX),
   settings: () => ui().setSettingsOpen(true),
   shortcuts: () => ui().setShortcutsOpen(true),
   notes: toggleNotes,

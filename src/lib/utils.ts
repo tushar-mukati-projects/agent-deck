@@ -12,7 +12,7 @@ const unifySeparators = (path: string) => trimTrailingSeparators(path).replace(/
 
 const JUST_NOW_MS = 45_000;
 const BYTES_PER_UNIT = 1024;
-const ONE_DECIMAL_BELOW = 10;
+const WHOLE_NUMBERS_FROM = 10;
 
 const WSL_ROOT = /^\\\\wsl(?:\$|\.localhost)\\([^\\]*)(.*)$/i;
 
@@ -85,7 +85,7 @@ export const formatBytes = (bytes: number) => {
     unit += 1;
   }
   const tenths = value.toFixed(1);
-  return `${Number(tenths) >= ONE_DECIMAL_BELOW ? value.toFixed(0) : tenths} ${units[unit]}`;
+  return `${Number(tenths) >= WHOLE_NUMBERS_FROM ? value.toFixed(0) : tenths} ${units[unit]}`;
 };
 
 export const timeAgo = (ms: number) => {

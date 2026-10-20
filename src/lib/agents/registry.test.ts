@@ -1,13 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  CLAUDE,
-  CODEX,
-  findAgent,
-  getAgent,
-  listAgents,
-  resumeLabel,
-} from "@/lib/agents/registry";
+import { CLAUDE, CODEX, findAgent, getAgent, listAgents, resumeLabel } from "@/lib/agents/registry";
 import { agentSettings } from "@/lib/agents/settings-fixture";
 import type { AgentSettings } from "@/lib/agents/registry";
 

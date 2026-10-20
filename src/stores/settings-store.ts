@@ -10,7 +10,7 @@ export type ClickBehavior = "preview" | "resume";
 
 const SETTINGS_STORAGE_KEY = "agent-deck-settings";
 
-export const DEFAULT_FONT_SIZE = 12;
+export const DEFAULT_FONT_SIZE_PX = 12;
 export const MIN_FONT_SIZE_PX = 9;
 export const MAX_FONT_SIZE_PX = 22;
 
@@ -62,7 +62,7 @@ const DEFAULTS: SettingsData = {
   customAgents: [],
   sessionTitles: {},
   shellProgram: "",
-  fontSize: DEFAULT_FONT_SIZE,
+  fontSize: DEFAULT_FONT_SIZE_PX,
   themeId: DEFAULT_THEME_ID,
   showHidden: true,
   clickBehavior: "preview",
