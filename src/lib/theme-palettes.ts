@@ -1,4 +1,61 @@
-import type { ThemeInput } from "@/lib/themes";
+export type ThemeKind = "dark" | "light";
+
+type Ansi = [
+  black: string,
+  red: string,
+  green: string,
+  yellow: string,
+  blue: string,
+  magenta: string,
+  cyan: string,
+  white: string,
+  brightBlack: string,
+  brightRed: string,
+  brightGreen: string,
+  brightYellow: string,
+  brightBlue: string,
+  brightMagenta: string,
+  brightCyan: string,
+  brightWhite: string,
+];
+
+export interface ThemeInput {
+  id: string;
+  name: string;
+  kind: ThemeKind;
+  bg: string;
+  panel: string;
+  chrome?: string;
+  elevated: string;
+  hover: string;
+  active: string;
+  border: string;
+  borderStrong: string;
+  fg: string;
+  muted: string;
+  faint: string;
+  accent: string;
+  accentStrong?: string;
+  onAccent: string;
+  ansi: Ansi;
+  codeBg?: string;
+  syntax?: Partial<Syntax>;
+}
+
+export interface Syntax {
+  comment: string;
+  keyword: string;
+  string: string;
+  number: string;
+  function: string;
+  type: string;
+  property: string;
+  tag: string;
+  variable: string;
+  operator: string;
+  heading: string;
+  link: string;
+}
 
 export const THEME_PALETTES: ThemeInput[] = [
   {
