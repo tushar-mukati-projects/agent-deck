@@ -1,9 +1,9 @@
 import { Plus } from "lucide-react";
 
 import { startNewSession } from "@/actions/sessions";
+import { Chevron } from "@/components/ui/chevron";
 import { StatusDot, type DotTone } from "@/components/ui/feedback";
 import { IconButton } from "@/components/ui/icon-button";
-import { Chevron } from "@/components/ui/panel";
 import { Tag } from "@/components/ui/tag";
 import { folderIcon } from "@/lib/file-icons";
 import { basename, cn } from "@/lib/utils";

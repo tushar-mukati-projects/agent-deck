@@ -1,6 +1,6 @@
 import { Dialog } from "@/components/ui/dialog";
 import { Kbd } from "@/components/ui/kbd";
-import { SectionLabel } from "@/components/ui/panel";
+import { SectionLabel } from "@/components/ui/section-label";
 import { EXTRA_SHORTCUT_HINTS, SHORTCUTS, type ShortcutGroup } from "@/lib/shortcuts";
 import { useUiStore } from "@/stores/ui-store";
 

@@ -1,9 +1,12 @@
 import { memo, useDeferredValue, useMemo, useState } from "react";
 import { BrainCircuit, RefreshCw } from "lucide-react";
 
+import { Alert } from "@/components/ui/alert";
+import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { EmptyState, LoadingState } from "@/components/ui/feedback";
 import { IconButton } from "@/components/ui/icon-button";
-import { Alert, CollapsibleSection, PanelHeader, SearchInput } from "@/components/ui/panel";
+import { PanelHeader } from "@/components/ui/panel-header";
+import { SearchInput } from "@/components/ui/search-input";
 import { SECTIONS } from "@/features/agent-config/sections";
 import { StartDistroButton } from "@/features/sidebar/WslStatus";
 import { useToggleSet } from "@/hooks/useToggleSet";

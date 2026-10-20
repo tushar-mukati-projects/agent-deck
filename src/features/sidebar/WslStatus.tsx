@@ -2,9 +2,9 @@ import { memo, useState } from "react";
 import { Power } from "lucide-react";
 import { toast } from "sonner";
 
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/feedback";
-import { Alert } from "@/components/ui/panel";
 import { failedTo } from "@/lib/utils";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore } from "@/stores/settings-store";

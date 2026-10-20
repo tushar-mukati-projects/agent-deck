@@ -4,7 +4,7 @@ import { Database, RefreshCw } from "lucide-react";
 import { ErrorAlert } from "@/components/ui/error-alert";
 import { Hint, LoadingState, showError } from "@/components/ui/feedback";
 import { IconButton } from "@/components/ui/icon-button";
-import { Segmented } from "@/components/ui/panel";
+import { Segmented } from "@/components/ui/segmented";
 import { DataPane } from "@/features/mcp/pg/DataPane";
 import { SqlPane } from "@/features/mcp/pg/SqlPane";
 import { StructurePane } from "@/features/mcp/pg/StructurePane";

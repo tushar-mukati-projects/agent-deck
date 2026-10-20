@@ -1,5 +1,5 @@
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Alert } from "@/components/ui/panel";
 
 type ErrorAlertProps = {
   message: string;

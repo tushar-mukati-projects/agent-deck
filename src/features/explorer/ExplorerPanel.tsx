@@ -11,7 +11,7 @@ import {
 
 import { EmptyState, LoadingState } from "@/components/ui/feedback";
 import { IconButton } from "@/components/ui/icon-button";
-import { PanelHeader } from "@/components/ui/panel";
+import { PanelHeader } from "@/components/ui/panel-header";
 import { FileTree } from "@/features/explorer/FileTree";
 import { decodeMcpTab, tabTargetPath } from "@/lib/diff-tabs";
 import { shortcutLabel } from "@/lib/shortcuts";

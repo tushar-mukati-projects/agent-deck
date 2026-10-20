@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
 import { Eye, Table2 } from "lucide-react";
 
+import { Chevron } from "@/components/ui/chevron";
 import { Hint } from "@/components/ui/feedback";
-import { Chevron, SearchInput } from "@/components/ui/panel";
+import { SearchInput } from "@/components/ui/search-input";
 import { useToggleSet } from "@/hooks/useToggleSet";
 import { tableKey, type TableRef } from "@/lib/mcp/pg-queries";
 import { cn, groupBy } from "@/lib/utils";

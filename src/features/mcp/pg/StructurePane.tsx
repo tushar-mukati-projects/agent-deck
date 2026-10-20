@@ -1,5 +1,6 @@
+import { Alert } from "@/components/ui/alert";
 import { LoadingState } from "@/components/ui/feedback";
-import { Alert, SectionLabel } from "@/components/ui/panel";
+import { SectionLabel } from "@/components/ui/section-label";
 import { ResultGrid } from "@/features/mcp/ResultGrid";
 import { useAsync } from "@/hooks/useAsync";
 import { structureSql, type PgRunner, type TableRef } from "@/lib/mcp/pg-queries";

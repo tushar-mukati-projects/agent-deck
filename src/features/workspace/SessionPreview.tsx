@@ -14,11 +14,12 @@ import {
 import { format, isValid } from "date-fns";
 
 import { deleteSessionWithConfirm, resumeWorkspace } from "@/actions/sessions";
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/feedback";
 import { IconButton } from "@/components/ui/icon-button";
 import { Kbd } from "@/components/ui/kbd";
-import { Alert, SearchInput } from "@/components/ui/panel";
+import { SearchInput } from "@/components/ui/search-input";
 import { TranscriptList } from "@/features/workspace/TranscriptList";
 import { useTranscript } from "@/features/workspace/useTranscript";
 import { useAsync } from "@/hooks/useAsync";

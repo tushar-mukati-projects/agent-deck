@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Database, FileText, Plug, RefreshCw, Wrench } from "lucide-react";
 
+import { Alert } from "@/components/ui/alert";
 import { ErrorAlert } from "@/components/ui/error-alert";
 import { EmptyState, LoadingState } from "@/components/ui/feedback";
 import { IconButton } from "@/components/ui/icon-button";
-import { Alert, Segmented } from "@/components/ui/panel";
+import { Segmented } from "@/components/ui/segmented";
 import { Tag } from "@/components/ui/tag";
 import { PgBrowser } from "@/features/mcp/PgBrowser";
 import { ToolsPane } from "@/features/mcp/ToolsPane";

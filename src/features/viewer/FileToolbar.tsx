@@ -9,7 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/menu";
-import { Segmented } from "@/components/ui/panel";
+import { Segmented } from "@/components/ui/segmented";
 import { fileActions } from "@/features/viewer/file-actions";
 import { cn, formatBytes, relativePath } from "@/lib/utils";
 import { agentName } from "@/stores/agents";

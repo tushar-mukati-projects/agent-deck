@@ -3,7 +3,9 @@ import { Plus, RefreshCw } from "lucide-react";
 
 import { refreshAll, startNewSession, startSessionInPickedFolder } from "@/actions/sessions";
 import { IconButton } from "@/components/ui/icon-button";
-import { PanelHeader, SearchInput, Segmented } from "@/components/ui/panel";
+import { PanelHeader } from "@/components/ui/panel-header";
+import { SearchInput } from "@/components/ui/search-input";
+import { Segmented } from "@/components/ui/segmented";
 import { FolderFilter } from "@/features/sidebar/FolderFilter";
 import { SessionList } from "@/features/sidebar/SessionList";
 import { WslStatus } from "@/features/sidebar/WslStatus";

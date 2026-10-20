@@ -9,9 +9,9 @@ import {
   saveFile,
 } from "@/actions/files";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { EmptyState, LoadingState, showError } from "@/components/ui/feedback";
-import { Alert } from "@/components/ui/panel";
 import { DiffView } from "@/features/changes/DiffView";
 import { McpView } from "@/features/mcp/McpView";
 import { CodeView } from "@/features/viewer/CodeView";

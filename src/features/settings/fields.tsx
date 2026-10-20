@@ -1,7 +1,7 @@
 import { useId } from "react";
 
 import { Input } from "@/components/ui/input";
-import { Segmented } from "@/components/ui/panel";
+import { Segmented } from "@/components/ui/segmented";
 import { useSettingsStore, type SettingsData } from "@/stores/settings-store";
 
 type TextKey = "claudeArgs" | "codexArgs" | "shellProgram";

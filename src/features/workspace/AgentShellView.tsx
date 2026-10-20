@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
 import { ArrowDown, Copy, FileText } from "lucide-react";
 
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { LoadingState } from "@/components/ui/feedback";
-import { Alert } from "@/components/ui/panel";
 import { TimeAgo } from "@/components/ui/time-ago";
 import { useStickToBottom } from "@/features/workspace/useStickToBottom";
 import { usePolling } from "@/hooks/usePolling";

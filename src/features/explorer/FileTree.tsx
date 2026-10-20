@@ -3,6 +3,7 @@ import { AtSign, Code2, Sparkles, SquareTerminal } from "lucide-react";
 
 import { canMention, mentionInAgent } from "@/actions/files";
 import { startNewSession } from "@/actions/sessions";
+import { Chevron } from "@/components/ui/chevron";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -10,7 +11,6 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/menu";
-import { Chevron } from "@/components/ui/panel";
 import { TreeGuides, treeIndent } from "@/features/explorer/TreeGuides";
 import { fileActions } from "@/features/viewer/file-actions";
 import { fileIcon, folderIcon } from "@/lib/file-icons";

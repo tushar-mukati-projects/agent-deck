@@ -1,10 +1,10 @@
 import { Bot, ChevronDown, Eraser, Plus, RotateCw, SquareTerminal, Trash2 } from "lucide-react";
 
 import { killShellWithConfirm, selectShell } from "@/actions/workspaces";
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { StatusDot, type DotTone } from "@/components/ui/feedback";
 import { IconButton } from "@/components/ui/icon-button";
-import { Alert } from "@/components/ui/panel";
 import { panelTabClass, Tab, TabStrip } from "@/components/ui/tabs";
 import { Tag } from "@/components/ui/tag";
 import { TerminalView } from "@/features/terminal/TerminalView";

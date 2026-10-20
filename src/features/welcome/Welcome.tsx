@@ -3,9 +3,9 @@ import { FolderPlus, MessageSquare, Play, Search } from "lucide-react";
 
 import { openSessionByClick, resumeSession, startSessionInPickedFolder } from "@/actions/sessions";
 import { AppLogo } from "@/components/AppLogo";
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
-import { Alert } from "@/components/ui/panel";
 import { Tag } from "@/components/ui/tag";
 import { TimeAgo } from "@/components/ui/time-ago";
 import { CLAUDE, CODEX } from "@/lib/agents/registry";

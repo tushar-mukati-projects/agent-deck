@@ -1,7 +1,7 @@
 import { useId } from "react";
 
 import { toggleHideMode } from "@/actions/hide-mode";
-import { Segmented } from "@/components/ui/panel";
+import { Segmented } from "@/components/ui/segmented";
 import { CustomAgentsEditor, DefaultAgentPicker } from "@/features/settings/AgentSettings";
 import {
   Field,

@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { FileText, Power, Wrench } from "lucide-react";
 
+import { Alert } from "@/components/ui/alert";
 import { ErrorAlert } from "@/components/ui/error-alert";
 import { EmptyState, LoadingState, showError, Spinner } from "@/components/ui/feedback";
 import { IconButton } from "@/components/ui/icon-button";
 import { ListRow } from "@/components/ui/list-row";
-import { Alert, SearchInput, SectionLabel } from "@/components/ui/panel";
+import { SearchInput } from "@/components/ui/search-input";
+import { SectionLabel } from "@/components/ui/section-label";
 import { TextResult } from "@/features/mcp/CallResult";
 import { ToolRunner } from "@/features/mcp/ToolRunner";
 import { useAsync } from "@/hooks/useAsync";

@@ -4,8 +4,8 @@ import { useShallow } from "zustand/react/shallow";
 
 import { startNewSession } from "@/actions/sessions";
 import { Button } from "@/components/ui/button";
+import { Chevron } from "@/components/ui/chevron";
 import { EmptyState, LoadingState } from "@/components/ui/feedback";
-import { Chevron } from "@/components/ui/panel";
 import { FolderHeader } from "@/features/sidebar/FolderHeader";
 import { SessionItem } from "@/features/sidebar/SessionItem";
 import { useExpandedGroups } from "@/features/sidebar/useExpandedGroups";

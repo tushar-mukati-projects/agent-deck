@@ -1,6 +1,6 @@
 import { memo, useMemo } from "react";
 
-import { Alert } from "@/components/ui/panel";
+import { Alert } from "@/components/ui/alert";
 import { ResultGrid } from "@/features/mcp/ResultGrid";
 import {
   callResultParts,

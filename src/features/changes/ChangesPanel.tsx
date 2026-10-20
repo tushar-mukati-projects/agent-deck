@@ -1,9 +1,11 @@
 import { Fragment, memo, useEffect, useMemo, useRef, useState } from "react";
 import { Eye, EyeOff, GitCompare, RefreshCw } from "lucide-react";
 
+import { Chevron } from "@/components/ui/chevron";
+import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { EmptyState, Hint, LoadingState } from "@/components/ui/feedback";
 import { IconButton } from "@/components/ui/icon-button";
-import { Chevron, CollapsibleSection, PanelHeader } from "@/components/ui/panel";
+import { PanelHeader } from "@/components/ui/panel-header";
 import { TreeGuides, treeIndent } from "@/features/explorer/TreeGuides";
 import { useAsync, useThrottledCallback } from "@/hooks/useAsync";
 import { useSessionFile } from "@/hooks/useSessionFile";
