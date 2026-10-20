@@ -1,11 +1,12 @@
 import { useEffect, useMemo } from "react";
+import { toast } from "sonner";
 
-import { showError } from "@/components/ui/feedback";
 import { useSessionFile } from "@/hooks/useSessionFile";
 import { useOwnPids } from "@/hooks/useWorkspaceStatus";
 import { agentShells, agentStartedMs, runningSubagents } from "@/lib/agent-tasks";
 import { CLAUDE } from "@/lib/agents/registry";
 import { api } from "@/lib/tauri/commands";
+import { errorMessage } from "@/lib/utils";
 import { useAgentTasksStore } from "@/stores/agent-tasks-store";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -57,7 +58,7 @@ export const useAgentShellSync = (workspace: Workspace) => {
         if (!cancelled) useAgentTasksStore.getState().setTasks(sessionId, tasks);
       },
       (error: unknown) => {
-        if (!cancelled) showError(error);
+        if (!cancelled) toast.error(errorMessage(error), { id: `session-tasks:${filePath}` });
       },
     );
     return () => {
