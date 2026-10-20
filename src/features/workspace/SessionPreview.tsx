@@ -28,7 +28,7 @@ import { isPersisted } from "@/lib/agents/launch";
 import { CLAUDE } from "@/lib/agents/registry";
 import { api } from "@/lib/tauri/commands";
 import { revealInExplorer } from "@/lib/tauri/system";
-import { formatBytes, shortenHome } from "@/lib/utils";
+import { formatBytes, plural, shortenHome } from "@/lib/utils";
 import { findAgent } from "@/stores/agents";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useUiStore } from "@/stores/ui-store";
@@ -70,7 +70,7 @@ const Meta = ({
       {session && (
         <span className="flex items-center gap-1.5">
           <MessageSquare />
-          {session.promptCount} {session.promptCount === 1 ? "prompt" : "prompts"} ·{" "}
+          {plural(session.promptCount, "prompt")} ·{" "}
           {formatBytes(session.size)}
         </span>
       )}

@@ -9,7 +9,7 @@ import { Kbd } from "@/components/ui/kbd";
 import { ResultGrid } from "@/features/mcp/ResultGrid";
 import { CodeView } from "@/features/viewer/CodeView";
 import { isMutating } from "@/lib/sql";
-import { errorMessage } from "@/lib/utils";
+import { errorMessage, plural } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
 import type { PgOutput } from "@/types";
 
@@ -93,7 +93,7 @@ export const SqlPane = ({
           />
         ) : (
           <p key={index} className="mb-2 text-[12px] text-muted">
-            Done · {result.rowCount} {result.rowCount === 1 ? "row" : "rows"} affected
+            Done · {plural(result.rowCount, "row")} affected
           </p>
         ),
       ),

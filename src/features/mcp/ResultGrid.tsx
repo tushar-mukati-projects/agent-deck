@@ -3,7 +3,7 @@ import { Copy } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { copyText } from "@/lib/tauri/system";
-import { cn } from "@/lib/utils";
+import { cn, plural } from "@/lib/utils";
 
 const PAGE = 300;
 const CELL_PREVIEW = 160;
@@ -119,7 +119,7 @@ export const ResultGrid = ({ columns, rows, footer, rowsLabel, className }: Resu
       </div>
       <div className="flex shrink-0 flex-wrap items-center gap-2 pt-1.5 text-[11px] text-faint">
         <span className="tabular-nums">
-          {rowsLabel ?? `${rows.length} ${rows.length === 1 ? "row" : "rows"}`}
+          {rowsLabel ?? plural(rows.length, "row")}
         </span>
         {footer}
         {rows.length > limit && (

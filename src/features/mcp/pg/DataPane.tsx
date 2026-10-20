@@ -8,7 +8,7 @@ import { Alert } from "@/components/ui/panel";
 import { ResultGrid } from "@/features/mcp/ResultGrid";
 import { buildSelect, PAGE_SIZE, type Order, type TableRef } from "@/features/mcp/pg/queries";
 import { isMutating } from "@/lib/sql";
-import { errorMessage } from "@/lib/utils";
+import { errorMessage, plural } from "@/lib/utils";
 import type { PgOutput, PgResult } from "@/types";
 
 const orderValue = (order: Order | null) =>
@@ -121,7 +121,7 @@ export const DataPane = ({
           className="flex-1"
           columns={result.columns}
           rows={rows}
-          rowsLabel={`${rows.length} ${rows.length === 1 ? "row" : "rows"} on this page`}
+          rowsLabel={`${plural(rows.length, "row")} on this page`}
           footer={
             <span className="flex items-center gap-1">
               <Button
