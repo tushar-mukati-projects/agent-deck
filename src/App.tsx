@@ -119,7 +119,7 @@ export const App = () => {
           <ResizeHandle orientation="horizontal" />
           <Panel id="content" minSize={420}>
             <ErrorBoundary key={activeId ?? "welcome"}>
-              {activeId ? <WorkspaceView key={activeId} workspaceId={activeId} /> : <Welcome />}
+              {activeId ? <WorkspaceView workspaceId={activeId} /> : <Welcome />}
             </ErrorBoundary>
           </Panel>
           <ResizeHandle orientation="horizontal" />
