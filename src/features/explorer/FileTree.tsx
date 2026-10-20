@@ -1,22 +1,12 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { AtSign, Code2, Sparkles, SquareTerminal } from "lucide-react";
 
-import { canMention, mentionInAgent } from "@/actions/files";
-import { startNewSession } from "@/actions/sessions";
 import { Chevron } from "@/components/ui/chevron";
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuTrigger,
-} from "@/components/ui/menu";
+import { FileRowMenu } from "@/features/explorer/FileRowMenu";
 import { TreeGuides, treeIndent } from "@/features/explorer/TreeGuides";
-import { fileActions } from "@/features/viewer/file-actions";
 import { fileIcon, folderIcon } from "@/lib/file-icons";
 import { DECK_PATH_MIME } from "@/lib/terminal/input";
+import { treeKeyAction } from "@/lib/tree-keys";
 import { cn, normalizePath } from "@/lib/utils";
-import { agentName } from "@/stores/agents";
 import { useExplorerStore } from "@/stores/explorer-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
@@ -52,57 +42,6 @@ const useRows = (root: string) => {
     walk(root, 0);
     return rows;
   }, [children, expanded, showHidden, root]);
-};
-
-type RowMenuProps = {
-  row: Row;
-  workspace: Workspace;
-  children: React.ReactNode;
-};
-
-const RowMenu = ({ row, workspace, children }: RowMenuProps) => {
-  const { entry } = row;
-  return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
-      <ContextMenuContent>
-        {!entry.isDir && (
-          <ContextMenuItem
-            icon={<Code2 />}
-            onSelect={() => useWorkspaceStore.getState().openFile(workspace.id, entry.path)}
-          >
-            Open
-          </ContextMenuItem>
-        )}
-        <ContextMenuItem
-          icon={<AtSign />}
-          disabled={!canMention(workspace)}
-          onSelect={() => mentionInAgent(workspace, entry.path)}
-        >
-          Mention in {agentName(workspace.agent)}
-        </ContextMenuItem>
-        {entry.isDir && (
-          <>
-            <ContextMenuItem
-              icon={<SquareTerminal />}
-              onSelect={() => useWorkspaceStore.getState().openShell(workspace.id, entry.path)}
-            >
-              Open shell here
-            </ContextMenuItem>
-            <ContextMenuItem icon={<Sparkles />} onSelect={() => startNewSession(entry.path)}>
-              New session here
-            </ContextMenuItem>
-          </>
-        )}
-        <ContextMenuSeparator />
-        {fileActions(entry.path, workspace.cwd, entry.isDir).map(({ label, icon, run }) => (
-          <ContextMenuItem key={label} icon={icon} onSelect={run}>
-            {label}
-          </ContextMenuItem>
-        ))}
-      </ContextMenuContent>
-    </ContextMenu>
-  );
 };
 
 type FileTreeProps = {
@@ -158,44 +97,14 @@ export const FileTree = ({ workspace }: FileTreeProps) => {
 
   const handleKeyDown = (event: React.KeyboardEvent) => {
     if (event.target !== event.currentTarget) return;
-    const current = rows[selectedIndex];
-    const move = (index: number) => {
-      const target = rows[Math.max(0, Math.min(rows.length - 1, index))];
-      if (target) select(target.entry.path);
-    };
-    switch (event.key) {
-      case "ArrowDown":
-        move(selectedIndex + 1);
-        break;
-      case "ArrowUp":
-        move(selectedIndex < 0 ? 0 : selectedIndex - 1);
-        break;
-      case "ArrowRight":
-        if (current?.entry.isDir && !current.expanded) expand(current.entry.path);
-        else move(selectedIndex + 1);
-        break;
-      case "ArrowLeft":
-        if (current?.entry.isDir && current.expanded) collapse(current.entry.path);
-        else if (current) {
-          const parentIndex = rows
-            .slice(0, selectedIndex)
-            .findLastIndex((r) => r.depth === current.depth - 1);
-          if (parentIndex >= 0) move(parentIndex);
-        }
-        break;
-      case "Enter":
-        if (current) activate(current);
-        break;
-      case "Home":
-        move(0);
-        break;
-      case "End":
-        move(rows.length - 1);
-        break;
-      default:
-        return;
-    }
+    const action = treeKeyAction(rows, selectedIndex, event.key);
+    if (!action) return;
     event.preventDefault();
+    const current = rows[selectedIndex];
+    if (action.kind === "select") select(rows[action.index].entry.path);
+    else if (current && action.kind === "expand") expand(current.entry.path);
+    else if (current && action.kind === "collapse") collapse(current.entry.path);
+    else if (current && action.kind === "activate") activate(current);
   };
 
   const start = Math.max(0, Math.floor(viewport.top / ROW_HEIGHT) - OVERSCAN);
@@ -228,7 +137,7 @@ export const FileTree = ({ workspace }: FileTreeProps) => {
           const Icon = spec.icon;
           const isLoading = entry.isDir && loading[row.key];
           return (
-            <RowMenu key={entry.path} row={row} workspace={workspace}>
+            <FileRowMenu key={entry.path} entry={entry} workspace={workspace}>
               <div
                 id={`tree-row-${index}`}
                 role="treeitem"
@@ -267,7 +176,7 @@ export const FileTree = ({ workspace }: FileTreeProps) => {
                 <span className="min-w-0 truncate">{entry.name}</span>
                 {entry.isSymlink && <span className="text-[10px] text-faint">↗</span>}
               </div>
-            </RowMenu>
+            </FileRowMenu>
           );
         })}
       </div>

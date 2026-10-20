@@ -3,7 +3,7 @@ import { assetUrl } from "@/lib/tauri/system";
 import { basename } from "@/lib/utils";
 import type { ViewKind } from "@/lib/view-kind";
 
-export type MediaKind = Exclude<ViewKind, "text" | "markdown">;
+type MediaKind = Exclude<ViewKind, "text" | "markdown">;
 
 type MediaFrameProps = {
   children: React.ReactNode;
