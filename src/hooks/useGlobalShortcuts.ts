@@ -13,8 +13,8 @@ import {
 import { matchShortcut, matchTabNumber, type ShortcutAction } from "@/lib/shortcuts";
 import {
   DEFAULT_FONT_SIZE,
-  MAX_FONT_SIZE,
-  MIN_FONT_SIZE,
+  MAX_FONT_SIZE_PX,
+  MIN_FONT_SIZE_PX,
   useSettingsStore,
 } from "@/stores/settings-store";
 import { useUiStore } from "@/stores/ui-store";
@@ -22,7 +22,7 @@ import { getActiveWorkspace, useWorkspaceStore } from "@/stores/workspace-store"
 
 const setFontSize = (update: (size: number) => number) => {
   const { fontSize, set } = useSettingsStore.getState();
-  set({ fontSize: Math.max(MIN_FONT_SIZE, Math.min(MAX_FONT_SIZE, update(fontSize))) });
+  set({ fontSize: Math.max(MIN_FONT_SIZE_PX, Math.min(MAX_FONT_SIZE_PX, update(fontSize))) });
 };
 
 const ui = () => useUiStore.getState();

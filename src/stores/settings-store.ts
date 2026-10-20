@@ -11,8 +11,8 @@ export type ClickBehavior = "preview" | "resume";
 const SETTINGS_STORAGE_KEY = "agent-deck-settings";
 
 export const DEFAULT_FONT_SIZE = 12;
-export const MIN_FONT_SIZE = 9;
-export const MAX_FONT_SIZE = 22;
+export const MIN_FONT_SIZE_PX = 9;
+export const MAX_FONT_SIZE_PX = 22;
 
 export interface SettingsData {
   claudeArgs: string;

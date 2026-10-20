@@ -8,8 +8,8 @@ import { ThemePicker } from "@/features/settings/ThemePicker";
 import { shortcutLabel } from "@/lib/shortcuts";
 import { useSessionsStore } from "@/stores/sessions-store";
 import {
-  MAX_FONT_SIZE,
-  MIN_FONT_SIZE,
+  MAX_FONT_SIZE_PX,
+  MIN_FONT_SIZE_PX,
   useSettingsStore,
   type ClickBehavior,
 } from "@/stores/settings-store";
@@ -28,8 +28,8 @@ const FontSize = () => {
         <input
           id={id}
           type="range"
-          min={MIN_FONT_SIZE}
-          max={MAX_FONT_SIZE}
+          min={MIN_FONT_SIZE_PX}
+          max={MAX_FONT_SIZE_PX}
           value={fontSize}
           onChange={(e) => useSettingsStore.getState().set({ fontSize: Number(e.target.value) })}
           className="w-56 accent-[var(--color-accent)]"

@@ -1,7 +1,7 @@
 import { fuzzyPathKeyScorer, type PathKey } from "@/lib/fuzzy";
 import type { PaletteMode } from "@/stores/ui-store";
 
-export const MIN_CHAT_QUERY = 2;
+export const MIN_CHAT_QUERY_CHARS = 2;
 
 export type PreparedFile = {
   rel: string;
@@ -53,8 +53,8 @@ export const emptyHint = ({
 }: EmptyHintState) => {
   if (mode === "files" && !hasWorkspace) return "Open a session to search its files.";
   if (mode !== "chats") return filesError ?? "Nothing matches.";
-  if (query.length < MIN_CHAT_QUERY)
-    return `Type at least ${MIN_CHAT_QUERY} characters to search every conversation.`;
+  if (query.length < MIN_CHAT_QUERY_CHARS)
+    return `Type at least ${MIN_CHAT_QUERY_CHARS} characters to search every conversation.`;
   if (searchingChats) return "Searching conversations…";
   return chatError ?? "No conversation mentions that.";
 };

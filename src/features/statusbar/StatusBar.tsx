@@ -16,7 +16,7 @@ import { useActiveWorkspace } from "@/stores/workspace-store";
 import { useAgentShells, useSubagents } from "@/hooks/useAgentShells";
 import type { Workspace } from "@/types";
 
-const SHORT_SESSION_ID_LENGTH = 8;
+const SHORT_SESSION_ID_CHARS = 8;
 
 type ItemProps = {
   children: React.ReactNode;
@@ -104,7 +104,7 @@ export const StatusBar = () => {
               >
                 <Hash />
                 <span className="font-mono">
-                  {workspace.sessionId.slice(0, SHORT_SESSION_ID_LENGTH)}
+                  {workspace.sessionId.slice(0, SHORT_SESSION_ID_CHARS)}
                 </span>
               </Item>
             )}

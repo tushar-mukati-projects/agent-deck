@@ -11,6 +11,8 @@ const trimTrailingSeparators = (path: string) => path.replace(/[\\/]+$/, "");
 const unifySeparators = (path: string) => trimTrailingSeparators(path).replace(/\//g, "\\");
 
 const JUST_NOW_MS = 45_000;
+const BYTES_PER_UNIT = 1024;
+const ONE_DECIMAL_BELOW = 10;
 
 const WSL_ROOT = /^\\\\wsl(?:\$|\.localhost)\\([^\\]*)(.*)$/i;
 
@@ -74,16 +76,16 @@ export const shortenHome = (path: string, home: string) => {
 };
 
 export const formatBytes = (bytes: number) => {
-  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < BYTES_PER_UNIT) return `${bytes} B`;
   const units = ["KB", "MB", "GB"];
-  let value = bytes / 1024;
+  let value = bytes / BYTES_PER_UNIT;
   let unit = 0;
-  while (Math.round(value) >= 1024 && unit < units.length - 1) {
-    value /= 1024;
+  while (Math.round(value) >= BYTES_PER_UNIT && unit < units.length - 1) {
+    value /= BYTES_PER_UNIT;
     unit += 1;
   }
   const tenths = value.toFixed(1);
-  return `${Number(tenths) >= 10 ? value.toFixed(0) : tenths} ${units[unit]}`;
+  return `${Number(tenths) >= ONE_DECIMAL_BELOW ? value.toFixed(0) : tenths} ${units[unit]}`;
 };
 
 export const timeAgo = (ms: number) => {

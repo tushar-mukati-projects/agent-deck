@@ -12,7 +12,7 @@ import { basename, lruSet, normalizePath } from "@/lib/utils";
 import { useSettingsStore } from "@/stores/settings-store";
 
 const SCROLL_POSITIONS_LIMIT = 200;
-const TAB_SIZE = 2;
+const TAB_SIZE_SPACES = 2;
 
 const makeTheme = (kind: "dark" | "light") =>
   createTheme({
@@ -128,7 +128,7 @@ export const CodeView = ({
   const extensions = useMemo(
     () => [
       EditorView.lineWrapping,
-      EditorState.tabSize.of(TAB_SIZE),
+      EditorState.tabSize.of(TAB_SIZE_SPACES),
       keymap.of([{ key: "Mod-s", preventDefault: true, run: () => (saveRef.current(), true) }]),
       ...(language ? [language] : []),
       ...(plain ? [PLAIN_PADDING] : []),

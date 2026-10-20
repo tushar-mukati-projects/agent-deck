@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { MIN_CHAT_QUERY } from "@/lib/palette";
+import { MIN_CHAT_QUERY_CHARS } from "@/lib/palette";
 import { api } from "@/lib/tauri/commands";
 import { failedTo } from "@/lib/utils";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -15,7 +15,7 @@ export const useChatSearch = (query: string, enabled: boolean) => {
   const [searching, setSearching] = useState(false);
   useEffect(() => {
     setError(null);
-    if (!enabled || query.length < MIN_CHAT_QUERY) {
+    if (!enabled || query.length < MIN_CHAT_QUERY_CHARS) {
       setHits(null);
       setSearching(false);
       return;

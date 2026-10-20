@@ -9,7 +9,7 @@ import { newId } from "@/lib/utils";
 import { useSettingsStore } from "@/stores/settings-store";
 import type { CustomAgent } from "@/types";
 
-const CUSTOM_AGENT_ID_LENGTH = 8;
+const CUSTOM_AGENT_ID_CHARS = 8;
 
 type DefaultAgentPickerProps = {
   id: string;
@@ -74,7 +74,7 @@ export const CustomAgentsEditor = () => {
           onClick={() =>
             update([
               ...agents,
-              { id: newId().slice(0, CUSTOM_AGENT_ID_LENGTH), name: "", command: "" },
+              { id: newId().slice(0, CUSTOM_AGENT_ID_CHARS), name: "", command: "" },
             ])
           }
         >

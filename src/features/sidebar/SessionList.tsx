@@ -23,7 +23,7 @@ import { useSettingsStore } from "@/stores/settings-store";
 import { activeWorkspaceOf, useWorkspaceStore } from "@/stores/workspace-store";
 import type { SessionInfo } from "@/types";
 
-const RENDER_STEP = 150;
+const RENDER_STEP_ROWS = 150;
 const NAV_KEYS = new Set(["ArrowDown", "ArrowUp", "Home", "End"]);
 const sectionClass =
   "flex h-7 w-full items-center gap-1.5 px-2 text-[11px] font-semibold tracking-wide text-faint";
@@ -56,9 +56,9 @@ export const SessionList = memo(
       useShallow((s) => s.workspaces.map((w) => w.sessionId)),
     );
     const tones = useSessionTones();
-    const [renderLimit, setRenderLimit] = useState(RENDER_STEP);
+    const [renderLimit, setRenderLimit] = useState(RENDER_STEP_ROWS);
 
-    useEffect(() => setRenderLimit(RENDER_STEP), [deferredQuery, folderFilter, agentFilter]);
+    useEffect(() => setRenderLimit(RENDER_STEP_ROWS), [deferredQuery, folderFilter, agentFilter]);
 
     const { total, pinned, archived, rest } = useMemo(
       () =>
@@ -187,9 +187,9 @@ export const SessionList = memo(
               <Button
                 size="xs"
                 variant="ghost"
-                onClick={() => setRenderLimit((n) => n + RENDER_STEP)}
+                onClick={() => setRenderLimit((n) => n + RENDER_STEP_ROWS)}
               >
-                Show {Math.min(-budget, RENDER_STEP)} more
+                Show {Math.min(-budget, RENDER_STEP_ROWS)} more
               </Button>
             </div>
           )}
