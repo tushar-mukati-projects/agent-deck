@@ -4,7 +4,7 @@ import { ExternalLink, FileQuestion } from "lucide-react";
 import { discardAndReload, openPathInWorkspace, reloadWithConfirm } from "@/actions/files";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { EmptyState, LoadingState, showError } from "@/components/ui/feedback";
+import { EmptyState, LoadingState } from "@/components/ui/feedback";
 import { CodeView } from "@/features/viewer/CodeView";
 import { FileToolbar } from "@/features/viewer/FileToolbar";
 import { MarkdownView } from "@/features/viewer/MarkdownView";
@@ -80,7 +80,7 @@ export const DocumentView = ({ workspace, path }: DocumentViewProps) => {
           title={state.content.kind === "binary" ? "Binary file" : "File is too large to preview"}
           description={basename(path)}
           action={
-            <Button size="sm" onClick={() => void openExternal(path).catch(showError)}>
+            <Button size="sm" onClick={() => void openExternal(path)}>
               <ExternalLink /> Open with default app
             </Button>
           }

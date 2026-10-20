@@ -17,7 +17,7 @@ export const pickFolder = async (defaultPath?: string) => {
 export const assetUrl = (path: string) => convertFileSrc(path, "deckfile");
 
 export const openExternal = (target: string) =>
-  /^(https?|mailto):/i.test(target) ? openUrl(target) : api.openPath(target);
+  (/^(https?|mailto):/i.test(target) ? openUrl(target) : api.openPath(target)).catch(showError);
 
 export const revealInExplorer = (path: string) => api.revealPath(path).catch(showError);
 

@@ -23,7 +23,7 @@ export const fileActions = (path: string, cwd: string, isDir: boolean): FileActi
         {
           label: "Open with default app",
           icon: <ExternalLink />,
-          run: () => void openExternal(path).catch(showError),
+          run: () => void openExternal(path),
         },
       ]),
   {
