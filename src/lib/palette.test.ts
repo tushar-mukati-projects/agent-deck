@@ -9,10 +9,10 @@ const prepare = (rels: string[], isDir = false) =>
 describe("foldersOf", () => {
   it("lists every folder above the files once, keeping their separators", () => {
     expect(foldersOf(["src\\lib\\a.ts", "src\\b.ts", "docs/guide/c.md", "README.md"])).toEqual([
-      "src",
       "src\\lib",
-      "docs",
+      "src",
       "docs/guide",
+      "docs",
     ]);
   });
 

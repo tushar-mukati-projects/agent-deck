@@ -27,11 +27,18 @@ export type EmptyHintState = {
 export const sortTop = <T extends { score: number }>(list: T[], limit: number) =>
   list.sort((a, b) => b.score - a.score).slice(0, limit);
 
+const lastSeparator = (path: string, before: number) =>
+  Math.max(path.lastIndexOf("\\", before), path.lastIndexOf("/", before));
+
 export const foldersOf = (files: string[]) => {
   const folders = new Set<string>();
-  for (const rel of files)
-    for (let index = 1; index < rel.length; index++)
-      if (rel[index] === "\\" || rel[index] === "/") folders.add(rel.slice(0, index));
+  for (const rel of files) {
+    for (let end = lastSeparator(rel, rel.length - 1); end > 0; end = lastSeparator(rel, end - 1)) {
+      const folder = rel.slice(0, end);
+      if (folders.has(folder)) break;
+      folders.add(folder);
+    }
+  }
   return [...folders];
 };
 
