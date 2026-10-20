@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 interface ListRowProps {
   icon: React.ReactNode;
   title: string;
-  subtitle?: string | null;
+  subtitle?: string;
   badge?: React.ReactNode;
   meta?: React.ReactNode;
   onClick: () => void;

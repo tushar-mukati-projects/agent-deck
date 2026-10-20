@@ -97,7 +97,7 @@ const MemorySection = ({ workspace, agent, profile, data, reload }: SectionProps
           key={file.path}
           icon={<FileText />}
           title={file.label}
-          subtitle={file.description}
+          subtitle={file.description ?? undefined}
           badge={<Tag>{scopeLabel(file.scope)}</Tag>}
           meta={<TimeAgo ms={file.modifiedMs} />}
           onClick={() => openFile(workspace, file.path)}
@@ -201,7 +201,7 @@ const ItemRows = ({
         icon={icon}
         title={kind === "agent" ? item.name : profile.typed(item, kind)}
         mono={kind !== "agent"}
-        subtitle={item.description}
+        subtitle={item.description ?? undefined}
         badge={<Tag>{scopeLabel(item.scope, item.plugin)}</Tag>}
         onClick={() => openFile(workspace, item.path)}
         actions={
@@ -304,7 +304,7 @@ const PluginsSection = ({ workspace, agent, profile, data }: SectionProps) => (
           key={`${plugin.scope}:${plugin.name}:${plugin.path}`}
           icon={<Blocks />}
           title={name}
-          subtitle={source ? `from ${source}` : null}
+          subtitle={source ? `from ${source}` : undefined}
           badge={<Tag>{plugin.scope}</Tag>}
           meta={plugin.enabled ? plugin.version : "disabled"}
           dim={!plugin.enabled}
