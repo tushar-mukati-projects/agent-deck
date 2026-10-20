@@ -24,7 +24,7 @@ suppressBrowserChrome();
 applyTheme(findTheme(useSettingsStore.getState().themeId));
 useSettingsStore.subscribe((state, previous) => {
   if (state.themeId !== previous.themeId) applyTheme(findTheme(state.themeId));
-  if (state.hideMode !== previous.hideMode) void syncHideMode(state.hideMode);
+  if (state.hideMode !== previous.hideMode) void syncHideMode(state.hideMode).catch(showError);
 });
 setPathLinkHandler((workspaceId, target) => void openPathFromTerminal(workspaceId, target));
 
@@ -72,7 +72,7 @@ const bootstrap = async () => {
       reattachTerminals(),
       useSessionsStore.getState().loadEnvironment().catch(keepStartupError),
       loadFonts(),
-      syncHideMode(useSettingsStore.getState().hideMode),
+      syncHideMode(useSettingsStore.getState().hideMode).catch(keepStartupError),
     ]);
   } finally {
     render();
