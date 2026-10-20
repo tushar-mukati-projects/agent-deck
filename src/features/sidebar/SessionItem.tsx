@@ -21,7 +21,6 @@ import {
   previewSession,
   resumeSession,
 } from "@/actions/sessions";
-import { AgentBadge } from "@/components/ui/agent-badge";
 import { StatusDot, type DotTone } from "@/components/ui/feedback";
 import {
   ContextMenu,
@@ -30,13 +29,14 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/menu";
+import { Tag } from "@/components/ui/tag";
 import { TimeAgo } from "@/components/ui/time-ago";
 import { resumeCommandLine } from "@/lib/agents/launch";
 import { CLAUDE } from "@/lib/agents/registry";
 import { sessionTitle } from "@/lib/sessions";
 import { copyText, revealInExplorer } from "@/lib/tauri/system";
 import { cn } from "@/lib/utils";
-import { findAgent } from "@/stores/agents";
+import { agentName, findAgent } from "@/stores/agents";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useUiStore } from "@/stores/ui-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
@@ -180,7 +180,11 @@ export const SessionItem = memo(({ session, number, tone, isActive, isOpen }: Se
           >
             {title}
           </span>
-          {session.agent !== CLAUDE && <AgentBadge agent={session.agent} className="mt-0.5" />}
+          {session.agent !== CLAUDE && (
+            <Tag tone="info" className="mt-0.5">
+              {agentName(session.agent)}
+            </Tag>
+          )}
           {tone && (
             <span className="flex h-[18px] shrink-0 items-center">
               <StatusDot tone={tone} />

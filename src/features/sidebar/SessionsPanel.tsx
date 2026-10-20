@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState, LoadingState, StatusDot, type DotTone } from "@/components/ui/feedback";
 import { IconButton } from "@/components/ui/icon-button";
 import { Chevron, PanelHeader, SearchInput, Segmented } from "@/components/ui/panel";
+import { Tag } from "@/components/ui/tag";
 import { FolderFilter } from "@/features/sidebar/FolderFilter";
 import { SessionItem } from "@/features/sidebar/SessionItem";
 import { useSessionTones } from "@/features/sidebar/useSessionTones";
@@ -69,9 +70,7 @@ const FolderHeader = ({
         <Icon className={cn("size-3.5 shrink-0", color)} />
         <span className="min-w-0 truncate">{name}</span>
         {parseWslPath(group.cwd) && (
-          <span className="shrink-0 rounded border border-badge/30 bg-badge/10 px-1 text-[9px] leading-[14px] font-bold tracking-wider text-badge">
-            WSL
-          </span>
+          <Tag tone="badge">WSL</Tag>
         )}
         {hint && (
           <span className="min-w-0 shrink-[2] truncate text-[11px] font-normal text-faint">

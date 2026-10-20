@@ -3,16 +3,17 @@ import { FolderPlus, MessageSquare, Play, Search } from "lucide-react";
 
 import { openSessionByClick, resumeSession, startSessionInPickedFolder } from "@/actions/sessions";
 import { AppLogo } from "@/components/AppLogo";
-import { AgentBadge } from "@/components/ui/agent-badge";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
 import { Alert } from "@/components/ui/panel";
+import { Tag } from "@/components/ui/tag";
 import { TimeAgo } from "@/components/ui/time-ago";
 import { CLAUDE, CODEX } from "@/lib/agents/registry";
 import { appName } from "@/lib/hide-mode";
 import { sessionTitle } from "@/lib/sessions";
 import { shortcutLabel, type ShortcutAction } from "@/lib/shortcuts";
 import { basename } from "@/lib/utils";
+import { agentName } from "@/stores/agents";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useUiStore } from "@/stores/ui-store";
@@ -60,7 +61,7 @@ const RecentCard = ({ session }: { session: SessionInfo }) => (
         <span className="min-w-0 flex-1 truncate text-[13px] font-medium">
           {sessionTitle(session)}
         </span>
-        {session.agent !== CLAUDE && <AgentBadge agent={session.agent} />}
+        {session.agent !== CLAUDE && <Tag tone="info">{agentName(session.agent)}</Tag>}
       </div>
       <div className="flex items-center gap-2 text-[11px] text-faint">
         <span className="truncate">{basename(session.cwd)}</span>
