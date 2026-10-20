@@ -52,7 +52,8 @@ type AgentShellViewProps = {
 };
 
 export const AgentShellView = ({ workspaceId, task, state }: AgentShellViewProps) => {
-  const { tail, error } = useOutput(task.outputPath, state === "running");
+  const { outputPath } = task;
+  const { tail, error } = useOutput(outputPath, state === "running");
   const text = useMemo(() => cleanOutput(tail?.text ?? ""), [tail?.text]);
   const { scrollRef, contentRef, atBottom, onScroll, jumpToBottom } = useStickToBottom(text);
 
@@ -74,11 +75,11 @@ export const AgentShellView = ({ workspaceId, task, state }: AgentShellViewProps
           >
             <Copy /> Copy command
           </Button>
-          {task.outputPath && (
+          {outputPath && (
             <Button
               size="xs"
               variant="ghost"
-              onClick={() => useWorkspaceStore.getState().openFile(workspaceId, task.outputPath!)}
+              onClick={() => useWorkspaceStore.getState().openFile(workspaceId, outputPath)}
             >
               <FileText /> Open output
             </Button>
