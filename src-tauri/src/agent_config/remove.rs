@@ -4,7 +4,7 @@ use anyhow::Context;
 use serde::Deserialize;
 use serde_json::Value;
 
-use super::{codex, files::rewrite_lines, overview, Agent, Item, Scope};
+use super::{codex, files::rewrite_lines, overview, Agent, Item, Overview, Scope};
 use crate::{
     pty::resolve_program,
     util::run_with_timeout,
@@ -45,18 +45,7 @@ pub fn remove(cwd: &str, agent: Agent, removal: Removal) -> anyhow::Result<()> {
             listed_item(&listed.agents, &path).or_else(|| listed_item(&listed.commands, &path)).context(GONE)?;
             discard(Path::new(&path))
         }
-        Removal::McpServer { id } => {
-            let server = listed.mcp.iter().find(|s| s.id == id && s.scope.removable()).context(GONE)?;
-            let source = Path::new(&server.source);
-            match agent {
-                Agent::Claude => {
-                    let dir = if server.scope == Scope::Project { source.parent().map(Path::to_string_lossy) } else { None };
-                    let dir = dir.map(|d| d.to_string()).unwrap_or_else(|| cwd.to_string());
-                    claude_cli(&dir, &["mcp", "remove", &server.name, "--scope", server.scope.as_str()])
-                }
-                Agent::Codex => codex::remove_server(source, &server.name),
-            }
-        }
+        Removal::McpServer { id } => remove_server(&listed, cwd, agent, &id),
         Removal::Hook { source, event, group, index, command } => {
             let found = listed.hooks.iter().any(|h| {
                 h.scope.removable() && h.source == source && h.event == event && h.group == group && h.index == index && h.command == command
@@ -64,30 +53,47 @@ pub fn remove(cwd: &str, agent: Agent, removal: Removal) -> anyhow::Result<()> {
             anyhow::ensure!(found, GONE);
             edit_json(Path::new(&source), |settings| remove_hook(settings, &event, group, index))
         }
-        Removal::Rule { path, list, rule } => {
-            let file = listed.settings.iter().find(|s| s.path == path).context(GONE)?;
-            let rules = match list.as_str() {
-                "allow" => &file.allow,
-                "ask" => &file.ask,
-                "deny" => &file.deny,
-                _ => anyhow::bail!("Unknown rule list {list}"),
-            };
-            anyhow::ensure!(rules.contains(&rule), GONE);
-            match agent {
-                Agent::Claude => edit_json(Path::new(&path), |settings| remove_rule(settings, &list, &rule)),
-                Agent::Codex => codex::remove_rule(Path::new(&path), &list, &rule),
-            }
+        Removal::Rule { path, list, rule } => remove_listed_rule(&listed, agent, &path, &list, &rule),
+        Removal::Plugin { name } => remove_plugin(&listed, cwd, agent, &name),
+    }
+}
+
+fn remove_server(listed: &Overview, cwd: &str, agent: Agent, id: &str) -> anyhow::Result<()> {
+    let server = listed.mcp.iter().find(|s| s.id == id && s.scope.removable()).context(GONE)?;
+    let source = Path::new(&server.source);
+    match agent {
+        Agent::Claude => {
+            let dir = if server.scope == Scope::Project { source.parent().map(Path::to_string_lossy) } else { None };
+            let dir = dir.map(|d| d.to_string()).unwrap_or_else(|| cwd.to_string());
+            claude_cli(&dir, &["mcp", "remove", &server.name, "--scope", server.scope.as_str()])
         }
-        Removal::Plugin { name } => {
-            let plugin = listed.plugins.iter().find(|p| p.name == name).context(GONE)?;
-            match agent {
-                Agent::Claude => claude_cli(cwd, &["plugin", "uninstall", &name, "--scope", &plugin.scope]),
-                Agent::Codex => match codex::remove_plugin(Path::new(&listed.home), &name)? {
-                    Some(cache) if cache.is_dir() => discard(&cache),
-                    _ => Ok(()),
-                },
-            }
-        }
+        Agent::Codex => codex::remove_server(source, &server.name),
+    }
+}
+
+fn remove_listed_rule(listed: &Overview, agent: Agent, path: &str, list: &str, rule: &str) -> anyhow::Result<()> {
+    let file = listed.settings.iter().find(|s| s.path == path).context(GONE)?;
+    let rules = match list {
+        "allow" => &file.allow,
+        "ask" => &file.ask,
+        "deny" => &file.deny,
+        _ => anyhow::bail!("Unknown rule list {list}"),
+    };
+    anyhow::ensure!(rules.iter().any(|r| r == rule), GONE);
+    match agent {
+        Agent::Claude => edit_json(Path::new(path), |settings| remove_rule(settings, list, rule)),
+        Agent::Codex => codex::remove_rule(Path::new(path), list, rule),
+    }
+}
+
+fn remove_plugin(listed: &Overview, cwd: &str, agent: Agent, name: &str) -> anyhow::Result<()> {
+    let plugin = listed.plugins.iter().find(|p| p.name == name).context(GONE)?;
+    match agent {
+        Agent::Claude => claude_cli(cwd, &["plugin", "uninstall", name, "--scope", &plugin.scope]),
+        Agent::Codex => match codex::remove_plugin(Path::new(&listed.home), name)? {
+            Some(cache) if cache.is_dir() => discard(&cache),
+            _ => Ok(()),
+        },
     }
 }
 

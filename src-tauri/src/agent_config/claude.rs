@@ -189,10 +189,8 @@ fn plugin_items(plugin: &InstalledPlugin, found: &mut Found) {
     }
 }
 
-pub fn overview(cwd: &str) -> anyhow::Result<Overview> {
-    let snapshot = Snapshot::load(cwd)?;
+fn found_items(snapshot: &Snapshot) -> Found {
     let home = &snapshot.project.ctx.claude_home;
-
     let mut found = Found { skills: Vec::new(), agents: Vec::new(), commands: Vec::new(), hooks: Vec::new() };
     let roots = std::iter::once((home.clone(), Scope::User)).chain(snapshot.project.dirs.iter().map(|d| (d.join(".claude"), Scope::Project)));
     for (root, scope) in roots {
@@ -208,7 +206,13 @@ pub fn overview(cwd: &str) -> anyhow::Result<Overview> {
     for plugin in snapshot.plugins.iter().filter(|p| p.enabled) {
         plugin_items(plugin, &mut found);
     }
-    let Found { mut skills, mut agents, mut commands, hooks } = found;
+    found
+}
+
+pub fn overview(cwd: &str) -> anyhow::Result<Overview> {
+    let snapshot = Snapshot::load(cwd)?;
+    let home = &snapshot.project.ctx.claude_home;
+    let Found { mut skills, mut agents, mut commands, hooks } = found_items(&snapshot);
     for list in [&mut skills, &mut agents, &mut commands] {
         sort_by_name(list);
     }
@@ -247,27 +251,42 @@ fn claude_json_project<'a>(snapshot: &Snapshot, root: &'a Value, dir: &Path) -> 
     root.get("projects")?.as_object()?.iter().find(|(key, _)| ctx::same_path(&snapshot.project.ctx.host(key), dir)).map(|(_, v)| v)
 }
 
+fn raw_entries(scope: Scope, plugin: Option<(String, String)>, source: &Path, map: &Map<String, Value>, disabled: &HashSet<String>) -> Vec<RawServer> {
+    let mut servers = Vec::new();
+    for (name, config) in map {
+        let Some(config) = config.as_object() else { continue };
+        let (plugin_name, plugin_root) = plugin.clone().unzip();
+        let id = match &plugin_name {
+            Some(p) => format!("plugin:{p}:{name}"),
+            None => format!("{}:{name}", scope.as_str()),
+        };
+        servers.push(RawServer {
+            id,
+            name: name.clone(),
+            scope,
+            plugin: plugin_name,
+            source: source.to_path_buf(),
+            config: config.clone(),
+            plugin_root,
+            disabled: disabled.contains(name),
+        });
+    }
+    servers
+}
+
+fn plugin_server_file(plugin: &InstalledPlugin) -> Option<(PathBuf, Value)> {
+    let manifest = plugin.root.join(".mcp.json");
+    let from_plugin_json = || {
+        let path = plugin.root.join(".claude-plugin").join("plugin.json");
+        json_file(&path).value.clone().filter(|v| v.get("mcpServers").is_some_and(Value::is_object)).map(|v| (path, v))
+    };
+    json_file(&manifest).value.clone().map(|v| (manifest.clone(), v)).or_else(from_plugin_json)
+}
+
 fn raw_servers(snapshot: &Snapshot) -> Vec<RawServer> {
     let mut servers = Vec::new();
     let mut push = |scope: Scope, plugin: Option<(String, String)>, source: &Path, map: &Map<String, Value>, disabled: &HashSet<String>| {
-        for (name, config) in map {
-            let Some(config) = config.as_object() else { continue };
-            let (plugin_name, plugin_root) = plugin.clone().unzip();
-            let id = match &plugin_name {
-                Some(p) => format!("plugin:{p}:{name}"),
-                None => format!("{}:{name}", scope.as_str()),
-            };
-            servers.push(RawServer {
-                id,
-                name: name.clone(),
-                scope,
-                plugin: plugin_name,
-                source: source.to_path_buf(),
-                config: config.clone(),
-                plugin_root,
-                disabled: disabled.contains(name),
-            });
-        }
+        servers.extend(raw_entries(scope, plugin, source, map, disabled));
     };
 
     let none = HashSet::new();
@@ -287,13 +306,7 @@ fn raw_servers(snapshot: &Snapshot) -> Vec<RawServer> {
         }
     }
     for plugin in snapshot.plugins.iter().filter(|p| p.enabled) {
-        let manifest = plugin.root.join(".mcp.json");
-        let from_plugin_json = || {
-            let path = plugin.root.join(".claude-plugin").join("plugin.json");
-            json_file(&path).value.clone().filter(|v| v.get("mcpServers").is_some_and(Value::is_object)).map(|v| (path, v))
-        };
-        let found = json_file(&manifest).value.clone().map(|v| (manifest.clone(), v)).or_else(from_plugin_json);
-        if let Some((path, value)) = found {
+        if let Some((path, value)) = plugin_server_file(plugin) {
             if let Some(map) = server_map(&value) {
                 let root = snapshot.project.ctx.native(&plugin.root);
                 push(Scope::Plugin, Some((short_plugin_name(&plugin.name), root)), &path, map, &none);

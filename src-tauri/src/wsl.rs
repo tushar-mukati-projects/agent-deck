@@ -393,6 +393,16 @@ pub fn index() -> WslIndex {
     for distro in &running {
         known_login_env(distro);
     }
+    let (changed, errors) = index_running(&running);
+    let mut sessions = cached_sessions(&running, &errors);
+    if changed {
+        save();
+    }
+    sessions.sort_by_key(|s| std::cmp::Reverse(s.modified_ms));
+    WslIndex { sessions, errors, distros }
+}
+
+fn index_running(running: &[String]) -> (bool, HashMap<String, String>) {
     let results: Vec<(String, anyhow::Result<bool>)> = thread::scope(|scope| {
         let handles: Vec<_> = running.iter().map(|d| (d.clone(), scope.spawn(move || index_distro(d)))).collect();
         handles.into_iter().map(|(d, h)| (d, h.join().unwrap_or_else(|_| Err(anyhow!("indexing stopped unexpectedly"))))).collect()
@@ -407,26 +417,23 @@ pub fn index() -> WslIndex {
             }
         }
     }
-    let mut sessions = {
-        let mut cache = CACHE.lock();
-        for (name, state) in cache.distros.iter_mut() {
-            if !running.contains(name) || errors.contains_key(name) {
-                state.live.clear();
-                state.live_at = None;
-            }
+    (changed, errors)
+}
+
+fn cached_sessions(running: &[String], errors: &HashMap<String, String>) -> Vec<SessionInfo> {
+    let mut cache = CACHE.lock();
+    for (name, state) in cache.distros.iter_mut() {
+        if !running.contains(name) || errors.contains_key(name) {
+            state.live.clear();
+            state.live_at = None;
         }
-        let mut sessions = Vec::new();
-        for distro in &running {
-            let Some(state) = cache.distros.get(distro) else { continue };
-            sessions.extend(state.entries.iter().filter_map(|(path, entry)| session_info(distro, path, entry)));
-        }
-        sessions
-    };
-    if changed {
-        save();
     }
-    sessions.sort_by_key(|s| std::cmp::Reverse(s.modified_ms));
-    WslIndex { sessions, errors, distros }
+    let mut sessions = Vec::new();
+    for distro in running {
+        let Some(state) = cache.distros.get(distro) else { continue };
+        sessions.extend(state.entries.iter().filter_map(|(path, entry)| session_info(distro, path, entry)));
+    }
+    sessions
 }
 
 pub fn live_sessions() -> Vec<LiveSession> {

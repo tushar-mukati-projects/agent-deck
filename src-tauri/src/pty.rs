@@ -286,6 +286,28 @@ fn build_command(req: &SpawnRequest) -> anyhow::Result<CommandBuilder> {
     Ok(cmd)
 }
 
+struct Terminal {
+    child: Box<dyn Child + Send + Sync>,
+    master: Box<dyn MasterPty + Send>,
+    reader: Box<dyn Read + Send>,
+    writer: Box<dyn Write + Send>,
+}
+
+fn open_terminal(req: &SpawnRequest) -> anyhow::Result<Terminal> {
+    let command = build_command(req)?;
+    let pair = native_pty_system().openpty(size(req.cols, req.rows)).context("Could not open a terminal")?;
+    let mut child = pair.slave.spawn_command(command).with_context(|| format!("Could not start {}", req.program))?;
+    drop(pair.slave);
+    let pipes = pair.master.try_clone_reader().and_then(|reader| pair.master.take_writer().map(|writer| (reader, writer)));
+    match pipes {
+        Ok((reader, writer)) => Ok(Terminal { child, master: pair.master, reader, writer }),
+        Err(error) => {
+            let _ = child.kill();
+            Err(error.context("Could not connect to the terminal"))
+        }
+    }
+}
+
 fn size(cols: u16, rows: u16) -> PtySize {
     PtySize { rows: rows.max(MIN_ROWS), cols: cols.max(MIN_COLS), pixel_width: 0, pixel_height: 0 }
 }
@@ -303,24 +325,11 @@ impl PtyManager {
             self.processes.lock().remove(&req.id);
         }
         anyhow::ensure!(Path::new(&req.cwd).is_dir(), "Folder does not exist: {}", req.cwd);
-
-        let command = build_command(&req)?;
-        let pair = native_pty_system().openpty(size(req.cols, req.rows)).context("Could not open a terminal")?;
-        let mut child = pair.slave.spawn_command(command).with_context(|| format!("Could not start {}", req.program))?;
-        drop(pair.slave);
-        let pipes = pair.master.try_clone_reader().and_then(|reader| pair.master.take_writer().map(|writer| (reader, writer)));
-        let (reader, writer) = match pipes {
-            Ok(pipes) => pipes,
-            Err(error) => {
-                let _ = child.kill();
-                return Err(error.context("Could not connect to the terminal"));
-            }
-        };
-
+        let Terminal { child, master, reader, writer } = open_terminal(&req)?;
         let output = Arc::new(Mutex::new(Output { channel: Some(channel), ..Output::default() }));
         let process = Arc::new(PtyProcess {
             input: Mutex::new(Some(spawn_writer(writer))),
-            master: Mutex::new(Some(pair.master)),
+            master: Mutex::new(Some(master)),
             killer: Mutex::new(child.clone_killer()),
             pid: child.process_id(),
             output: output.clone(),

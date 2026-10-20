@@ -2,7 +2,7 @@ use std::{
     collections::{HashMap, VecDeque},
     io::{BufRead, BufReader, Read, Write},
     path::Path,
-    process::{ChildStdin, Command, Stdio},
+    process::{ChildStderr, ChildStdin, ChildStdout, Command, Stdio},
     sync::{
         atomic::{AtomicBool, AtomicU64, Ordering},
         mpsc, Arc,
@@ -184,7 +184,12 @@ fn spawn_stdio(server: &ResolvedServer, launch: &Launch) -> anyhow::Result<Stdio
     let pending: Pending = Arc::default();
     let stderr: Arc<Mutex<VecDeque<String>>> = Arc::default();
     let closed = Arc::new(AtomicBool::new(false));
-    let (reader_pending, reader_stdin, reader_closed) = (pending.clone(), stdin.clone(), closed.clone());
+    read_replies(stdout, pending.clone(), stdin.clone(), closed.clone());
+    keep_stderr_tail(stderr_pipe, stderr.clone());
+    Ok(StdioTransport { process, stdin, pending, stderr, closed })
+}
+
+fn read_replies(stdout: ChildStdout, reader_pending: Pending, reader_stdin: Arc<Mutex<ChildStdin>>, reader_closed: Arc<AtomicBool>) {
     thread::spawn(move || {
         let mut reader = BufReader::new(stdout);
         let mut line = Vec::new();
@@ -204,7 +209,9 @@ fn spawn_stdio(server: &ResolvedServer, launch: &Launch) -> anyhow::Result<Stdio
         reader_closed.store(true, Ordering::SeqCst);
         reader_pending.lock().clear();
     });
-    let err_lines = stderr.clone();
+}
+
+fn keep_stderr_tail(stderr_pipe: ChildStderr, err_lines: Arc<Mutex<VecDeque<String>>>) {
     thread::spawn(move || {
         let mut reader = BufReader::new(stderr_pipe);
         let mut buf = Vec::new();
@@ -221,7 +228,6 @@ fn spawn_stdio(server: &ResolvedServer, launch: &Launch) -> anyhow::Result<Stdio
             lines.push_back(line);
         }
     });
-    Ok(StdioTransport { process, stdin, pending, stderr, closed })
 }
 
 fn http_transport(launch: &Launch) -> anyhow::Result<HttpTransport> {
@@ -298,19 +304,23 @@ impl HttpTransport {
             bail!("HTTP {status} from {host}: {}", text.chars().take(ERROR_BODY_CHARS).collect::<String>());
         }
         let Some(id) = id else { return Ok(HttpReply::Message(None)) };
-        if content_type.contains("text/event-stream") {
-            return match sse_message(BufReader::new(body), id)? {
-                Some(value) => Ok(HttpReply::Message(Some(value))),
-                None => bail!("The server's event stream ended without a response"),
-            };
-        }
-        let mut text = String::new();
-        BufReader::new(body).read_to_string(&mut text)?;
-        if text.trim().is_empty() {
-            return Ok(HttpReply::Message(None));
-        }
-        Ok(HttpReply::Message(Some(serde_json::from_str(&text).context("The server returned invalid JSON")?)))
+        reply_from(body, &content_type, id)
     }
+}
+
+fn reply_from(body: impl Read, content_type: &str, id: u64) -> anyhow::Result<HttpReply> {
+    if content_type.contains("text/event-stream") {
+        return match sse_message(BufReader::new(body), id)? {
+            Some(value) => Ok(HttpReply::Message(Some(value))),
+            None => bail!("The server's event stream ended without a response"),
+        };
+    }
+    let mut text = String::new();
+    BufReader::new(body).read_to_string(&mut text)?;
+    if text.trim().is_empty() {
+        return Ok(HttpReply::Message(None));
+    }
+    Ok(HttpReply::Message(Some(serde_json::from_str(&text).context("The server returned invalid JSON")?)))
 }
 
 fn describe_http_error(error: &ureq::Error) -> String {
