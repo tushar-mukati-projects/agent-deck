@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import ctypes
-import difflib
 import glob
 import json
 import os
@@ -665,6 +663,8 @@ def line_stats(before: str, after: str) -> tuple[int, int]:
     if len(old) + len(new) > EXACT_DIFF_LINES:
         old_counts, new_counts = Counter(old), Counter(new)
         return sum((new_counts - old_counts).values()), sum((old_counts - new_counts).values())
+    import difflib
+
     additions = deletions = 0
     for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(None, old, new, autojunk=False).get_opcodes():
         if tag in ("replace", "delete"):
@@ -866,6 +866,8 @@ def noisy(root: str, path: str) -> bool:
 
 class Watcher:
     def __init__(self, root: str) -> None:
+        import ctypes
+
         self.libc = ctypes.CDLL(None, use_errno=True)
         self.fd = self.libc.inotify_init1(os.O_NONBLOCK | IN_CLOEXEC)
         if self.fd < 0:
