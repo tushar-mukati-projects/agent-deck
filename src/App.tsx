@@ -35,6 +35,7 @@ const PANEL_ANIMATION_MS = 180;
 let panelTimer: number | undefined;
 const animatePanels = () => {
   const root = document.documentElement;
+  root.style.setProperty("--panel-animation", `${PANEL_ANIMATION_MS}ms`);
   root.classList.add("panels-animating");
   holdTerminalFits(PANEL_ANIMATION_MS);
   window.clearTimeout(panelTimer);

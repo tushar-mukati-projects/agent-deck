@@ -139,7 +139,7 @@
 
 @media (prefers-reduced-motion: no-preference) {
   .panels-animating [data-panel] {
-    transition: flex-grow 180ms cubic-bezier(0.2, 0, 0, 1);
+    transition: flex-grow var(--panel-animation) cubic-bezier(0.2, 0, 0, 1);
   }
 
   .animate-fade-in[data-state="closed"] {
