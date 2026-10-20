@@ -2,7 +2,6 @@ import { toast } from "sonner";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-import { adoptSessions } from "@/lib/adopt";
 import {
   agentSpec,
   defaultShellProgram,
@@ -21,10 +20,16 @@ import {
   startTerminal,
   type TerminalSpec,
 } from "@/lib/terminal/registry";
-import { neighborAt, newId, samePath } from "@/lib/utils";
+import { neighborAt, newId } from "@/lib/utils";
 import { parseWslPath } from "@/lib/wsl";
 import {
   blankWorkspace,
+  closeFileFields,
+  closeShellFields,
+  cycledWorkspace,
+  movedWorkspace,
+  openFileFields,
+  syncedWorkspaces,
   workspaceFromSession,
   workspaceTerminalIds,
 } from "@/stores/workspace-factory";
@@ -224,26 +229,14 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
         cycle: (direction) => {
           const { workspaces, activeId } = get();
-          if (!workspaces.length) return;
-          const index = workspaces.findIndex((w) => w.id === activeId);
-          const next =
-            index < 0
-              ? direction > 0
-                ? 0
-                : workspaces.length - 1
-              : (index + direction + workspaces.length) % workspaces.length;
-          if (next !== index) get().activate(workspaces[next].id);
+          const next = cycledWorkspace(workspaces, activeId, direction);
+          if (next && next.id !== activeId) get().activate(next.id);
         },
 
         reorder: (fromId, toId) =>
           set((s) => {
-            const list = [...s.workspaces];
-            const from = list.findIndex((w) => w.id === fromId);
-            const to = list.findIndex((w) => w.id === toId);
-            if (from < 0 || to < 0 || from === to) return s;
-            const [moved] = list.splice(from, 1);
-            list.splice(to, 0, moved);
-            return { workspaces: list };
+            const workspaces = movedWorkspace(s.workspaces, fromId, toId);
+            return workspaces === s.workspaces ? s : { workspaces };
           }),
 
         openShell: (workspaceId, cwd) => {
@@ -267,15 +260,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           const workspace = find(workspaceId);
           if (!workspace) return;
           void disposeTerminal(shellId);
-          const index = workspace.shells.findIndex((s) => s.id === shellId);
-          const shells = workspace.shells.filter((s) => s.id !== shellId);
-          const activeShellId =
-            workspace.activeShellId === shellId
-              ? (neighborAt(shells, index)?.id ?? null)
-              : workspace.activeShellId;
-          const shellPanelOpen = shells.length > 0 && workspace.shellPanelOpen;
-          patch(workspaceId, () => ({ shells, activeShellId, shellPanelOpen }));
-          const focusId = shellPanelOpen ? activeShellId : workspace.agentTerminalId;
+          const fields = closeShellFields(workspace, shellId);
+          patch(workspaceId, () => fields);
+          const focusId = fields.shellPanelOpen ? fields.activeShellId : workspace.agentTerminalId;
           if (focusId) requestFocus(focusId);
         },
 
@@ -305,42 +292,16 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
         collapseShellPanel: (workspaceId) => patch(workspaceId, () => ({ shellPanelOpen: false })),
 
-        openFile: (workspaceId, path) =>
-          patch(workspaceId, (w) => ({
-            openFiles: w.openFiles.some((f) => samePath(f, path))
-              ? w.openFiles
-              : [...w.openFiles, path],
-            activeFile: path,
-          })),
+        openFile: (workspaceId, path) => patch(workspaceId, (w) => openFileFields(w, path)),
 
-        closeFile: (workspaceId, path) =>
-          patch(workspaceId, (w) => {
-            const index = w.openFiles.findIndex((f) => samePath(f, path));
-            const openFiles = w.openFiles.filter((f) => !samePath(f, path));
-            const wasActive = !!w.activeFile && samePath(w.activeFile, path);
-            return {
-              openFiles,
-              activeFile: wasActive
-                ? (neighborAt(openFiles, index) ?? null)
-                : w.activeFile,
-            };
-          }),
+        closeFile: (workspaceId, path) => patch(workspaceId, (w) => closeFileFields(w, path)),
 
         setActiveFile: (workspaceId, path) => patch(workspaceId, () => ({ activeFile: path })),
 
         syncSessions: (byId) =>
           set((s) => {
-            const adopted = adoptSessions(s.workspaces, byId);
-            let changed = adopted !== s.workspaces;
-            const workspaces = adopted.map((w) => {
-              const session = byId[w.sessionId];
-              if (!session) return w;
-              const title = session.title ?? w.title;
-              if (title === w.title && session.filePath === w.filePath) return w;
-              changed = true;
-              return { ...w, title, filePath: session.filePath };
-            });
-            return changed ? { workspaces } : s;
+            const workspaces = syncedWorkspaces(s.workspaces, byId);
+            return workspaces === s.workspaces ? s : { workspaces };
           }),
 
         restore: () => {
