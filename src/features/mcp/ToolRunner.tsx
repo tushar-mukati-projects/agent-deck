@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ErrorAlert } from "@/components/ui/error-alert";
 import { Spinner } from "@/components/ui/feedback";
 import { Kbd } from "@/components/ui/kbd";
-import { ScopeBadge } from "@/components/ui/panel";
+import { Tag } from "@/components/ui/tag";
 import { CallResult } from "@/features/mcp/CallResult";
 import { CodeView } from "@/features/viewer/CodeView";
 import { MarkdownView } from "@/features/viewer/MarkdownView";
@@ -114,8 +114,8 @@ export const ToolRunner = ({
         >
           {tool.name}
         </h2>
-        {tool.annotations?.readOnlyHint && <ScopeBadge>read-only</ScopeBadge>}
-        {tool.annotations?.destructiveHint && <ScopeBadge>destructive</ScopeBadge>}
+        {tool.annotations?.readOnlyHint && <Tag>read-only</Tag>}
+        {tool.annotations?.destructiveHint && <Tag>destructive</Tag>}
       </div>
       {tool.description && (
         <div className="mt-2 max-h-[200px] overflow-y-auto">

@@ -21,7 +21,7 @@ import { startAgentSession } from "@/actions/sessions";
 import { Hint, showError } from "@/components/ui/feedback";
 import { IconButton } from "@/components/ui/icon-button";
 import { ListRow } from "@/components/ui/list-row";
-import { ScopeBadge } from "@/components/ui/panel";
+import { Tag } from "@/components/ui/tag";
 import { TimeAgo } from "@/components/ui/time-ago";
 import {
   modeLabel,
@@ -98,7 +98,7 @@ const MemorySection = ({ workspace, agent, profile, data, reload }: SectionProps
           icon={<FileText />}
           title={file.label}
           subtitle={file.description}
-          badge={<ScopeBadge>{scopeLabel(file.scope)}</ScopeBadge>}
+          badge={<Tag>{scopeLabel(file.scope)}</Tag>}
           meta={<TimeAgo ms={file.modifiedMs} />}
           onClick={() => openFile(workspace, file.path)}
           actions={
@@ -134,8 +134,8 @@ const McpSection = ({ workspace, agent, profile, data }: SectionProps) => (
         subtitle={serverDetail(server)}
         badge={
           <>
-            <ScopeBadge>{scopeLabel(server.scope, server.plugin)}</ScopeBadge>
-            <ScopeBadge>{server.transport}</ScopeBadge>
+            <Tag>{scopeLabel(server.scope, server.plugin)}</Tag>
+            <Tag>{server.transport}</Tag>
           </>
         }
         meta={server.disabled ? "disabled" : undefined}
@@ -202,7 +202,7 @@ const ItemRows = ({
         title={kind === "agent" ? item.name : profile.typed(item, kind)}
         mono={kind !== "agent"}
         subtitle={item.description}
-        badge={<ScopeBadge>{scopeLabel(item.scope, item.plugin)}</ScopeBadge>}
+        badge={<Tag>{scopeLabel(item.scope, item.plugin)}</Tag>}
         onClick={() => openFile(workspace, item.path)}
         actions={
           <>
@@ -251,7 +251,7 @@ const HooksSection = ({ workspace, agent, profile, data }: SectionProps) => (
         icon={<Webhook />}
         title={hook.matcher ? `${hook.event} · ${hook.matcher}` : hook.event}
         subtitle={hook.command}
-        badge={<ScopeBadge>{scopeLabel(hook.scope, hook.plugin)}</ScopeBadge>}
+        badge={<Tag>{scopeLabel(hook.scope, hook.plugin)}</Tag>}
         onClick={() => openFile(workspace, hook.source)}
         actions={
           canRemove(hook.scope) && (
@@ -272,7 +272,7 @@ const PermissionsSection = ({ workspace, agent, profile, data }: SectionProps) =
         key={`mode:${file.path}`}
         icon={<Settings2 />}
         title={modeLabel(file)}
-        badge={<ScopeBadge>{scopeLabel(file.scope)}</ScopeBadge>}
+        badge={<Tag>{scopeLabel(file.scope)}</Tag>}
         onClick={() => openFile(workspace, file.path)}
       />
     ))}
@@ -283,7 +283,7 @@ const PermissionsSection = ({ workspace, agent, profile, data }: SectionProps) =
         icon={<ShieldCheck className={RULE_TONE[permission.kind]} />}
         title={permission.rule}
         mono
-        badge={<ScopeBadge>{permission.kind}</ScopeBadge>}
+        badge={<Tag>{permission.kind}</Tag>}
         meta={scopeLabel(permission.file.scope)}
         onClick={() => openFile(workspace, permission.file.path)}
         actions={
@@ -305,7 +305,7 @@ const PluginsSection = ({ workspace, agent, profile, data }: SectionProps) => (
           icon={<Blocks />}
           title={name}
           subtitle={source ? `from ${source}` : null}
-          badge={<ScopeBadge>{plugin.scope}</ScopeBadge>}
+          badge={<Tag>{plugin.scope}</Tag>}
           meta={plugin.enabled ? plugin.version : "disabled"}
           dim={!plugin.enabled}
           onClick={() => void revealInExplorer(plugin.path)}
@@ -330,7 +330,7 @@ const SettingsSection = ({ workspace, data }: SectionProps) => (
         icon={<Settings2 />}
         title={file.label}
         subtitle={file.error ? file.error : file.exists ? file.path : "Not created yet"}
-        badge={<ScopeBadge>{scopeLabel(file.scope)}</ScopeBadge>}
+        badge={<Tag>{scopeLabel(file.scope)}</Tag>}
         meta={file.error ? <span className="text-danger">error</span> : undefined}
         dim={!file.exists}
         disabled={!file.exists}

@@ -4,7 +4,8 @@ import { Database, FileText, Plug, RefreshCw, Wrench } from "lucide-react";
 import { ErrorAlert } from "@/components/ui/error-alert";
 import { EmptyState, LoadingState } from "@/components/ui/feedback";
 import { IconButton } from "@/components/ui/icon-button";
-import { Alert, ScopeBadge, Segmented } from "@/components/ui/panel";
+import { Alert, Segmented } from "@/components/ui/panel";
+import { Tag } from "@/components/ui/tag";
 import { PgBrowser } from "@/features/mcp/PgBrowser";
 import { ToolsPane } from "@/features/mcp/ToolsPane";
 import { serverDetail } from "@/lib/agent-config/filter-overview";
@@ -42,8 +43,8 @@ const ServerView = ({
           <Plug className="size-3.5 text-faint" />
         )}
         <span className="text-[12.5px] font-semibold text-fg">{server.name}</span>
-        <ScopeBadge>{server.plugin ?? server.scope}</ScopeBadge>
-        <ScopeBadge>{server.transport}</ScopeBadge>
+        <Tag>{server.plugin ?? server.scope}</Tag>
+        <Tag>{server.transport}</Tag>
         <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-faint" title={detail}>
           {detail}
         </span>

@@ -1,6 +1,5 @@
 import { AlertTriangle, ChevronRight, Info, Search, X } from "lucide-react";
 
-import { Tag } from "@/components/ui/tag";
 import { cn } from "@/lib/utils";
 
 export const PanelHeader = ({ title, children }: { title: string; children?: React.ReactNode }) => (
@@ -197,5 +196,3 @@ export const CollapsibleSection = ({
     {open && <div className="flex flex-col px-1.5">{children}</div>}
   </section>
 );
-
-export const ScopeBadge = ({ children }: { children: React.ReactNode }) => <Tag>{children}</Tag>;
