@@ -83,7 +83,7 @@ static SAVE_LOCK: Mutex<()> = Mutex::new(());
 static INDEX_LOCK: Mutex<()> = Mutex::new(());
 static RUNNING: Mutex<Option<(Instant, Vec<String>)>> = Mutex::new(None);
 static HOMES: LazyLock<Mutex<HashMap<String, String>>> = LazyLock::new(Mutex::default);
-type LoginEnv = Option<Arc<HashMap<String, String>>>;
+type LoginEnv = Arc<HashMap<String, String>>;
 type LoginSlot = Arc<Mutex<Option<LoginEnv>>>;
 static LOGIN_ENV: LazyLock<Mutex<HashMap<String, LoginSlot>>> = LazyLock::new(Mutex::default);
 
@@ -270,11 +270,11 @@ fn login_slot(distro: &str) -> LoginSlot {
     LOGIN_ENV.lock().entry(distro.to_string()).or_default().clone()
 }
 
-fn known_login_env(distro: &str) -> LoginEnv {
+fn known_login_env(distro: &str) -> Option<LoginEnv> {
     let slot = login_slot(distro);
     let value = slot.try_lock()?;
     if let Some(env) = value.as_ref() {
-        return env.clone();
+        return Some(env.clone());
     }
     drop(value);
     let distro = distro.to_string();
@@ -282,11 +282,11 @@ fn known_login_env(distro: &str) -> LoginEnv {
     None
 }
 
-pub fn login_env(distro: &str) -> LoginEnv {
+pub fn login_env(distro: &str) -> Option<LoginEnv> {
     let slot = login_slot(distro);
     let mut value = slot.lock();
     if let Some(env) = value.as_ref() {
-        return env.clone();
+        return Some(env.clone());
     }
     #[derive(Deserialize)]
     struct Reply {
@@ -295,13 +295,9 @@ pub fn login_env(distro: &str) -> LoginEnv {
     }
     let reply = run_agent_raw(agent_command(distro, &["loginenv"]), distro, None, LOGIN_TIMEOUT)
         .ok()
-        .and_then(|bytes| serde_json::from_slice::<Reply>(&bytes).ok());
-    let env = reply.map(|reply| {
-        CACHE.lock().distros.entry(distro.to_string()).or_default().shell = Some(reply.shell);
-        Arc::new(reply.env)
-    });
-    *value = Some(env.clone());
-    env
+        .and_then(|bytes| serde_json::from_slice::<Reply>(&bytes).ok())?;
+    CACHE.lock().distros.entry(distro.to_string()).or_default().shell = Some(reply.shell);
+    Some(value.insert(Arc::new(reply.env)).clone())
 }
 
 pub fn login_var(distro: &str, name: &str) -> Option<String> {
