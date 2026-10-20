@@ -26,6 +26,7 @@ import { useSessionFile } from "@/hooks/useSessionFile";
 import { useExternalLive } from "@/hooks/useWorkspaceStatus";
 import { isPersisted } from "@/lib/agents/launch";
 import { CLAUDE } from "@/lib/agents/registry";
+import { dangerHoverClass } from "@/lib/styles";
 import { api } from "@/lib/tauri/commands";
 import { revealInExplorer } from "@/lib/tauri/system";
 import { formatBytes, plural, shortenHome } from "@/lib/utils";
@@ -214,7 +215,7 @@ const PreviewHeader = ({
             <Button
               size="sm"
               variant="ghost"
-              className="hover:bg-danger/15 hover:text-danger"
+              className={dangerHoverClass}
               onClick={() => void deleteSessionWithConfirm(session)}
             >
               <Trash2 /> Delete

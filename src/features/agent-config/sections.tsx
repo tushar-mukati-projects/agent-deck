@@ -42,6 +42,7 @@ import {
   skillRemoval,
 } from "@/features/agent-config/remove-config";
 import { encodeMcpTab } from "@/lib/diff-tabs";
+import { dangerHoverClass } from "@/lib/styles";
 import { api } from "@/lib/tauri/commands";
 import { revealInExplorer } from "@/lib/tauri/system";
 import { useViewerStore } from "@/stores/viewer-store";
@@ -81,7 +82,7 @@ const RemoveButton = ({
 }) => (
   <IconButton
     label={`Remove ${request.name}`}
-    className="hover:bg-danger/15 hover:text-danger"
+    className={dangerHoverClass}
     onClick={() => void removeConfig(workspace, agent, request)}
   >
     <Trash2 />
