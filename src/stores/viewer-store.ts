@@ -53,6 +53,7 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
         drafts: keep(s.drafts),
         editing: keep(s.editing),
         markdownMode: keep(s.markdownMode),
+        lines: keep(s.lines),
       };
     }),
 }));
