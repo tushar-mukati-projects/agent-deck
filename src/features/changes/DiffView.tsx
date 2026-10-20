@@ -20,6 +20,8 @@ import type { Workspace } from "@/types";
 
 const RELOAD_DELAY_MS = 300;
 const RELOAD_MAX_WAIT_MS = 2000;
+const UNCHANGED_MARGIN_LINES = 3;
+const UNCHANGED_MIN_LINES = 6;
 
 interface DiffContent {
   before: string;
@@ -140,7 +142,7 @@ export const DiffView = ({ tab, workspace }: DiffViewProps) => {
               highlightChanges: true,
               gutter: true,
               syntaxHighlightDeletions: true,
-              collapseUnchanged: { margin: 3, minSize: 6 },
+              collapseUnchanged: { margin: UNCHANGED_MARGIN_LINES, minSize: UNCHANGED_MIN_LINES },
             }),
             ...(language ? [language] : []),
           ]

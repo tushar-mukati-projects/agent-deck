@@ -15,6 +15,13 @@ import { useUiStore } from "@/stores/ui-store";
 import { useWorkspace, useWorkspaceStore } from "@/stores/workspace-store";
 import type { Workspace } from "@/types";
 
+const MAIN_MIN_PX = 280;
+const PRIMARY_MIN_PX = 120;
+const SIDE_PANE_MIN_PX = 100;
+const SIDE_PANE_DEFAULT = "34%";
+const VIEWER_MIN_PX = 240;
+const VIEWER_DEFAULT = "46%";
+
 const useSavedLayout = (id: string, panelIds: string[]) =>
   useDefaultLayout({ id, panelIds, onlySaveAfterUserInteractions: true });
 
@@ -61,14 +68,14 @@ const WorkspaceLayout = ({ workspace }: WorkspaceLayoutProps) => {
       defaultLayout={columns.defaultLayout}
       onLayoutChanged={columns.onLayoutChanged}
     >
-      <Panel id="main" minSize={280}>
+      <Panel id="main" minSize={MAIN_MIN_PX}>
         <Group
           orientation="vertical"
           className="h-full"
           defaultLayout={rows.defaultLayout}
           onLayoutChanged={rows.onLayoutChanged}
         >
-          <Panel id="primary" minSize={120}>
+          <Panel id="primary" minSize={PRIMARY_MIN_PX}>
             {workspace.mode === "live" ? (
               <AgentPane workspace={workspace} />
             ) : (
@@ -78,7 +85,7 @@ const WorkspaceLayout = ({ workspace }: WorkspaceLayoutProps) => {
           {shellOpen && (
             <>
               <ResizeHandle orientation="vertical" />
-              <Panel id="shell" defaultSize="34%" minSize={100}>
+              <Panel id="shell" defaultSize={SIDE_PANE_DEFAULT} minSize={SIDE_PANE_MIN_PX}>
                 <ShellPanel workspace={workspace} />
               </Panel>
             </>
@@ -86,7 +93,7 @@ const WorkspaceLayout = ({ workspace }: WorkspaceLayoutProps) => {
           {subagentsOpen && (
             <>
               <ResizeHandle orientation="vertical" />
-              <Panel id="subagents" defaultSize="34%" minSize={100}>
+              <Panel id="subagents" defaultSize={SIDE_PANE_DEFAULT} minSize={SIDE_PANE_MIN_PX}>
                 <SubagentsPanel workspace={workspace} agents={subagents} />
               </Panel>
             </>
@@ -96,7 +103,7 @@ const WorkspaceLayout = ({ workspace }: WorkspaceLayoutProps) => {
       {hasFiles && (
         <>
           <ResizeHandle orientation="horizontal" />
-          <Panel id="viewer" defaultSize="46%" minSize={240}>
+          <Panel id="viewer" defaultSize={VIEWER_DEFAULT} minSize={VIEWER_MIN_PX}>
             <FileViewer workspace={workspace} />
           </Panel>
         </>

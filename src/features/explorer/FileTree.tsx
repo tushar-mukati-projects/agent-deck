@@ -15,6 +15,7 @@ import type { DirEntry, Workspace } from "@/types";
 const ROW_HEIGHT = 22;
 const OVERSCAN = 12;
 const SCROLL_STEP = ROW_HEIGHT * 6;
+const INITIAL_VIEWPORT_PX = 600;
 
 interface Row {
   entry: DirEntry;
@@ -57,7 +58,7 @@ export const FileTree = ({ workspace }: FileTreeProps) => {
   const openFile = useWorkspaceStore((s) => s.openFile);
   const activeFile = workspace.activeFile;
   const containerRef = useRef<HTMLDivElement>(null);
-  const [viewport, setViewport] = useState({ top: 0, height: 600 });
+  const [viewport, setViewport] = useState({ top: 0, height: INITIAL_VIEWPORT_PX });
 
   useLayoutEffect(() => {
     const element = containerRef.current;

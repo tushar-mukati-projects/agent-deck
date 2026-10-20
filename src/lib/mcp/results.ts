@@ -13,7 +13,7 @@ export type ContentItem = {
   resource?: { uri?: string; text?: string };
 };
 
-const JSON_INDENT = 2;
+export const JSON_INDENT = 2;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === "object" && !Array.isArray(value);

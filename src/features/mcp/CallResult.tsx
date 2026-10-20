@@ -5,6 +5,7 @@ import { ResultGrid } from "@/features/mcp/ResultGrid";
 import {
   callResultParts,
   gridFromObjects,
+  JSON_INDENT,
   parseJson,
   type ContentItem,
 } from "@/lib/mcp/results";
@@ -21,7 +22,7 @@ export const TextResult = memo(({ text }: TextResultProps) => {
   if (grid) return <ResultGrid className="max-h-[520px]" columns={grid.columns} rows={grid.rows} />;
   return (
     <pre className="max-h-[520px] overflow-auto rounded-md border border-border bg-code-bg p-3 font-mono text-[11.5px] break-words whitespace-pre-wrap text-fg/90 select-text">
-      {parsed !== undefined ? JSON.stringify(parsed, null, 2) : text}
+      {parsed !== undefined ? JSON.stringify(parsed, null, JSON_INDENT) : text}
     </pre>
   );
 });
@@ -43,7 +44,7 @@ const ContentView = ({ item }: ContentViewProps) => {
     );
   if (item.type === "resource" && typeof item.resource?.text === "string")
     return <TextResult text={item.resource.text} />;
-  return <TextResult text={JSON.stringify(item, null, 2)} />;
+  return <TextResult text={JSON.stringify(item, null, JSON_INDENT)} />;
 };
 
 type CallResultProps = {
