@@ -43,6 +43,7 @@ export const DataPane = ({
     if (isMutating(sql)) {
       setResult(null);
       setError("The filter must be a single condition, not another statement.");
+      setLoading(false);
       return;
     }
     setLoading(true);
