@@ -13,6 +13,7 @@ use crate::{
 };
 
 pub const AGENT: &str = "codex";
+const SESSION_DIR_DEPTH: usize = 3;
 
 #[derive(Deserialize, Default)]
 struct Payload<'a> {
@@ -103,7 +104,7 @@ pub fn session_files() -> Vec<(PathBuf, fs::Metadata)> {
         }
     }
     let mut files = Vec::new();
-    walk(&sessions_dir(), 3, &mut files);
+    walk(&sessions_dir(), SESSION_DIR_DEPTH, &mut files);
     files
 }
 

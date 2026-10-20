@@ -21,6 +21,9 @@ const SENDER_BATCH_LIMIT: usize = 512 * 1024;
 const SENDER_COALESCE: Duration = Duration::from_millis(4);
 const SENDER_HOT_GAP: Duration = Duration::from_millis(16);
 const SENDER_HOT_BURST: u32 = 8;
+const READ_CHUNK_BYTES: usize = 64 * 1024;
+const MIN_ROWS: u16 = 2;
+const MIN_COLS: u16 = 10;
 
 const ALLOWED_PROGRAMS: &[&str] = &["claude", "codex", "pwsh", "powershell", "cmd", "wsl", "bash", "zsh", "fish", "nu", "sh"];
 
@@ -284,7 +287,7 @@ fn build_command(req: &SpawnRequest) -> anyhow::Result<CommandBuilder> {
 }
 
 fn size(cols: u16, rows: u16) -> PtySize {
-    PtySize { rows: rows.max(2), cols: cols.max(10), pixel_width: 0, pixel_height: 0 }
+    PtySize { rows: rows.max(MIN_ROWS), cols: cols.max(MIN_COLS), pixel_width: 0, pixel_height: 0 }
 }
 
 impl PtyManager {
@@ -402,7 +405,7 @@ fn spawn_writer(mut writer: Box<dyn Write + Send>) -> mpsc::Sender<Vec<u8>> {
 
 fn spawn_reader(mut reader: Box<dyn Read + Send>, tx: mpsc::Sender<String>) {
     thread::spawn(move || {
-        let mut buf = vec![0u8; 64 * 1024];
+        let mut buf = vec![0u8; READ_CHUNK_BYTES];
         let mut pending = Vec::new();
         loop {
             match reader.read(&mut buf) {

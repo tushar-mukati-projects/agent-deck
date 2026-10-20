@@ -32,6 +32,7 @@ const IDLE_CHECK_AFTER: Duration = Duration::from_secs(30);
 const VALIDATE_TIMEOUT: Duration = Duration::from_secs(5);
 const KEEPALIVE_IDLE: Duration = Duration::from_secs(30);
 const KEEPALIVE_INTERVAL: Duration = Duration::from_secs(10);
+const DEFAULT_PORT: u16 = 5432;
 
 const URL_KEYS: &[&str] = &[
     "DATABASE_URL",
@@ -122,7 +123,7 @@ fn finish(mut config: Config, verify: Verify) -> Target {
         config.application_name("agent-deck");
     }
     let host = config.get_hosts().first().map(|Host::Tcp(host)| host.clone());
-    let port = config.get_ports().first().copied().unwrap_or(5432);
+    let port = config.get_ports().first().copied().unwrap_or(DEFAULT_PORT);
     Target { host: host.unwrap_or_else(|| "localhost".into()), port, verify, config }
 }
 

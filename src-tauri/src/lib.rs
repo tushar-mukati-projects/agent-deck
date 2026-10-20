@@ -29,7 +29,7 @@ use watcher::Watchers;
 const IDLE_SWEEP: std::time::Duration = std::time::Duration::from_secs(60);
 const IDLE_LIMIT: std::time::Duration = std::time::Duration::from_secs(15 * 60);
 
-pub fn run() {
+pub fn run() -> tauri::Result<()> {
     let context = tauri::generate_context!();
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -111,8 +111,7 @@ pub fn run() {
             commands::notes_folder,
             commands::phone_ping,
         ])
-        .build(context)
-        .expect("error while building Agent Deck");
+        .build(context)?;
 
     app.run(|handle, event| {
         if let RunEvent::Exit = event {
@@ -122,4 +121,5 @@ pub fn run() {
             handle.state::<Watchers>().clear();
         }
     });
+    Ok(())
 }

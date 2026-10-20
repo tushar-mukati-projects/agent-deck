@@ -34,6 +34,7 @@ const LIVE_TTL: Duration = Duration::from_secs(30);
 const UNC_PREFIX: &str = r"\\wsl.localhost\";
 const FORWARDED_VARS: [&str; 2] = ["CLAUDE_CONFIG_DIR", "CODEX_HOME"];
 const CACHE_DIR: &str = "agent-deck";
+const ENCODING_SAMPLE_BYTES: usize = 256;
 
 static SCRIPT: LazyLock<String> = LazyLock::new(|| base64::engine::general_purpose::STANDARD.encode(AGENT));
 
@@ -120,14 +121,8 @@ struct ErrorReply {
     error: Option<String>,
 }
 
-#[cfg(not(test))]
 fn cache_file() -> PathBuf {
     dirs::cache_dir().unwrap_or_else(std::env::temp_dir).join(CACHE_DIR).join("wsl-index.json")
-}
-
-#[cfg(test)]
-fn cache_file() -> PathBuf {
-    std::env::temp_dir().join("agent-deck-test").join("wsl-index.json")
 }
 
 fn load_cache() -> Cache {
@@ -152,7 +147,7 @@ fn save() {
 }
 
 pub fn decode_output(bytes: &[u8]) -> String {
-    let sample = &bytes[..bytes.len().min(256)];
+    let sample = &bytes[..bytes.len().min(ENCODING_SAMPLE_BYTES)];
     let odd_nuls = sample.iter().skip(1).step_by(2).filter(|b| **b == 0).count();
     if sample.len() >= 2 && odd_nuls * 4 >= sample.len() {
         let units: Vec<u16> = bytes.as_chunks::<2>().0.iter().map(|c| u16::from_le_bytes(*c)).collect();

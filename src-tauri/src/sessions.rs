@@ -28,6 +28,11 @@ const PROMPT_PREVIEW_CHARS: usize = 280;
 const TITLE_CHARS: usize = 80;
 const TOOL_DETAIL_CHARS: usize = 160;
 const TRANSCRIPT_TEXT_CHARS: usize = 24_000;
+const AGENT_ID_MAX_LEN: usize = 64;
+const TASKKILL_TIMEOUT: Duration = Duration::from_secs(10);
+const EXIT_WAIT: Duration = Duration::from_secs(5);
+const EXIT_POLL: Duration = Duration::from_millis(100);
+const PARTIAL_LINE_WAIT: Duration = Duration::from_millis(300);
 const TOOL_RESULT: &[u8] = br#""type":"tool_result""#;
 const SYSTEM_PREFIXES: &[&str] = &["Caveat:", "[Request interrupted", "This session is being continued"];
 const SYSTEM_TAGS: &[&str] = &[
@@ -575,7 +580,7 @@ pub fn live_sessions() -> Vec<LiveSession> {
 
 fn end_process_tree(pid: u32) -> anyhow::Result<()> {
     let pid_text = pid.to_string();
-    let output = run_with_timeout(Command::new("taskkill").args(["/PID", &pid_text, "/T", "/F"]), None, Duration::from_secs(10))?;
+    let output = run_with_timeout(Command::new("taskkill").args(["/PID", &pid_text, "/T", "/F"]), None, TASKKILL_TIMEOUT)?;
     if output.status.success() || !is_agent_process(pid) {
         return Ok(());
     }
@@ -593,10 +598,10 @@ pub fn terminate_live(session_id: &str, pid: u32) -> anyhow::Result<()> {
     let recorded = record.proc_start.and_then(|start| start.parse::<u64>().ok());
     anyhow::ensure!(recorded.is_some() && recorded == process_start(pid), "Couldn't confirm PID {pid} is that Claude session, so it was left running");
     end_process_tree(pid)?;
-    let deadline = Instant::now() + Duration::from_secs(5);
+    let deadline = Instant::now() + EXIT_WAIT;
     while is_agent_process(pid) {
         anyhow::ensure!(Instant::now() < deadline, "Claude (PID {pid}) is still running");
-        std::thread::sleep(Duration::from_millis(100));
+        std::thread::sleep(EXIT_POLL);
     }
     Ok(())
 }
@@ -725,7 +730,7 @@ pub fn transcript(file_path: &str, from_offset: u64) -> anyhow::Result<Transcrip
 }
 
 pub fn is_agent_id(id: &str) -> bool {
-    !id.is_empty() && id.len() <= 64 && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+    !id.is_empty() && id.len() <= AGENT_ID_MAX_LEN && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
 }
 
 fn subagent_file(dir: &Path, id: &str) -> Option<PathBuf> {
@@ -879,7 +884,7 @@ pub fn rename_session(file_path: &str, title: &str) -> anyhow::Result<()> {
     let mut file = fs::OpenOptions::new().read(true).append(true).open(&path)?;
     let mut complete = ends_with_newline(&mut file)?;
     if !complete {
-        std::thread::sleep(Duration::from_millis(300));
+        std::thread::sleep(PARTIAL_LINE_WAIT);
         complete = ends_with_newline(&mut file)?;
     }
     let line = format!("{}{record}\n", if complete { "" } else { "\n" });

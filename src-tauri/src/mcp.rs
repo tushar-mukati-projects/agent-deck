@@ -29,6 +29,11 @@ const INIT_TIMEOUT: Duration = Duration::from_secs(60);
 const CALL_TIMEOUT: Duration = Duration::from_secs(120);
 const STDERR_LINES: usize = 30;
 const MAX_BODY_BYTES: u64 = 32 * 1024 * 1024;
+const METHOD_NOT_FOUND: i32 = -32601;
+const ERROR_BODY_BYTES: u64 = 4096;
+const ERROR_BODY_CHARS: usize = 300;
+const MAX_LIST_PAGES: usize = 20;
+const STDERR_TAIL_LINES: usize = 6;
 
 type Pending = Arc<Mutex<HashMap<u64, mpsc::Sender<Value>>>>;
 
@@ -161,7 +166,7 @@ fn answer_server_request(message: &Value, stdin: &Mutex<ChildStdin>) {
     let reply = if method == "ping" {
         json!({ "jsonrpc": "2.0", "id": id, "result": {} })
     } else {
-        json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32601, "message": format!("{method} isn't supported by Agent Deck") } })
+        json!({ "jsonrpc": "2.0", "id": id, "error": { "code": METHOD_NOT_FOUND, "message": format!("{method} isn't supported by Agent Deck") } })
     };
     let mut stdin = stdin.lock();
     let _ = writeln!(stdin, "{reply}").and_then(|_| stdin.flush());
@@ -283,14 +288,14 @@ impl HttpTransport {
             return Ok(HttpReply::SessionExpired);
         }
         if status == 401 || status == 403 {
-            bail!("This server needs you to sign in. Connect it once from Claude Code (/mcp) — Deck can't reuse that login.");
+            bail!("This server needs you to sign in. Connect it once from Claude Code (/mcp), because Deck can't reuse that login.");
         }
         let content_type = response.headers().get("content-type").and_then(|v| v.to_str().ok()).unwrap_or_default().to_lowercase();
         let body = response.body_mut().as_reader().take(MAX_BODY_BYTES);
         if !(200..300).contains(&status) {
             let mut text = String::new();
-            let _ = BufReader::new(body).take(4096).read_to_string(&mut text);
-            bail!("HTTP {status} from {host}: {}", text.chars().take(300).collect::<String>());
+            let _ = BufReader::new(body).take(ERROR_BODY_BYTES).read_to_string(&mut text);
+            bail!("HTTP {status} from {host}: {}", text.chars().take(ERROR_BODY_CHARS).collect::<String>());
         }
         let Some(id) = id else { return Ok(HttpReply::Message(None)) };
         if content_type.contains("text/event-stream") {
@@ -323,7 +328,7 @@ impl Client {
         let connection = match &launch.transport {
             Transport::Stdio => Connection::Stdio(spawn_stdio(server, &launch)?),
             Transport::Http => Connection::Http(http_transport(&launch)?),
-            Transport::Sse => bail!("Legacy SSE servers aren't supported here yet — Claude Code can still use it."),
+            Transport::Sse => bail!("Legacy SSE servers aren't supported here yet. Claude Code can still use it."),
             Transport::Unknown(other) => bail!("Unknown MCP transport \"{other}\""),
         };
         Ok(Self { connection, next_id: AtomicU64::new(1), info: Mutex::new(None), last_used: Mutex::new(Instant::now()) })
@@ -359,7 +364,7 @@ impl Client {
         let list = |method: &str, field: &str| -> anyhow::Result<Vec<Value>> {
             let mut items = Vec::new();
             let mut cursor: Option<String> = None;
-            for _ in 0..20 {
+            for _ in 0..MAX_LIST_PAGES {
                 let params = cursor.as_ref().map_or(json!({}), |c| json!({ "cursor": c }));
                 let page = self.request(method, params, CALL_TIMEOUT)?;
                 items.extend(page.get(field).and_then(Value::as_array).cloned().unwrap_or_default());
@@ -383,7 +388,7 @@ impl Client {
         match &self.connection {
             Connection::Stdio(stdio) => {
                 let lines = stdio.stderr.lock();
-                let tail = lines.iter().rev().take(6).rev().cloned().collect::<Vec<_>>().join("\n");
+                let tail = lines.iter().rev().take(STDERR_TAIL_LINES).rev().cloned().collect::<Vec<_>>().join("\n");
                 if tail.is_empty() { String::new() } else { format!("\n\n{tail}") }
             }
             Connection::Http(_) => String::new(),
