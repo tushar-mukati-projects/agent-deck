@@ -22,11 +22,11 @@ import {
 } from "@/lib/terminal/input";
 import { registerPathLinks, type PathLinkTarget } from "@/lib/terminal/links";
 import {
-  captureAnchor,
-  locateAnchor,
-  type Rows,
-  type ScrollAnchor,
-} from "@/lib/terminal/scroll-anchor";
+  holdScroll,
+  restoreScrollAfterOutput,
+  scrollToAnchor,
+  type ScrollHold,
+} from "@/lib/terminal/scroll-hold";
 import { ensureWebgl, releaseWebgl } from "@/lib/terminal/webgl";
 import { findTheme } from "@/lib/themes";
 import { errorMessage } from "@/lib/utils";
@@ -62,23 +62,12 @@ interface Entry {
   scrollHold: ScrollHold | null;
 }
 
-interface ScrollHold {
-  anchor: ScrollAnchor;
-  release: () => void;
-  timer?: number;
-  writes?: { dispose: () => void };
-}
-
 const PTY_RESIZE_DELAY_MS = 200;
 const REFLOW_LINES = 200;
 const REFLOW_DELAY_MS = 100;
-const FIRST_OUTPUT_MS = 1000;
-const QUIET_OUTPUT_MS = 300;
-const MAX_HOLD_MS = 3000;
 const SCROLLBACK_LINES = 10_000;
 const MIN_FIT_SIZE_PX = 20;
 const FIT_RESUME_SLACK_MS = 20;
-const USER_SCROLL_EVENTS = ["wheel", "mousedown", "keydown"] as const;
 
 const SEARCH_DECORATIONS = {
   matchBackground: "#88888855",
@@ -132,7 +121,7 @@ const handlePtyEvent = (entry: Entry, generation: number) => (event: PtyEvent) =
   store().update(entry.spec.id, { status: "exited", exitCode: event.code });
 };
 
-const createEntry = (spec: TerminalSpec): Entry => {
+const createXterm = () => {
   const { fontSize, themeId } = useSettingsStore.getState();
   const theme = findTheme(themeId);
   const term = new Terminal({
@@ -158,11 +147,31 @@ const createEntry = (spec: TerminalSpec): Entry => {
   term.loadAddon(new Unicode11Addon());
   term.loadAddon(new WebLinksAddon((_event, uri) => void openExternal(uri)));
   term.unicode.activeVersion = "11";
+  return { term, fit, search };
+};
 
+const wireInput = (entry: Entry) => {
+  const { term, element } = entry;
+  const owner = {
+    get agent() {
+      return entry.spec.kind === "agent" ? entry.spec.agent : null;
+    },
+    term,
+    send: (data: string) => send(entry, data),
+    onFind: () => findListeners.forEach((listener) => listener(entry.spec.id)),
+  };
+  term.attachCustomKeyEventHandler(createKeyHandler(owner));
+  term.onData((data) => send(entry, data));
+  registerPathLinks(term, (target) => pathLinkHandler?.(entry.spec.workspaceId, target));
+  element.addEventListener("paste", createPasteHandler(owner), true);
+  element.addEventListener("contextmenu", createContextMenuHandler(owner));
+};
+
+const createEntry = (spec: TerminalSpec): Entry => {
+  const { term, fit, search } = createXterm();
   const element = document.createElement("div");
   element.className = "h-full w-full";
   element.dataset.terminalKind = spec.kind;
-
   const entry: Entry = {
     spec,
     term,
@@ -181,20 +190,7 @@ const createEntry = (spec: TerminalSpec): Entry => {
     reflowTimer: undefined,
     scrollHold: null,
   };
-
-  const owner = {
-    get agent() {
-      return entry.spec.kind === "agent" ? entry.spec.agent : null;
-    },
-    term,
-    send: (data: string) => send(entry, data),
-    onFind: () => findListeners.forEach((listener) => listener(entry.spec.id)),
-  };
-  term.attachCustomKeyEventHandler(createKeyHandler(owner));
-  term.onData((data) => send(entry, data));
-  registerPathLinks(term, (target) => pathLinkHandler?.(entry.spec.workspaceId, target));
-  element.addEventListener("paste", createPasteHandler(owner), true);
-  element.addEventListener("contextmenu", createContextMenuHandler(owner));
+  wireInput(entry);
   return entry;
 };
 
@@ -271,52 +267,6 @@ export const terminalInput = (id: string) => {
 };
 
 let fitsHeldUntil = 0;
-
-const rowsOf = (term: Terminal): Rows => {
-  const buffer = term.buffer.active;
-  return {
-    count: buffer.length,
-    text: (row) => buffer.getLine(row)?.translateToString(true) ?? "",
-  };
-};
-
-const scrollToAnchor = (term: Terminal, anchor: ScrollAnchor) =>
-  term.scrollToLine(locateAnchor(rowsOf(term), anchor, term.buffer.active.baseY));
-
-const holdScroll = (entry: Entry) => {
-  const { viewportY, baseY } = entry.term.buffer.active;
-  if (entry.scrollHold || viewportY >= baseY) return;
-  const release = () => {
-    window.clearTimeout(hold.timer);
-    hold.writes?.dispose();
-    USER_SCROLL_EVENTS.forEach((type) => entry.element.removeEventListener(type, release, true));
-    if (entry.scrollHold === hold) entry.scrollHold = null;
-  };
-  const hold: ScrollHold = { anchor: captureAnchor(rowsOf(entry.term), viewportY, baseY), release };
-  USER_SCROLL_EVENTS.forEach((type) => entry.element.addEventListener(type, release, true));
-  entry.scrollHold = hold;
-};
-
-const restoreScrollAfterOutput = (entry: Entry, redrawing: boolean) => {
-  const hold = entry.scrollHold;
-  if (!hold) return;
-  window.clearTimeout(hold.timer);
-  hold.writes?.dispose();
-  hold.writes = undefined;
-  const finish = () => {
-    if (entry.scrollHold !== hold) return;
-    hold.release();
-    scrollToAnchor(entry.term, hold.anchor);
-  };
-  if (!redrawing) return finish();
-  const deadline = performance.now() + MAX_HOLD_MS;
-  const finishAfter = (ms: number) => {
-    window.clearTimeout(hold.timer);
-    hold.timer = window.setTimeout(finish, Math.min(ms, Math.max(0, deadline - performance.now())));
-  };
-  hold.writes = entry.term.onWriteParsed(() => finishAfter(QUIET_OUTPUT_MS));
-  finishAfter(FIRST_OUTPUT_MS);
-};
 
 const syncPtySize = (entry: Entry) => {
   window.clearTimeout(entry.resizeTimer);
