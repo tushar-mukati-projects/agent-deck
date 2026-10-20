@@ -7,6 +7,8 @@ import type { AgentId, CustomAgent } from "@/types";
 
 export type ClickBehavior = "preview" | "resume";
 
+const SETTINGS_STORAGE_KEY = "agent-deck-settings";
+
 export const DEFAULT_FONT_SIZE = 12;
 export const MIN_FONT_SIZE = 9;
 export const MAX_FONT_SIZE = 22;
@@ -114,7 +116,7 @@ export const useSettingsStore = create<SettingsState>()(
       set: (patch) => set(patch),
     }),
     {
-      name: "agent-deck-settings",
+      name: SETTINGS_STORAGE_KEY,
       version: 1,
     },
   ),

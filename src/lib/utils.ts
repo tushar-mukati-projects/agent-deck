@@ -10,6 +10,8 @@ const trimTrailingSeparators = (path: string) => path.replace(/[\\/]+$/, "");
 
 const unifySeparators = (path: string) => trimTrailingSeparators(path).replace(/\//g, "\\");
 
+const JUST_NOW_MS = 45_000;
+
 const WSL_ROOT = /^\\\\wsl(?:\$|\.localhost)\\([^\\]*)(.*)$/i;
 
 export const normalizePath = (path: string) => {
@@ -85,7 +87,7 @@ export const formatBytes = (bytes: number) => {
 };
 
 export const timeAgo = (ms: number) => {
-  if (Date.now() - ms < 45_000) return "just now";
+  if (Date.now() - ms < JUST_NOW_MS) return "just now";
   return formatDistanceToNowStrict(ms, { addSuffix: true })
     .replace(/ seconds?/, "s")
     .replace(/ minutes?/, "m")

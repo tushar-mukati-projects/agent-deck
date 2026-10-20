@@ -7,6 +7,7 @@ const IDLE_AFTER_MS = 1600;
 const ECHO_WINDOW_MS = 400;
 const RESIZE_WINDOW_MS = 600;
 const MIN_BUSY_FOR_ALERT_MS = 3000;
+const PROMPT_SCAN_LINES = 18;
 const TERMINAL_REPORT = /^\x1b\[(?:[IO]|<[\d;]+[Mm]|M[\s\S]{3})$/;
 const CONTROL = /[\x00-\x1f\x7f]/;
 const PASTE_START = "\x1b[200~";
@@ -98,7 +99,7 @@ const settle = (owner: ActivityOwner) => {
     terminalId: spec.id,
     workspaceId: spec.workspaceId,
     cwd: spec.root,
-    needsInput: INPUT_PROMPT_PATTERN.test(screenTail(owner.term, 18)),
+    needsInput: INPUT_PROMPT_PATTERN.test(screenTail(owner.term, PROMPT_SCAN_LINES)),
     visible,
   };
   listeners.forEach((listener) => listener(event));

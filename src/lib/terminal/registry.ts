@@ -75,6 +75,9 @@ const REFLOW_DELAY_MS = 100;
 const FIRST_OUTPUT_MS = 1000;
 const QUIET_OUTPUT_MS = 300;
 const MAX_HOLD_MS = 3000;
+const SCROLLBACK_LINES = 10_000;
+const MIN_FIT_SIZE_PX = 20;
+const FIT_RESUME_SLACK_MS = 20;
 const USER_SCROLL_EVENTS = ["wheel", "mousedown", "keydown"] as const;
 
 const SEARCH_DECORATIONS = {
@@ -142,7 +145,7 @@ const createEntry = (spec: TerminalSpec): Entry => {
     cursorBlink: true,
     cursorStyle: "bar",
     cursorWidth: 2,
-    scrollback: 10_000,
+    scrollback: SCROLLBACK_LINES,
     smoothScrollDuration: 90,
     minimumContrastRatio: theme.terminalContrast,
     drawBoldTextInBrightColors: false,
@@ -333,7 +336,8 @@ const syncPtySize = (entry: Entry) => {
 export const fitTerminal = (id: string, settled = false) => {
   const entry = entries.get(id);
   if (!entry?.opened || !entry.element.isConnected || performance.now() < fitsHeldUntil) return;
-  if (entry.element.clientWidth < 20 || entry.element.clientHeight < 20) return;
+  const { clientWidth, clientHeight } = entry.element;
+  if (clientWidth < MIN_FIT_SIZE_PX || clientHeight < MIN_FIT_SIZE_PX) return;
   const proposed = entry.fit.proposeDimensions();
   if (!proposed || Number.isNaN(proposed.cols) || Number.isNaN(proposed.rows)) return;
   if (proposed.cols === entry.term.cols && proposed.rows === entry.term.rows) return;
@@ -354,7 +358,7 @@ export const holdTerminalFits = (ms: number) => {
   fitsHeldUntil = performance.now() + ms;
   window.setTimeout(() => {
     for (const id of entries.keys()) fitTerminal(id);
-  }, ms + 20);
+  }, ms + FIT_RESUME_SLACK_MS);
 };
 
 export const mountTerminal = (id: string, host: HTMLElement) => {

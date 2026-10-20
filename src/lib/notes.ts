@@ -8,13 +8,14 @@ export interface NoteEntry extends Note {
   dirty: boolean;
 }
 
+const TITLE_MAX_CHARS = 80;
 const LINE_MARKER = /^(?:#+\s*|[-*+>]\s+(?:\[[ xX]\]\s+)?|\d+[.)]\s+)/;
 const HEADING = /^(#{1,6})\s/;
 
 export const noteTitle = (text: string) => {
   for (const part of text.split("\n")) {
     const line = part.trim().replace(LINE_MARKER, "").trim();
-    if (line) return line.slice(0, 80);
+    if (line) return line.slice(0, TITLE_MAX_CHARS);
   }
   return "Untitled";
 };

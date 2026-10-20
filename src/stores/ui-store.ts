@@ -5,6 +5,10 @@ import type { ContextView, SessionInfo } from "@/types";
 
 export type PaletteMode = "all" | "files" | "chats";
 
+const UI_STORAGE_KEY = "agent-deck-ui";
+const SESSIONS_WIDTH_PX = 280;
+const CONTEXT_WIDTH_PX = 320;
+
 interface ConfirmRequest {
   title: string;
   description: string;
@@ -50,8 +54,8 @@ export const useUiStore = create<UiState>()(
   persist(
     (set, get) => ({
       sessionsOpen: true,
-      sessionsWidth: 280,
-      contextWidth: 320,
+      sessionsWidth: SESSIONS_WIDTH_PX,
+      contextWidth: CONTEXT_WIDTH_PX,
       setPanelWidth: (panel, width) =>
         set(panel === "sessions" ? { sessionsWidth: width } : { contextWidth: width }),
       contextOpen: true,
@@ -92,7 +96,7 @@ export const useUiStore = create<UiState>()(
       },
     }),
     {
-      name: "agent-deck-ui",
+      name: UI_STORAGE_KEY,
       version: 2,
       partialize: (s) => ({
         sessionsOpen: s.sessionsOpen,

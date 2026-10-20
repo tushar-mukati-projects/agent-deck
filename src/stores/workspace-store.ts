@@ -62,6 +62,7 @@ interface NewSessionOptions {
   subagent?: string;
 }
 
+const WORKSPACES_STORAGE_KEY = "agent-deck-workspaces";
 const RECENTLY_CLOSED_LIMIT = 20;
 
 const launchFields = (plan: LaunchPlan) => ({
@@ -351,7 +352,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       };
     },
     {
-      name: "agent-deck-workspaces",
+      name: WORKSPACES_STORAGE_KEY,
       version: 3,
       partialize: (s) => ({ workspaces: s.workspaces, activeId: s.activeId }),
       merge: (persisted, current) => ({ ...current, ...restoreSaved(persisted) }),
