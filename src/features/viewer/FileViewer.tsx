@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import { ExternalLink, FileQuestion, FileWarning } from "lucide-react";
 import { toast } from "sonner";
 
-import { closeFilesWithConfirm, openTypedPath } from "@/actions/files";
+import { closeFilesWithConfirm, openPathInWorkspace } from "@/actions/files";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Button } from "@/components/ui/button";
 import { EmptyState, LoadingState, showError } from "@/components/ui/feedback";
@@ -21,7 +21,7 @@ import { assetUrl, openExternal } from "@/lib/tauri/system";
 import { basename, dirname, errorMessage, normalizePath, samePath } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
 import { useViewerStore } from "@/stores/viewer-store";
-import { findWorkspace, useWorkspaceStore } from "@/stores/workspace-store";
+import { useWorkspaceStore } from "@/stores/workspace-store";
 import type { Workspace } from "@/types";
 
 type MediaKind = Exclude<ViewKind, "text" | "markdown">;
@@ -137,10 +137,7 @@ const DocumentBody = ({ workspace, path }: { workspace: Workspace; path: string 
 
   const workspaceId = workspace.id;
   const onOpenPath = useCallback(
-    (target: string) => {
-      const current = findWorkspace(workspaceId);
-      if (current) void openTypedPath(current, target);
-    },
+    (target: string) => openPathInWorkspace(workspaceId, target),
     [workspaceId],
   );
 

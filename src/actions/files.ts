@@ -85,6 +85,11 @@ export const openTypedPath = async (workspace: Workspace, path: string) => {
   }
 };
 
+export const openPathInWorkspace = (workspaceId: string, path: string) => {
+  const workspace = findWorkspace(workspaceId);
+  if (workspace) void openTypedPath(workspace, path);
+};
+
 const firstExistingFile = async (paths: string[]) => {
   let failure: unknown = null;
   for (const path of paths) {
