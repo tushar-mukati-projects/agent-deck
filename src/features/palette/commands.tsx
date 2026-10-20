@@ -38,7 +38,7 @@ import { useSettingsStore } from "@/stores/settings-store";
 import type { ShortcutAction } from "@/lib/shortcuts";
 import type { Workspace } from "@/types";
 
-interface CommandDef {
+export interface CommandDef {
   id: string;
   title: string;
   icon: React.ReactNode;

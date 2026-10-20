@@ -4,9 +4,10 @@ import { Search } from "lucide-react";
 import { Dialog } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/feedback";
 import { Kbd } from "@/components/ui/kbd";
-import { usePaletteItems, type PaletteItem } from "@/features/palette/usePaletteItems";
+import { usePaletteItems } from "@/features/palette/usePaletteItems";
 import { cn } from "@/lib/utils";
 import { useUiStore, type PaletteMode } from "@/stores/ui-store";
+import type { PaletteItem } from "@/features/palette/items";
 
 const placeholders: Record<PaletteMode, string> = {
   all: "Search sessions, open tabs, files…   (type > for actions)",
