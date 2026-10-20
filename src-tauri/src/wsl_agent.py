@@ -80,16 +80,31 @@ def codex_homes():
     return homes("CODEX_HOME", ".codex", "sessions")
 
 
+def real_folder(home, name):
+    return os.path.realpath(os.path.join(home, name))
+
+
+def real_files(folder, depth, prefix):
+    try:
+        with os.scandir(folder) as scanned:
+            entries = [entry for entry in scanned if not entry.is_symlink()]
+    except OSError:
+        return
+    for entry in entries:
+        if depth and entry.is_dir():
+            yield from real_files(entry.path, depth - 1, prefix)
+        elif not depth and entry.is_file() and entry.name.startswith(prefix) and entry.name.endswith(".jsonl"):
+            yield entry.path
+
+
 def claude_files():
     for home in claude_homes():
-        for path in glob.glob(os.path.join(home, "projects", "*", "*.jsonl")):
-            yield path
+        yield from real_files(real_folder(home, "projects"), 1, "")
 
 
 def codex_files():
     for home in codex_homes():
-        for path in glob.glob(os.path.join(home, "sessions", "*", "*", "*", "rollout-*.jsonl")):
-            yield path
+        yield from real_files(real_folder(home, "sessions"), 3, "rollout-")
 
 
 def resolve_session(path):
@@ -98,11 +113,11 @@ def resolve_session(path):
     if not real.endswith(".jsonl"):
         raise ValueError("not a session file")
     for home in codex_homes():
-        root = os.path.join(home, "sessions") + os.sep
+        root = real_folder(home, "sessions") + os.sep
         if real.startswith(root) and name.startswith("rollout-") and SESSION_ID_RE.fullmatch(name[:-6][-36:]):
             return {"path": real, "codex": True, "home": home, "id": name[:-6][-36:]}
     for home in claude_homes():
-        if os.path.dirname(os.path.dirname(real)) == os.path.join(home, "projects") and SESSION_ID_RE.fullmatch(name[:-6]):
+        if os.path.dirname(os.path.dirname(real)) == real_folder(home, "projects") and SESSION_ID_RE.fullmatch(name[:-6]):
             return {"path": real, "codex": False, "home": home, "id": name[:-6]}
     raise ValueError("not a session file")
 
