@@ -10,19 +10,15 @@ import {
   ShieldCheck,
   Sparkles,
   SquareSlash,
-  Terminal,
-  Trash2,
   Webhook,
 } from "lucide-react";
 
-import { removeConfig } from "@/actions/agent-config";
-import { sendToAgent } from "@/actions/files";
-import { startAgentSession } from "@/actions/sessions";
 import { Hint, showError } from "@/components/ui/feedback";
-import { IconButton } from "@/components/ui/icon-button";
 import { ListRow } from "@/components/ui/list-row";
 import { Tag } from "@/components/ui/tag";
 import { TimeAgo } from "@/components/ui/time-ago";
+import { ItemRows } from "@/features/agent-config/ItemRows";
+import { RemoveButton } from "@/features/agent-config/RemoveButton";
 import {
   modeLabel,
   scopeLabel,
@@ -31,23 +27,19 @@ import {
 } from "@/lib/agent-config/filter-overview";
 import {
   canRemove,
-  fileRemoval,
   hookRemoval,
   memoryRemoval,
   pluginRemoval,
   ruleRemoval,
   serverRemoval,
-  skillRemoval,
-  type RemovalRequest,
 } from "@/lib/agent-config/removals";
 import { encodeMcpTab } from "@/lib/diff-tabs";
-import { dangerHoverClass } from "@/lib/styles";
 import { api } from "@/lib/tauri/commands";
 import { revealInExplorer } from "@/lib/tauri/system";
 import { useViewerStore } from "@/stores/viewer-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import type { AgentProfile, SectionKey } from "@/lib/agent-config/profiles";
-import type { ConfigAgent, ConfigItem, Workspace } from "@/types";
+import type { ConfigAgent, Workspace } from "@/types";
 
 interface SectionProps {
   workspace: Workspace;
@@ -70,22 +62,6 @@ const createMemory = async (workspace: Workspace, path: string, reload: () => vo
     showError(error);
   }
 };
-
-type RemoveButtonProps = {
-  workspace: Workspace;
-  agent: ConfigAgent;
-  request: RemovalRequest;
-};
-
-const RemoveButton = ({ workspace, agent, request }: RemoveButtonProps) => (
-  <IconButton
-    label={`Remove ${request.name}`}
-    className={dangerHoverClass}
-    onClick={() => void removeConfig(workspace, agent, request)}
-  >
-    <Trash2 />
-  </IconButton>
-);
 
 const MemorySection = ({ workspace, agent, profile, data, reload }: SectionProps) => (
   <>
@@ -143,73 +119,6 @@ const McpSection = ({ workspace, agent, profile, data }: SectionProps) => (
           canRemove(server.scope) && (
             <RemoveButton workspace={workspace} agent={agent} request={serverRemoval(server)} />
           )
-        }
-      />
-    ))}
-  </>
-);
-
-type ItemActionProps = {
-  workspace: Workspace;
-  profile: AgentProfile;
-  item: ConfigItem;
-  kind: "skill" | "command" | "agent";
-};
-
-const ItemAction = ({ workspace, profile, item, kind }: ItemActionProps) => {
-  if (kind === "agent")
-    return (
-      <IconButton
-        label={`New session with ${item.name}`}
-        onClick={() => startAgentSession(workspace.cwd, item.name)}
-      >
-        <Sparkles />
-      </IconButton>
-    );
-  const typed = profile.typed(item, kind);
-  return (
-    <IconButton
-      label={`Type ${typed} in ${profile.name}`}
-      onClick={() => sendToAgent(workspace, `${typed} `)}
-    >
-      <Terminal />
-    </IconButton>
-  );
-};
-
-const ItemRows = ({
-  workspace,
-  agent,
-  profile,
-  items,
-  icon,
-  kind,
-}: Omit<SectionProps, "data" | "reload"> & {
-  items: ConfigItem[];
-  icon: React.ReactNode;
-  kind: "skill" | "command" | "agent";
-}) => (
-  <>
-    {items.map((item) => (
-      <ListRow
-        key={item.path}
-        icon={icon}
-        title={kind === "agent" ? item.name : profile.typed(item, kind)}
-        mono={kind !== "agent"}
-        subtitle={item.description ?? undefined}
-        badge={<Tag>{scopeLabel(item.scope, item.plugin)}</Tag>}
-        onClick={() => openFile(workspace, item.path)}
-        actions={
-          <>
-            <ItemAction workspace={workspace} profile={profile} item={item} kind={kind} />
-            {canRemove(item.scope) && (
-              <RemoveButton
-                workspace={workspace}
-                agent={agent}
-                request={kind === "skill" ? skillRemoval(item) : fileRemoval(item)}
-              />
-            )}
-          </>
         }
       />
     ))}
