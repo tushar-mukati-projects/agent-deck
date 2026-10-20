@@ -11,7 +11,7 @@ import { agentName } from "@/lib/agents/registry";
 import { shortcutLabel, type ShortcutAction } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
-import { useWorkspaceStore } from "@/stores/workspace-store";
+import { activeWorkspaceOf, useWorkspaceStore } from "@/stores/workspace-store";
 import type { ContextView } from "@/types";
 
 const TABS: { view: ContextView; label: string; icon: typeof Files; shortcut: ShortcutAction }[] = [
@@ -34,7 +34,7 @@ export const SessionsSidebar = () => (
 
 export const ContextPanel = () => {
   const view = useUiStore((s) => s.contextView);
-  const agent = useWorkspaceStore((s) => s.workspaces.find((w) => w.id === s.activeId)?.agent);
+  const agent = useWorkspaceStore((s) => activeWorkspaceOf(s)?.agent);
   const { showContext, setContextOpen } = useUiStore.getState();
 
   return (

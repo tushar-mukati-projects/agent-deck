@@ -11,6 +11,8 @@ export const openElsewhere = (
   sessionId: string,
 ) => externalLive(live, ownPids).find((l) => l.sessionId === sessionId) ?? null;
 
+export const sessionTitle = (session: SessionInfo) => session.title ?? "Untitled session";
+
 export const mergeSessions = (windows: SessionInfo[], wsl: SessionInfo[]) => {
   const wslIds = new Set(wsl.map((s) => s.id));
   return [...wsl, ...windows.filter((s) => !wslIds.has(s.id))].sort(

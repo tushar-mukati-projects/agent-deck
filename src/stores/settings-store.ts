@@ -8,6 +8,8 @@ import type { AgentId, CustomAgent } from "@/types";
 export type ClickBehavior = "preview" | "resume";
 
 export const DEFAULT_FONT_SIZE = 12;
+export const MIN_FONT_SIZE = 9;
+export const MAX_FONT_SIZE = 22;
 
 export interface SettingsData {
   claudeArgs: string;

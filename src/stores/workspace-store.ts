@@ -359,10 +359,13 @@ export const useWorkspaceStore = create<WorkspaceState>()(
   ),
 );
 
-export const getActiveWorkspace = () => {
-  const { workspaces, activeId } = useWorkspaceStore.getState();
-  return workspaces.find((w) => w.id === activeId) ?? null;
-};
+export const activeWorkspaceOf = ({
+  workspaces,
+  activeId,
+}: Pick<WorkspaceState, "workspaces" | "activeId">) =>
+  workspaces.find((w) => w.id === activeId) ?? null;
+
+export const getActiveWorkspace = () => activeWorkspaceOf(useWorkspaceStore.getState());
 
 export const findWorkspace = (id: string) =>
   useWorkspaceStore.getState().workspaces.find((w) => w.id === id) ?? null;
@@ -373,8 +376,7 @@ export const findWorkspaceBySession = (sessionId: string) =>
 export const useWorkspace = (id: string | null) =>
   useWorkspaceStore((s) => (id ? (s.workspaces.find((w) => w.id === id) ?? null) : null));
 
-export const useActiveWorkspace = () =>
-  useWorkspaceStore((s) => s.workspaces.find((w) => w.id === s.activeId) ?? null);
+export const useActiveWorkspace = () => useWorkspaceStore(activeWorkspaceOf);
 
 export const referencedTerminalIds = () =>
   new Set(useWorkspaceStore.getState().workspaces.flatMap(workspaceTerminalIds));

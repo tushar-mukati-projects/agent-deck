@@ -40,6 +40,7 @@ import { runShortcut } from "@/hooks/useGlobalShortcuts";
 import { subscribeFileChanges, watchedSince } from "@/lib/file-events";
 import { FileIcon } from "@/lib/file-icons";
 import { fuzzyPathKeyScorer, fuzzyScore, pathKey, type PathKey } from "@/lib/fuzzy";
+import { sessionTitle } from "@/lib/sessions";
 import { shortcutLabel, type ShortcutAction } from "@/lib/shortcuts";
 import { api } from "@/lib/tauri/commands";
 import { copyText, revealInExplorer } from "@/lib/tauri/system";
@@ -383,7 +384,7 @@ export const usePaletteItems = (mode: PaletteMode, liveQuery: string) => {
           return [
             {
               id: `chat:${hit.sessionId}:${index}`,
-              group: session.title ?? "Untitled session",
+              group: sessionTitle(session),
               title: hit.snippet,
               subtitle: `${hit.role === "user" ? "You" : agentName(session.agent)} · ${basename(session.cwd)} · ${timeAgo(session.modifiedMs)}`,
               icon: <MessageSquareText />,
@@ -443,7 +444,7 @@ export const usePaletteItems = (mode: PaletteMode, liveQuery: string) => {
       ({ session: s, score }): PaletteItem => ({
         id: `session:${s.id}`,
         group: "Sessions",
-        title: s.title ?? "Untitled session",
+        title: sessionTitle(s),
         subtitle: `${shortenHome(s.cwd, home)} · ${timeAgo(s.modifiedMs)}`,
         icon: <MessagesSquare />,
         score,

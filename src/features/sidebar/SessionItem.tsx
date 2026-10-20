@@ -34,6 +34,7 @@ import {
 import { TimeAgo } from "@/components/ui/time-ago";
 import { resumeCommandLine } from "@/lib/agents/launch";
 import { CLAUDE, findAgent } from "@/lib/agents/registry";
+import { sessionTitle } from "@/lib/sessions";
 import { copyText, revealInExplorer } from "@/lib/tauri/system";
 import { cn } from "@/lib/utils";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -130,7 +131,7 @@ const SessionMenu = ({
 export const SessionItem = memo(({ session, number, tone, isActive, isOpen }: SessionItemProps) => {
   const pinned = useSettingsStore((s) => s.pinnedSessions.includes(session.id));
   const archived = useSettingsStore((s) => s.archivedSessions.includes(session.id));
-  const title = session.title ?? "Untitled session";
+  const title = sessionTitle(session);
 
   return (
     <ContextMenu>

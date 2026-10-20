@@ -1,7 +1,7 @@
 import { toast } from "sonner";
 
 import { SUBAGENT_NAME } from "@/lib/agents/registry";
-import { openElsewhere } from "@/lib/sessions";
+import { openElsewhere, sessionTitle } from "@/lib/sessions";
 import { api } from "@/lib/tauri/commands";
 import { pickFolder } from "@/lib/tauri/system";
 import { errorMessage, plural } from "@/lib/utils";
@@ -109,7 +109,7 @@ export const deleteSessionWithConfirm = async (session: SessionInfo) => {
     return;
   }
   const confirmed = await useUiStore.getState().askConfirm({
-    title: `Delete “${session.title ?? "Untitled session"}”?`,
+    title: `Delete “${sessionTitle(session)}”?`,
     description: session.distro
       ? `This permanently deletes the conversation (${plural(session.promptCount, "prompt")}) from WSL ${session.distro}. It can't be undone.`
       : `The conversation (${plural(session.promptCount, "prompt")}) and its history files will be moved to the Recycle Bin.`,

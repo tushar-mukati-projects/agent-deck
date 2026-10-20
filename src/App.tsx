@@ -25,7 +25,7 @@ import { holdTerminalFits } from "@/lib/terminal/registry";
 import { findTheme } from "@/lib/themes";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useUiStore, type SidePanel } from "@/stores/ui-store";
-import { useWorkspaceStore } from "@/stores/workspace-store";
+import { activeWorkspaceOf, useWorkspaceStore } from "@/stores/workspace-store";
 
 const FLAG = { sessions: "sessionsOpen", context: "contextOpen" } as const;
 const WIDTH = { sessions: "sessionsWidth", context: "contextWidth" } as const;
@@ -82,9 +82,7 @@ const useSidePanel = (panel: SidePanel, available = true) => {
 };
 
 export const App = () => {
-  const activeId = useWorkspaceStore((s) =>
-    s.workspaces.some((w) => w.id === s.activeId) ? s.activeId : null,
-  );
+  const activeId = useWorkspaceStore((s) => activeWorkspaceOf(s)?.id ?? null);
   const themeKind = useSettingsStore((s) => findTheme(s.themeId).kind);
   const sessions = useSidePanel("sessions");
   const context = useSidePanel("context", !!activeId);

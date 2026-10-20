@@ -17,7 +17,13 @@ import { englishVoices, pickVoice, speak, voiceLabel } from "@/lib/speech";
 import { api } from "@/lib/tauri/commands";
 import { cn } from "@/lib/utils";
 import { useSessionsStore } from "@/stores/sessions-store";
-import { useSettingsStore, type ClickBehavior, type SettingsData } from "@/stores/settings-store";
+import {
+  MAX_FONT_SIZE,
+  MIN_FONT_SIZE,
+  useSettingsStore,
+  type ClickBehavior,
+  type SettingsData,
+} from "@/stores/settings-store";
 import { useUiStore } from "@/stores/ui-store";
 
 type TextKey = "claudeArgs" | "codexArgs" | "shellProgram";
@@ -119,8 +125,8 @@ const FontSize = () => {
         <input
           id={id}
           type="range"
-          min={9}
-          max={22}
+          min={MIN_FONT_SIZE}
+          max={MAX_FONT_SIZE}
           value={fontSize}
           onChange={(e) => setSetting({ fontSize: Number(e.target.value) })}
           className="w-56 accent-[var(--color-accent)]"

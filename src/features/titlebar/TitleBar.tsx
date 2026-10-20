@@ -26,7 +26,7 @@ import { shortcutLabel } from "@/lib/shortcuts";
 import { appWindow } from "@/lib/tauri/system";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useUiStore } from "@/stores/ui-store";
-import { useWorkspaceStore } from "@/stores/workspace-store";
+import { activeWorkspaceOf, useWorkspaceStore } from "@/stores/workspace-store";
 
 const WindowControls = () => {
   const [maximized, setMaximized] = useState(false);
@@ -89,7 +89,7 @@ export const TitleBar = () => {
   const contextOpen = useUiStore((s) => s.contextOpen);
   const notesOpen = useUiStore((s) => s.notesOpen);
   const hidden = useSettingsStore((s) => s.hideMode);
-  const hasWorkspace = useWorkspaceStore((s) => s.workspaces.some((w) => w.id === s.activeId));
+  const hasWorkspace = useWorkspaceStore((s) => !!activeWorkspaceOf(s));
   const { toggleSessions, toggleContext, setShortcutsOpen, setSettingsOpen } =
     useUiStore.getState();
 

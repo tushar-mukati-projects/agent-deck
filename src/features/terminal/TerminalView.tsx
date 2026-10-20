@@ -7,10 +7,10 @@ import {
   clearTerminalSearch,
   findInTerminal,
   fitTerminal,
-  focusTerminal,
   mountTerminal,
   onFindRequest,
   pasteIntoTerminal,
+  requestFocus,
   unmountTerminal,
 } from "@/lib/terminal/registry";
 import { cn } from "@/lib/utils";
@@ -50,7 +50,7 @@ const FindBar = ({
   const close = () => {
     clearTerminalSearch(terminalId);
     onClose();
-    focusTerminal(terminalId);
+    requestFocus(terminalId);
   };
 
   return (
@@ -141,7 +141,7 @@ export const TerminalView = ({ terminalId, dropText, dropLabel }: TerminalViewPr
         ref={hostRef}
         style={{ backgroundColor: "var(--color-terminal-bg)" }}
         className="isolate h-full w-full overflow-hidden"
-        onMouseDown={() => requestAnimationFrame(() => focusTerminal(terminalId))}
+        onMouseDown={() => requestAnimationFrame(() => requestFocus(terminalId))}
         onDragOver={(e) => {
           if (!acceptsDrop(e)) return;
           e.preventDefault();

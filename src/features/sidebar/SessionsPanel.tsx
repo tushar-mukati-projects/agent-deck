@@ -25,7 +25,7 @@ import { basename, cn, normalizePath, samePath, toggled } from "@/lib/utils";
 import { parseWslPath } from "@/lib/wsl";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore } from "@/stores/settings-store";
-import { useWorkspaceStore } from "@/stores/workspace-store";
+import { activeWorkspaceOf, useWorkspaceStore } from "@/stores/workspace-store";
 import type { SessionInfo } from "@/types";
 
 const RENDER_STEP = 150;
@@ -97,9 +97,7 @@ const FolderHeader = ({
 const useExpandedGroups = (searching: boolean, groups: SessionGroup[]) => {
   const [saved, setSaved] = useState<Map<string, boolean>>(new Map());
   const [collapsedInSearch, setCollapsedInSearch] = useState<Set<string>>(new Set());
-  const activeCwd = useWorkspaceStore(
-    (s) => s.workspaces.find((w) => w.id === s.activeId)?.cwd ?? null,
-  );
+  const activeCwd = useWorkspaceStore((s) => activeWorkspaceOf(s)?.cwd ?? null);
 
   useEffect(() => {
     if (!searching) setCollapsedInSearch((current) => (current.size ? new Set() : current));
@@ -184,9 +182,7 @@ const SessionList = memo(
           showArchived: s.showArchived,
         })),
       );
-    const activeSessionId = useWorkspaceStore(
-      (s) => s.workspaces.find((w) => w.id === s.activeId)?.sessionId ?? null,
-    );
+    const activeSessionId = useWorkspaceStore((s) => activeWorkspaceOf(s)?.sessionId ?? null);
     const openSessionIds = useWorkspaceStore(
       useShallow((s) => s.workspaces.map((w) => w.sessionId)),
     );

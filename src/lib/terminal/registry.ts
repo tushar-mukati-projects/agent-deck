@@ -383,8 +383,6 @@ export const unmountTerminal = (id: string, host: HTMLElement) => {
   if (entry && entry.element.parentElement === host) host.removeChild(entry.element);
 };
 
-export const focusTerminal = (id: string) => entries.get(id)?.term.focus();
-
 export const requestFocus = (id: string) => {
   const entry = entries.get(id);
   if (!entry) return;

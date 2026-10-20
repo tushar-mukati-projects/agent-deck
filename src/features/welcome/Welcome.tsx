@@ -10,6 +10,7 @@ import { Alert } from "@/components/ui/panel";
 import { TimeAgo } from "@/components/ui/time-ago";
 import { CLAUDE, CODEX } from "@/lib/agents/registry";
 import { appName } from "@/lib/hide-mode";
+import { sessionTitle } from "@/lib/sessions";
 import { shortcutLabel, type ShortcutAction } from "@/lib/shortcuts";
 import { basename } from "@/lib/utils";
 import { useSessionsStore } from "@/stores/sessions-store";
@@ -57,7 +58,7 @@ const RecentCard = ({ session }: { session: SessionInfo }) => (
     >
       <div className="flex items-center gap-2">
         <span className="min-w-0 flex-1 truncate text-[13px] font-medium">
-          {session.title ?? "Untitled session"}
+          {sessionTitle(session)}
         </span>
         {session.agent !== CLAUDE && <AgentBadge agent={session.agent} />}
       </div>
