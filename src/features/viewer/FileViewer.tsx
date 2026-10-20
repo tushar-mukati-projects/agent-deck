@@ -113,7 +113,7 @@ const DocumentBody = ({ workspace, path }: DocumentBodyProps) => {
   );
 
   const body = () => {
-    if (!needsText) return <MediaFile path={path} kind={kind as MediaKind} />;
+    if (!needsText) return <MediaFile path={path} kind={kind} />;
     if (state.status === "loading") return <LoadingState className="h-full" />;
     if (state.status === "error")
       return (
@@ -255,7 +255,10 @@ type FileViewerProps = {
 
 export const FileViewer = ({ workspace }: FileViewerProps) => {
   const activeFile = workspace.activeFile ?? workspace.openFiles[0];
-  const serverTabs = workspace.openFiles.filter((tab) => decodeMcpTab(tab) !== null);
+  const serverTabs = workspace.openFiles.flatMap((tab) => {
+    const serverId = decodeMcpTab(tab);
+    return serverId === null ? [] : [{ tab, serverId }];
+  });
   const activeIsServer = !!activeFile && decodeMcpTab(activeFile) !== null;
 
   useEffect(() => {
@@ -267,13 +270,13 @@ export const FileViewer = ({ workspace }: FileViewerProps) => {
   return (
     <div className="flex h-full min-h-0 flex-col bg-bg">
       <FileTabs workspace={workspace} />
-      {serverTabs.map((tab) => (
+      {serverTabs.map(({ tab, serverId }) => (
         <div
           key={tab}
           className={samePath(tab, activeFile) ? "flex min-h-0 flex-1 flex-col" : "hidden"}
         >
           <TabBoundary workspace={workspace} tab={tab}>
-            <McpView workspace={workspace} serverId={decodeMcpTab(tab)!} />
+            <McpView workspace={workspace} serverId={serverId} />
           </TabBoundary>
         </div>
       ))}

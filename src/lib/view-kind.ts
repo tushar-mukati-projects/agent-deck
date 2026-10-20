@@ -18,4 +18,5 @@ export const viewKind = (path: string): ViewKind => {
   return match?.[0] ?? "text";
 };
 
-export const isTextKind = (kind: ViewKind) => kind === "text" || kind === "markdown";
+export const isTextKind = (kind: ViewKind): kind is "text" | "markdown" =>
+  kind === "text" || kind === "markdown";
