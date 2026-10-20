@@ -16,11 +16,12 @@ use crate::{
 
 type CmdResult<T> = Result<T, String>;
 
+fn message(error: impl std::fmt::Display) -> String {
+    format!("{error:#}")
+}
+
 async fn blocking<T: Send + 'static>(work: impl FnOnce() -> anyhow::Result<T> + Send + 'static) -> CmdResult<T> {
-    tauri::async_runtime::spawn_blocking(work)
-        .await
-        .map_err(|e| e.to_string())?
-        .map_err(|e| format!("{e:#}"))
+    tauri::async_runtime::spawn_blocking(work).await.map_err(message)?.map_err(message)
 }
 
 fn on_host<T>(path: &str, wsl: impl FnOnce(&str, &str) -> T, local: impl FnOnce() -> T) -> T {
@@ -249,17 +250,17 @@ pub async fn pty_spawn(app: AppHandle, request: SpawnRequest, on_event: Channel<
 
 #[tauri::command(async)]
 pub fn pty_attach(state: tauri::State<PtyManager>, id: String, on_event: Channel<PtyEvent>) -> CmdResult<PtyInfo> {
-    state.attach(&id, on_event).map_err(|e| format!("{e:#}"))
+    state.attach(&id, on_event).map_err(message)
 }
 
 #[tauri::command(async)]
 pub fn pty_write(state: tauri::State<PtyManager>, id: String, data: String) -> CmdResult<()> {
-    state.write(&id, &data).map_err(|e| format!("{e:#}"))
+    state.write(&id, &data).map_err(message)
 }
 
 #[tauri::command(async)]
 pub fn pty_resize(state: tauri::State<PtyManager>, id: String, cols: u16, rows: u16) -> CmdResult<()> {
-    state.resize(&id, cols, rows).map_err(|e| format!("{e:#}"))
+    state.resize(&id, cols, rows).map_err(message)
 }
 
 #[tauri::command]
@@ -351,12 +352,12 @@ pub async fn unwatch_dir(app: AppHandle, root: String) -> CmdResult<()> {
 
 #[tauri::command]
 pub fn set_attention_badge(window: tauri::WebviewWindow, active: bool) -> CmdResult<()> {
-    window.set_overlay_icon(active.then(badge_icon)).map_err(|e| e.to_string())
+    window.set_overlay_icon(active.then(badge_icon)).map_err(message)
 }
 
 #[tauri::command]
 pub fn apply_hide_mode(window: tauri::WebviewWindow, enabled: bool) -> CmdResult<Option<String>> {
-    hide_mode::apply(&window, enabled).map_err(|e| format!("{e:#}"))
+    hide_mode::apply(&window, enabled).map_err(message)
 }
 
 fn notes_dir(app: &AppHandle) -> anyhow::Result<std::path::PathBuf> {

@@ -305,12 +305,12 @@ pub fn open_path(path: &str) -> anyhow::Result<()> {
         target.is_dir() || !(is_blocked_extension(&target) || is_blocked_extension(Path::new(path))),
         "Agent Deck doesn't launch programs or scripts. Use Reveal in File Explorer instead."
     );
-    tauri_plugin_opener::open_path(path, None::<&str>).map_err(|e| anyhow::anyhow!("{e}"))
+    Ok(tauri_plugin_opener::open_path(path, None::<&str>)?)
 }
 
 pub fn reveal_path(path: &str) -> anyhow::Result<()> {
     existing(path)?;
-    tauri_plugin_opener::reveal_item_in_dir(path).map_err(|e| anyhow::anyhow!("{e}"))
+    Ok(tauri_plugin_opener::reveal_item_in_dir(path)?)
 }
 
 #[cfg(test)]

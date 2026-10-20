@@ -306,15 +306,15 @@ impl PtyManager {
         anyhow::ensure!(Path::new(&req.cwd).is_dir(), "Folder does not exist: {}", req.cwd);
 
         let command = build_command(&req)?;
-        let pair = native_pty_system().openpty(size(req.cols, req.rows)).map_err(|e| anyhow!("Could not open a terminal: {e}"))?;
-        let mut child = pair.slave.spawn_command(command).map_err(|e| anyhow!("Could not start {}: {e}", req.program))?;
+        let pair = native_pty_system().openpty(size(req.cols, req.rows)).context("Could not open a terminal")?;
+        let mut child = pair.slave.spawn_command(command).with_context(|| format!("Could not start {}", req.program))?;
         drop(pair.slave);
         let pipes = pair.master.try_clone_reader().and_then(|reader| pair.master.take_writer().map(|writer| (reader, writer)));
         let (reader, writer) = match pipes {
             Ok(pipes) => pipes,
             Err(error) => {
                 let _ = child.kill();
-                return Err(anyhow!("Could not connect to the terminal: {error}"));
+                return Err(error.context("Could not connect to the terminal"));
             }
         };
 
@@ -364,7 +364,7 @@ impl PtyManager {
         let process = self.get(id)?;
         let master = process.master.lock();
         match master.as_ref() {
-            Some(master) => master.resize(size(cols, rows)).map_err(|e| anyhow!("{e}")),
+            Some(master) => master.resize(size(cols, rows)),
             None => Ok(()),
         }
     }
