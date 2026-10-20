@@ -1,5 +1,8 @@
 import { basename, dirname, isWithin, normalizePath, samePath } from "@/lib/utils";
+import type { DotTone } from "@/components/ui/feedback";
 import type { AgentId, SessionInfo } from "@/types";
+
+const TONE_PRIORITY: DotTone[] = ["attention", "busy", "running", "external"];
 
 export interface SessionFilter {
   agent: AgentId | "all";
@@ -96,5 +99,29 @@ export const partitionSessions = (sessions: SessionInfo[], filter: SessionFilter
     }),
     archived: matched.filter((s) => archived.has(s.id)),
     rest: matched.filter((s) => !archived.has(s.id) && !pinned.has(s.id)),
+  };
+};
+
+export const groupTone = (sessions: SessionInfo[], tones: Map<string, DotTone>) => {
+  const present = new Set(sessions.map((s) => tones.get(s.id)));
+  return TONE_PRIORITY.find((tone) => present.has(tone)) ?? null;
+};
+
+export const emptyMessage = (query: string, folderFilter: string | null) => {
+  if (query)
+    return {
+      title: "No matching sessions",
+      description: folderFilter
+        ? "Try a different search, or clear the folder filter."
+        : "Try a different search.",
+    };
+  if (folderFilter)
+    return {
+      title: "No sessions in this folder yet",
+      description: `Start a session in ${basename(folderFilter)} and it will show up here.`,
+    };
+  return {
+    title: "No sessions yet",
+    description: "Start a session with any agent and it will show up here.",
   };
 };

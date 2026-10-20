@@ -10,8 +10,13 @@ import { FolderHeader } from "@/features/sidebar/FolderHeader";
 import { SessionItem } from "@/features/sidebar/SessionItem";
 import { useExpandedGroups } from "@/features/sidebar/useExpandedGroups";
 import { useSessionTones } from "@/features/sidebar/useSessionTones";
-import { folderHints, groupByFolder, partitionSessions } from "@/lib/session-list";
-import { emptyMessage, groupTone } from "@/lib/sessions-panel";
+import {
+  emptyMessage,
+  folderHints,
+  groupByFolder,
+  groupTone,
+  partitionSessions,
+} from "@/lib/session-list";
 import { cn } from "@/lib/utils";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore } from "@/stores/settings-store";
