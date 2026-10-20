@@ -2,6 +2,8 @@ import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
 
+export const DANGER_HOVER = "hover:bg-danger/15 hover:text-danger";
+
 const buttonVariants = cva(
   "inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md font-medium whitespace-nowrap transition-colors duration-100 disabled:pointer-events-none disabled:opacity-40 [&_svg]:size-3.5 [&_svg]:shrink-0",
   {
@@ -11,7 +13,7 @@ const buttonVariants = cva(
           "bg-accent text-on-accent shadow-[inset_0_1px_0_var(--color-highlight)] hover:bg-accent-strong",
         secondary: "border border-border-strong bg-elevated text-fg hover:bg-hover",
         ghost: "text-muted hover:bg-hover hover:text-fg",
-        ghostDanger: "text-muted hover:bg-danger/15 hover:text-danger",
+        ghostDanger: `text-muted ${DANGER_HOVER}`,
         danger: "bg-danger/90 text-on-danger hover:bg-danger",
       },
       size: {

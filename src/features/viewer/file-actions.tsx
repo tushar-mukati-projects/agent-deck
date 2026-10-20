@@ -1,15 +1,18 @@
 import { Code2, Copy, ExternalLink, FolderOpen } from "lucide-react";
 
 import { showError } from "@/components/ui/feedback";
+import type { ContextMenuItem, DropdownMenuItem } from "@/components/ui/menu";
 import { api } from "@/lib/tauri/commands";
 import { copyText, openExternal, revealInExplorer } from "@/lib/tauri/system";
 import { relativePath } from "@/lib/utils";
 
-export type FileAction = {
+type FileAction = {
   label: string;
   icon: React.ReactNode;
   run: () => void;
 };
+
+type MenuItem = typeof ContextMenuItem | typeof DropdownMenuItem;
 
 export const openActions = (path: string, isDir: boolean): FileAction[] => [
   {
@@ -46,3 +49,10 @@ export const fileActions = (path: string, cwd: string, isDir: boolean) => [
   ...openActions(path, isDir),
   ...copyActions(path, cwd),
 ];
+
+export const actionItems = (actions: FileAction[], Item: MenuItem) =>
+  actions.map(({ label, icon, run }) => (
+    <Item key={label} icon={icon} onSelect={run}>
+      {label}
+    </Item>
+  ));

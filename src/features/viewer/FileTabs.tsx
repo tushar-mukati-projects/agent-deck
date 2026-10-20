@@ -10,7 +10,7 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/menu";
 import { Tab, TabStrip } from "@/components/ui/tabs";
-import { fileActions } from "@/features/viewer/file-actions";
+import { actionItems, fileActions } from "@/features/viewer/file-actions";
 import { decodeDiffTab, decodeMcpTab, tabTargetPath } from "@/lib/diff-tabs";
 import { scrollIntoViewNearest } from "@/lib/dom";
 import { FileIcon } from "@/lib/file-icons";
@@ -69,11 +69,7 @@ const TabMenu = ({ workspace, tab, children }: TabMenuProps) => {
         {isFile && (
           <>
             <ContextMenuSeparator />
-            {fileActions(path, workspace.cwd, false).map(({ label, icon, run }) => (
-              <ContextMenuItem key={label} icon={icon} onSelect={run}>
-                {label}
-              </ContextMenuItem>
-            ))}
+            {actionItems(fileActions(path, workspace.cwd, false), ContextMenuItem)}
           </>
         )}
       </ContextMenuContent>

@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/menu";
 import { Segmented } from "@/components/ui/segmented";
-import { fileActions } from "@/features/viewer/file-actions";
+import { actionItems, fileActions } from "@/features/viewer/file-actions";
 import { cn, formatBytes, relativePath } from "@/lib/utils";
 import { agentName } from "@/stores/agents";
 import type { MarkdownMode } from "@/stores/viewer-store";
@@ -120,11 +120,7 @@ export const FileToolbar = ({
           </IconButton>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          {fileActions(path, workspace.cwd, false).map(({ label, icon, run }) => (
-            <DropdownMenuItem key={label} icon={icon} onSelect={run}>
-              {label}
-            </DropdownMenuItem>
-          ))}
+          {actionItems(fileActions(path, workspace.cwd, false), DropdownMenuItem)}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
