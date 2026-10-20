@@ -12,7 +12,7 @@ import { CLAUDE, CODEX } from "@/lib/agents/registry";
 import { appName } from "@/lib/hide-mode";
 import { sessionTitle } from "@/lib/sessions";
 import { shortcutLabel, type ShortcutAction } from "@/lib/shortcuts";
-import { basename } from "@/lib/utils";
+import { basename, plural } from "@/lib/utils";
 import { agentName } from "@/stores/agents";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -106,7 +106,7 @@ export const Welcome = () => {
             <p className="text-[12.5px] text-faint">
               {!loaded
                 ? "Loading your sessions…"
-                : `${sessions.length} ${sessions.length === 1 ? "session" : "sessions"} across your folders. Pick one up or start fresh.`}
+                : `${plural(sessions.length, "session")} across your folders. Pick one up or start fresh.`}
             </p>
           </div>
         </div>
