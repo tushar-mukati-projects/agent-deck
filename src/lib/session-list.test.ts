@@ -7,19 +7,11 @@ import {
   partitionSessions,
   type SessionFilter,
 } from "@/lib/session-list";
+import { sessionInfo } from "@/lib/session-fixture";
 import type { SessionInfo } from "@/types";
 
 const session = (id: string, cwd: string, extra: Partial<SessionInfo> = {}) =>
-  ({
-    id,
-    cwd,
-    agent: "claude",
-    title: id,
-    firstPrompt: null,
-    lastPrompt: null,
-    gitBranch: null,
-    ...extra,
-  }) as SessionInfo;
+  sessionInfo(id, { cwd, ...extra });
 
 const filter = (extra: Partial<SessionFilter> = {}): SessionFilter => ({
   agent: "all",

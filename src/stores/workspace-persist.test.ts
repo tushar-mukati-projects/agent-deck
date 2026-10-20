@@ -34,6 +34,8 @@ describe("saved workspaces", () => {
 
   it("handles missing or empty storage", () => {
     expect(restoreSaved(undefined)).toEqual({ workspaces: [], activeId: null });
+    expect(restoreSaved({})).toEqual({ workspaces: [], activeId: null });
+    expect(restoreSaved({ workspaces: [] })).toEqual({ workspaces: [], activeId: null });
   });
 
   it.each([

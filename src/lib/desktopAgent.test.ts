@@ -7,7 +7,7 @@ describe("desktop agent ids", () => {
     expect(protectedTerminalId("a b:c/d")).toBe("winpilot-protected-terminal-a-b-c-d");
   });
 
-  it("keeps the opt-in marker outside the protected prefix", () => {
-    expect(DESKTOP_AGENT_OPT_IN_ID.startsWith("winpilot-protected")).toBe(false);
+  it("keeps the opt-in marker WinPilot looks for, outside the protected prefix", () => {
+    expect(DESKTOP_AGENT_OPT_IN_ID).toBe("winpilot-protects-terminals");
   });
 });
