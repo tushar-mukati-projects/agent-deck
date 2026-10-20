@@ -39,7 +39,8 @@ import { useAsync } from "@/hooks/useAsync";
 import { runShortcut } from "@/hooks/useGlobalShortcuts";
 import { subscribeFileChanges, watchedSince } from "@/lib/file-events";
 import { FileIcon } from "@/lib/file-icons";
-import { fuzzyPathKeyScorer, fuzzyScore, pathKey, type PathKey } from "@/lib/fuzzy";
+import { fuzzyScore, pathKey } from "@/lib/fuzzy";
+import { sortTop, topFiles, type PreparedFile } from "@/lib/palette";
 import { sessionTitle } from "@/lib/sessions";
 import { shortcutLabel, type ShortcutAction } from "@/lib/shortcuts";
 import { api } from "@/lib/tauri/commands";
@@ -270,37 +271,11 @@ const buildCommands = (workspace: Workspace | null): CommandDef[] => {
   ];
 };
 
-const sortTop = <T extends { score: number }>(list: T[], limit: number) =>
-  list.sort((a, b) => b.score - a.score).slice(0, limit);
-
-interface PreparedFile {
-  rel: string;
-  key: PathKey;
-}
-
 interface FileNarrowing {
   files: PreparedFile[];
   query: string;
   matched: PreparedFile[];
 }
-
-const topFiles = (files: PreparedFile[], query: string, limit: number) => {
-  if (!query)
-    return { top: files.slice(0, limit).map(({ rel }) => ({ rel, score: 0 })), matched: files };
-  const scoreOf = fuzzyPathKeyScorer(query);
-  const top: { rel: string; score: number }[] = [];
-  const matched: PreparedFile[] = [];
-  for (const file of files) {
-    const score = scoreOf(file.key);
-    if (score === null) continue;
-    matched.push(file);
-    if (top.length < limit) top.push({ rel: file.rel, score });
-    else if (score > top[top.length - 1].score) top[top.length - 1] = { rel: file.rel, score };
-    else continue;
-    top.sort((a, b) => b.score - a.score);
-  }
-  return { top, matched };
-};
 
 export const usePaletteItems = (mode: PaletteMode, liveQuery: string) => {
   const rawQuery = useDeferredValue(liveQuery);
