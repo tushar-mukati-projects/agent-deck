@@ -11,7 +11,6 @@ import {
   openNotesFolder,
   renameNote,
   selectNote,
-  useNotesStore,
 } from "@/actions/notes";
 import { Dialog } from "@/components/ui/dialog";
 import { LoadingState } from "@/components/ui/feedback";
@@ -21,6 +20,7 @@ import { CodeView } from "@/features/viewer/CodeView";
 import { noteTitle, type NoteEntry } from "@/lib/notes";
 import { shortcutLabel } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
+import { useNotesStore } from "@/stores/notes-store";
 import { useUiStore } from "@/stores/ui-store";
 
 const NameInput = ({ title, onDone }: { title: string; onDone: (name: string | null) => void }) => {

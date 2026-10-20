@@ -1,4 +1,3 @@
-import { create } from "zustand";
 import { toast } from "sonner";
 
 import {
@@ -11,19 +10,8 @@ import {
 } from "@/lib/notes";
 import { api } from "@/lib/tauri/commands";
 import { failedTo } from "@/lib/utils";
+import { useNotesStore } from "@/stores/notes-store";
 import { useUiStore } from "@/stores/ui-store";
-
-interface NotesState {
-  notes: NoteEntry[];
-  activeId: string | null;
-  loaded: boolean;
-}
-
-export const useNotesStore = create<NotesState>(() => ({
-  notes: [],
-  activeId: null,
-  loaded: false,
-}));
 
 const SAVE_DELAY_MS = 400;
 let timer: number | undefined;
