@@ -76,11 +76,12 @@ export const formatBytes = (bytes: number) => {
   const units = ["KB", "MB", "GB"];
   let value = bytes / 1024;
   let unit = 0;
-  while (value >= 1024 && unit < units.length - 1) {
+  while (Math.round(value) >= 1024 && unit < units.length - 1) {
     value /= 1024;
     unit += 1;
   }
-  return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[unit]}`;
+  const tenths = value.toFixed(1);
+  return `${Number(tenths) >= 10 ? value.toFixed(0) : tenths} ${units[unit]}`;
 };
 
 export const timeAgo = (ms: number) => {

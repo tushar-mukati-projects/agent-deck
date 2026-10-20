@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { parseArgs } from "@/lib/args";
 import {
+  formatBytes,
   isWithin,
   normalizePath,
   relativePath,
@@ -51,6 +52,20 @@ describe("path helpers", () => {
         "\\\\wsl$\\Ubuntu\\home\\me\\proj",
       ),
     ).toBe("src\\a.ts");
+  });
+});
+
+describe("formatBytes", () => {
+  it.each([
+    [1023, "1023 B"],
+    [1024, "1.0 KB"],
+    [10137, "9.9 KB"],
+    [10199, "10 KB"],
+    [1047961, "1023 KB"],
+    [1048575, "1.0 MB"],
+    [10 * 1024 * 1024, "10 MB"],
+  ])("formats %j as %j", (bytes, text) => {
+    expect(formatBytes(bytes)).toBe(text);
   });
 });
 
