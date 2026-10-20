@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useRef } from "react";
 import { ExternalLink, FileQuestion } from "lucide-react";
 
-import { discardAndReload, openPathInWorkspace, reloadWithConfirm } from "@/actions/files";
+import {
+  discardAndReload,
+  openPathInWorkspace,
+  reloadWithConfirm,
+  saveFile,
+} from "@/actions/files";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { EmptyState, LoadingState } from "@/components/ui/feedback";
@@ -9,7 +14,6 @@ import { CodeView } from "@/features/viewer/CodeView";
 import { FileToolbar } from "@/features/viewer/FileToolbar";
 import { MarkdownView } from "@/features/viewer/MarkdownView";
 import { MediaView } from "@/features/viewer/MediaView";
-import { useDocumentSave } from "@/features/viewer/useDocumentSave";
 import { useFileContent } from "@/features/viewer/useFileContent";
 import { openExternal } from "@/lib/tauri/system";
 import { basename, dirname, normalizePath } from "@/lib/utils";
@@ -45,7 +49,12 @@ export const DocumentView = ({ workspace, path }: DocumentViewProps) => {
 
   const clearLine = useCallback(() => void useViewerStore.getState().takeLine(path), [path]);
 
-  const save = useDocumentSave(path, content, reload);
+  const contentRef = useRef(content);
+  contentRef.current = content;
+  const save = useCallback(() => {
+    const base = contentRef.current;
+    if (base) void saveFile(path, base, reload);
+  }, [path, reload]);
 
   const textRef = useRef(text);
   textRef.current = text;
