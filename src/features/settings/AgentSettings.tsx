@@ -9,7 +9,11 @@ import { newId } from "@/lib/utils";
 import { useSettingsStore } from "@/stores/settings-store";
 import type { CustomAgent } from "@/types";
 
-export const DefaultAgentPicker = ({ id }: { id?: string }) => {
+type DefaultAgentPickerProps = {
+  id: string;
+};
+
+export const DefaultAgentPicker = ({ id }: DefaultAgentPickerProps) => {
   const defaultAgent = useSettingsStore((s) => s.defaultAgent);
   const agents = useAgents();
   return (
