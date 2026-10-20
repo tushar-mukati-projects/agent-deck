@@ -5,6 +5,7 @@ import { openElsewhere, sessionTitle } from "@/lib/sessions";
 import { api } from "@/lib/tauri/commands";
 import { pickFolder } from "@/lib/tauri/system";
 import { errorMessage, failedTo, plural } from "@/lib/utils";
+import { parseWslPath } from "@/lib/wsl";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { isTerminalAlive, terminalPids } from "@/stores/terminal-store";
@@ -60,7 +61,9 @@ export const resumeWorkspace = async (
 
 export const restartWorkspaceAgent = async (workspaceId: string) => {
   const workspace = findWorkspace(workspaceId);
-  if (!workspace || !(await claimSession(workspace.sessionId))) return;
+  if (!workspace) return;
+  if (parseWslPath(workspace.cwd)) await useSessionsStore.getState().refreshWsl();
+  if (!(await claimSession(workspace.sessionId))) return;
   useWorkspaceStore.getState().restartAgent(workspaceId);
 };
 
