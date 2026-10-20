@@ -30,6 +30,19 @@ type TextKey = "claudeArgs" | "codexArgs" | "shellProgram";
 type ToggleKey = "matchAgentTheme" | "notifications" | "sound" | "speech" | "includeWsl" | "pet";
 type SectionId = "appearance" | "agents" | "sessions" | "terminal" | "notifications";
 
+type OnOffToggleProps = {
+  value: boolean;
+  onChange: (on: boolean) => void;
+  on?: string;
+  off?: string;
+};
+
+type ToggleProps = {
+  field: ToggleKey;
+  on?: string;
+  off?: string;
+};
+
 const setSetting = (patch: Partial<SettingsData>) => useSettingsStore.getState().set(patch);
 
 const Field = ({
@@ -86,34 +99,32 @@ const TextField = ({
   );
 };
 
-const Toggle = ({ field, on, off }: { field: ToggleKey; on: string; off: string }) => {
+const OnOffToggle = ({ value, onChange, on = "On", off = "Off" }: OnOffToggleProps) => (
+  <Segmented<"on" | "off">
+    value={value ? "on" : "off"}
+    onChange={(next) => onChange(next === "on")}
+    options={[
+      { value: "on", label: on },
+      { value: "off", label: off },
+    ]}
+  />
+);
+
+const Toggle = ({ field, on, off }: ToggleProps) => {
   const value = useSettingsStore((s) => s[field]);
   return (
-    <Segmented<"on" | "off">
-      value={value ? "on" : "off"}
-      onChange={(next) => setSetting({ [field]: next === "on" })}
-      options={[
-        { value: "on", label: on },
-        { value: "off", label: off },
-      ]}
+    <OnOffToggle
+      value={value}
+      onChange={(next) => setSetting({ [field]: next })}
+      on={on}
+      off={off}
     />
   );
 };
 
 const HideModeToggle = () => {
   const hidden = useSettingsStore((s) => s.hideMode);
-  return (
-    <Segmented<"on" | "off">
-      value={hidden ? "on" : "off"}
-      onChange={(next) => {
-        if ((next === "on") !== hidden) toggleHideMode();
-      }}
-      options={[
-        { value: "on", label: "On" },
-        { value: "off", label: "Off" },
-      ]}
-    />
-  );
+  return <OnOffToggle value={hidden} onChange={(on) => on !== hidden && toggleHideMode()} />;
 };
 
 const FontSize = () => {
@@ -152,7 +163,7 @@ const AppearanceSection = () => (
       label="Deck pet"
       hint="Deckie lives in the bottom right corner: it naps when nothing runs, works along with Claude, waves when a session needs you and celebrates when one finishes."
     >
-      <Toggle field="pet" on="On" off="Off" />
+      <Toggle field="pet" />
     </Field>
     <Field
       label="Hide mode"
@@ -253,9 +264,9 @@ const PhonePing = () => {
   const enabled = useSettingsStore((s) => s.phonePing);
   const topic = useSettingsStore((s) => s.phoneTopic);
   const [testing, setTesting] = useState(false);
-  const turn = (next: "on" | "off") =>
+  const turn = (on: boolean) =>
     setSetting(
-      next === "on"
+      on
         ? {
             phonePing: true,
             phoneTopic: topic || newPhoneTopic((n) => crypto.getRandomValues(new Uint8Array(n))),
@@ -275,14 +286,7 @@ const PhonePing = () => {
   };
   return (
     <div className="flex flex-col gap-2.5">
-      <Segmented<"on" | "off">
-        value={enabled ? "on" : "off"}
-        onChange={turn}
-        options={[
-          { value: "on", label: "On" },
-          { value: "off", label: "Off" },
-        ]}
-      />
+      <OnOffToggle value={enabled} onChange={turn} />
       {enabled && (
         <div className="flex items-center gap-2">
           <Input
@@ -335,11 +339,11 @@ const NotificationsSection = () => (
       label="Desktop notifications"
       hint="Shown when an agent finishes or needs approval in a session you're not looking at."
     >
-      <Toggle field="notifications" on="On" off="Off" />
+      <Toggle field="notifications" />
     </Field>
     <Field label="Sound" hint="A short chime whenever an agent finishes a turn.">
       <div className="flex items-center gap-2">
-        <Toggle field="sound" on="On" off="Silent" />
+        <Toggle field="sound" off="Silent" />
         <Button size="sm" variant="ghost" onClick={() => void playChime("done")}>
           Play sample
         </Button>
@@ -350,7 +354,7 @@ const NotificationsSection = () => (
       hint="Says the session's name out loud when it finishes or needs your approval and you're not looking at it. Automatic picks a female voice when one is installed. For more voices, add them in Windows Settings › Time & language › Speech, for example English (India) with Heera."
     >
       <div className="flex flex-wrap items-center gap-2">
-        <Toggle field="speech" on="On" off="Off" />
+        <Toggle field="speech" />
         <VoicePicker />
         <Button
           size="sm"
