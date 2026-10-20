@@ -48,6 +48,7 @@ interface SettingsState extends SettingsData {
   toggleArchived: (sessionId: string) => void;
   forgetSession: (sessionId: string) => void;
   setSessionTitle: (sessionId: string, title: string) => void;
+  removeCustomAgent: (agentId: string) => void;
   set: (patch: Partial<SettingsData>) => void;
 }
 
@@ -113,6 +114,15 @@ export const useSettingsStore = create<SettingsState>()(
           archivedSessions: without(get().archivedSessions, sessionId),
           sessionTitles: omitKey(get().sessionTitles, sessionId),
         }),
+      removeCustomAgent: (agentId) => {
+        const id = `custom:${agentId}`;
+        const { customAgents, defaultAgent, agentFilter } = get();
+        set({
+          customAgents: customAgents.filter((a) => a.id !== agentId),
+          ...(defaultAgent === id ? { defaultAgent: DEFAULTS.defaultAgent } : {}),
+          ...(agentFilter === id ? { agentFilter: DEFAULTS.agentFilter } : {}),
+        });
+      },
       set: (patch) => set(patch),
     }),
     {

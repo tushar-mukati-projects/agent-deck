@@ -32,16 +32,6 @@ export const DefaultAgentPicker = ({ id }: DefaultAgentPickerProps) => {
   );
 };
 
-const removeAgent = (agents: CustomAgent[], agent: CustomAgent) => {
-  const id = `custom:${agent.id}`;
-  const { defaultAgent, agentFilter, set } = useSettingsStore.getState();
-  set({
-    customAgents: agents.filter((a) => a.id !== agent.id),
-    ...(defaultAgent === id ? { defaultAgent: CLAUDE } : {}),
-    ...(agentFilter === id ? { agentFilter: "all" } : {}),
-  });
-};
-
 export const CustomAgentsEditor = () => {
   const agents = useSettingsStore((s) => s.customAgents);
   const update = (next: CustomAgent[]) => useSettingsStore.getState().set({ customAgents: next });
@@ -69,7 +59,7 @@ export const CustomAgentsEditor = () => {
           />
           <IconButton
             label={`Remove ${agent.name || "agent"}`}
-            onClick={() => removeAgent(agents, agent)}
+            onClick={() => useSettingsStore.getState().removeCustomAgent(agent.id)}
           >
             <Trash2 />
           </IconButton>
