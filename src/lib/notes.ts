@@ -42,7 +42,7 @@ export const draftNote = (): NoteEntry => {
   };
 };
 
-export const pruneDrafts = (notes: NoteEntry[], keepId?: string | null) =>
+export const pruneDrafts = (notes: NoteEntry[], keepId?: string) =>
   notes.filter((note) => note.stored || note.text || note.id === keepId);
 
 export const withoutNote = (notes: NoteEntry[], activeId: string | null, id: string) => {

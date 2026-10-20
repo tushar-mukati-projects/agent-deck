@@ -13,7 +13,7 @@ const SCOPE_LABELS: Partial<Record<ConfigScope, string>> = {
   system: "built-in",
 };
 
-export const scopeLabel = (scope: ConfigScope, plugin?: string | null) =>
+export const scopeLabel = (scope: ConfigScope, plugin: string | null = null) =>
   plugin ?? SCOPE_LABELS[scope] ?? scope;
 
 export const serverDetail = (server: McpServer) =>
