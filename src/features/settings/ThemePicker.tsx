@@ -26,7 +26,7 @@ const ThemeCard = ({
       )}
     >
       <div
-        className="relative h-14 overflow-hidden rounded-md border border-black/10"
+        className="relative h-14 overflow-hidden rounded-md border border-swatch-edge"
         style={{ background: bg }}
       >
         <div className="absolute inset-x-0 top-0 h-2.5" style={{ background: chrome }} />

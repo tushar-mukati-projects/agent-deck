@@ -9,10 +9,10 @@ const buttonVariants = cva(
     variants: {
       variant: {
         primary:
-          "bg-accent text-on-accent shadow-[inset_0_1px_0_rgb(255_255_255/0.2)] hover:bg-accent-strong",
+          "bg-accent text-on-accent shadow-[inset_0_1px_0_var(--color-highlight)] hover:bg-accent-strong",
         secondary: "border border-border-strong bg-elevated text-fg hover:bg-hover",
         ghost: "text-muted hover:bg-hover hover:text-fg",
-        danger: "bg-danger/90 text-white hover:bg-danger",
+        danger: "bg-danger/90 text-on-danger hover:bg-danger",
       },
       size: {
         xs: "h-6 px-2 text-[11.5px]",

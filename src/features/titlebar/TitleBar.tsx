@@ -73,7 +73,7 @@ const WindowControls = () => {
       <button
         type="button"
         aria-label="Close"
-        className={`${controlClass} hover:!bg-[#c42b1c] hover:!text-white`}
+        className={`${controlClass} hover:!bg-window-close hover:!text-on-danger`}
         onClick={() => appWindow.close()}
       >
         <X className="size-4" strokeWidth={1.5} />

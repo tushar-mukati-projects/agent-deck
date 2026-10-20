@@ -32,6 +32,11 @@
   --color-terminal-bg: #0c0d10;
   --color-shadow: rgb(0 0 0 / 0.55);
   --color-scrim: rgb(0 0 0 / 0.5);
+  --color-highlight: rgb(255 255 255 / 0.2);
+  --color-on-danger: #ffffff;
+  --color-window-close: #c42b1c;
+  --color-swatch-edge: rgb(0 0 0 / 0.1);
+  --color-paper: #ffffff;
 
   --font-sans: "Inter Variable", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono Variable", ui-monospace, "Cascadia Code", Consolas, monospace;
