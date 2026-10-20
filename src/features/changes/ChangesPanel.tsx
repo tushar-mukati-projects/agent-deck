@@ -1,150 +1,27 @@
-import { Fragment, memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { Eye, EyeOff, GitCompare, RefreshCw } from "lucide-react";
 
-import { Chevron } from "@/components/ui/chevron";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { EmptyState, Hint, LoadingState } from "@/components/ui/feedback";
 import { IconButton } from "@/components/ui/icon-button";
 import { PanelHeader } from "@/components/ui/panel-header";
-import { TreeGuides, treeIndent } from "@/features/explorer/TreeGuides";
+import { ChangeRow, ChangeTree, STATUS_BADGE } from "@/features/changes/ChangeTree";
 import { useAsync, useThrottledCallback } from "@/hooks/useAsync";
 import { useSessionFile } from "@/hooks/useSessionFile";
 import { useToggleSet } from "@/hooks/useToggleSet";
-import { buildChangeTree, type ChangeFolder, type ChangeNode } from "@/lib/change-tree";
+import { buildChangeTree } from "@/lib/change-tree";
 import { changeDiffSource, gitChangeStatus, gitMessage } from "@/lib/changes";
 import { encodeDiffTab } from "@/lib/diff-tabs";
 import { subscribeFileChanges } from "@/lib/file-events";
-import { FileIcon, folderIcon } from "@/lib/file-icons";
 import { api } from "@/lib/tauri/commands";
-import { DECK_PATH_MIME } from "@/lib/terminal/input";
-import {
-  basename,
-  cn,
-  errorMessage,
-  isWithin,
-  sameJson,
-  shortenHome,
-} from "@/lib/utils";
+import { basename, cn, errorMessage, isWithin, sameJson } from "@/lib/utils";
 import { agentName } from "@/stores/agents";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useActiveWorkspace, useWorkspaceStore } from "@/stores/workspace-store";
-import type { ChangedFile, ChangeStatus, GitChange, Workspace } from "@/types";
-
-interface Badge {
-  letter: string;
-  className: string;
-  label: string;
-}
-
-const STATUS_BADGE: Record<ChangeStatus, Badge> = {
-  added: { letter: "A", className: "text-add", label: "Added" },
-  modified: { letter: "M", className: "text-mod", label: "Modified" },
-  deleted: { letter: "D", className: "text-del", label: "Deleted" },
-  unchanged: { letter: "·", className: "text-faint", label: "Changed, then restored" },
-};
+import type { ChangedFile, GitChange, Workspace } from "@/types";
 
 const RELOAD_DELAY_MS = 1200;
 const RELOAD_MAX_WAIT_MS = 8000;
-
-const rowClass =
-  "relative flex h-[26px] w-full min-w-0 items-center gap-1.5 rounded-md pr-2 text-left text-[12px] hover:bg-hover";
-
-type RowProps = {
-  path: string;
-  depth: number;
-  badge: Badge;
-  onOpen: () => void;
-  children?: React.ReactNode;
-};
-
-const Row = ({ path, depth, badge, onOpen, children }: RowProps) => (
-  <button
-    type="button"
-    onClick={onOpen}
-    title={path}
-    draggable
-    onDragStart={(e) => e.dataTransfer.setData(DECK_PATH_MIME, path)}
-    style={{ paddingLeft: treeIndent(depth) }}
-    className={rowClass}
-  >
-    <TreeGuides depth={depth} />
-    <span className="w-3 shrink-0" />
-    <FileIcon path={path} />
-    <span className="min-w-0 flex-1 truncate text-fg/90">{basename(path)}</span>
-    {children}
-    <span
-      title={badge.label}
-      className={cn(
-        "w-3 shrink-0 text-center font-mono text-[11px] font-semibold",
-        badge.className,
-      )}
-    >
-      {badge.letter}
-    </span>
-  </button>
-);
-
-type FolderRowProps = {
-  folder: ChangeFolder<unknown>;
-  depth: number;
-  open: boolean;
-  onToggle: () => void;
-};
-
-const FolderRow = ({ folder, depth, open, onToggle }: FolderRowProps) => {
-  const home = useSessionsStore((s) => s.environment?.home ?? "");
-  const { icon: Icon, color } = folderIcon(basename(folder.path), open);
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      title={folder.path}
-      aria-expanded={open}
-      style={{ paddingLeft: treeIndent(depth) }}
-      className={cn(rowClass, "text-fg/85")}
-    >
-      <TreeGuides depth={depth} />
-      <Chevron open={open} className="text-faint" />
-      <Icon className={cn("size-3.5 shrink-0", color)} />
-      <span className="min-w-0 truncate">{shortenHome(folder.name, home)}</span>
-    </button>
-  );
-};
-
-interface ChangeTreeProps<T> {
-  nodes: ChangeNode<T>[];
-  depth?: number;
-  collapsed: ReadonlySet<string>;
-  onToggle: (key: string) => void;
-  renderFile: (item: T, depth: number) => React.ReactNode;
-}
-
-const ChangeTree = <T,>({
-  nodes,
-  depth = 0,
-  collapsed,
-  onToggle,
-  renderFile,
-}: ChangeTreeProps<T>) =>
-  nodes.map((node) => {
-    if (node.kind === "file")
-      return <Fragment key={node.key}>{renderFile(node.item, depth)}</Fragment>;
-    const open = !collapsed.has(node.key);
-    return (
-      <Fragment key={node.key}>
-        <FolderRow folder={node} depth={depth} open={open} onToggle={() => onToggle(node.key)} />
-        {open && (
-          <ChangeTree
-            nodes={node.children}
-            depth={depth + 1}
-            collapsed={collapsed}
-            onToggle={onToggle}
-            renderFile={renderFile}
-          />
-        )}
-      </Fragment>
-    );
-  });
 
 const loadChanges = async (cwd: string, filePath: string | null, distro: string | null) => {
   const [changes, status] = await Promise.allSettled([
@@ -227,7 +104,7 @@ const SessionChanges = memo(
           collapsed={collapsed}
           onToggle={toggleFolder}
           renderFile={(file, depth) => (
-            <Row
+            <ChangeRow
               path={file.path}
               depth={depth}
               badge={STATUS_BADGE[file.status]}
@@ -237,7 +114,7 @@ const SessionChanges = memo(
                 {file.additions > 0 && <span className="text-add">+{file.additions}</span>}
                 {file.deletions > 0 && <span className="ml-1 text-del">−{file.deletions}</span>}
               </span>
-            </Row>
+            </ChangeRow>
           )}
         />
       </CollapsibleSection>
@@ -273,7 +150,7 @@ const RepoChanges = memo(({ workspace, git, error }: RepoChangesProps) => {
         collapsed={collapsed}
         onToggle={toggleFolder}
         renderFile={(change, depth) => (
-          <Row
+          <ChangeRow
             path={change.path}
             depth={depth}
             badge={STATUS_BADGE[gitChangeStatus(change.code)]}
