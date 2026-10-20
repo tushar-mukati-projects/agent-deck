@@ -25,7 +25,7 @@ import { useAsync } from "@/hooks/useAsync";
 import { useSessionFile } from "@/hooks/useSessionFile";
 import { useExternalLive } from "@/hooks/useWorkspaceStatus";
 import { isPersisted } from "@/lib/agents/launch";
-import { CLAUDE } from "@/lib/agents/registry";
+import { resumeLabel } from "@/lib/resume-label";
 import { dangerHoverClass } from "@/lib/styles";
 import { api } from "@/lib/tauri/commands";
 import { revealInExplorer } from "@/lib/tauri/system";
@@ -77,13 +77,6 @@ const Meta = ({
       {session?.version && <span>v{session.version}</span>}
     </div>
   );
-};
-
-const resumeLabel = (workspace: Workspace) => {
-  const agent = findAgent(workspace.agent);
-  if (!isPersisted(workspace, useSessionsStore.getState().byId) || !agent.history)
-    return `Start ${agent.name}`;
-  return agent.id === CLAUDE ? "Resume session" : `Resume in ${agent.name}`;
 };
 
 const TakeOverButton = ({ workspaceId }: { workspaceId: string }) => {
@@ -170,7 +163,8 @@ const PreviewHeader = ({
           disabled={!folderExists}
           onClick={() => void resumeWorkspace(workspace.id)}
         >
-          <Play className="fill-current" /> {resumeLabel(workspace)}
+          <Play className="fill-current" />{" "}
+          {resumeLabel(agent, isPersisted(workspace, useSessionsStore.getState().byId))}
           <Kbd
             keys="Enter"
             className="ml-0.5 opacity-60 [&_kbd]:border-on-accent/25 [&_kbd]:bg-on-accent/10 [&_kbd]:text-on-accent"
