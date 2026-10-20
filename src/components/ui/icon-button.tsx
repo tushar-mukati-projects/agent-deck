@@ -5,12 +5,14 @@ type IconButtonProps = React.ComponentProps<"button"> & {
   label: string;
   shortcut?: string;
   active?: boolean;
+  danger?: boolean;
 };
 
 export const IconButton = ({
   label,
   shortcut,
   active,
+  danger,
   className,
   children,
   ...props
@@ -22,6 +24,7 @@ export const IconButton = ({
       className={cn(
         "inline-flex size-6 shrink-0 items-center justify-center rounded-md text-faint transition-colors duration-100 hover:bg-hover hover:text-fg disabled:pointer-events-none disabled:opacity-40 [&_svg]:size-3.5",
         active && "bg-hover text-fg",
+        danger && "hover:bg-danger/15 hover:text-danger",
         className,
       )}
       {...props}

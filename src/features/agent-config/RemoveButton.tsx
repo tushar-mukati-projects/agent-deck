@@ -3,7 +3,6 @@ import { Trash2 } from "lucide-react";
 import { removeConfig } from "@/actions/agent-config";
 import { IconButton } from "@/components/ui/icon-button";
 import type { RemovalRequest } from "@/lib/agent-config/removals";
-import { dangerHoverClass } from "@/lib/styles";
 import type { ConfigAgent, Workspace } from "@/types";
 
 type RemoveButtonProps = {
@@ -15,7 +14,7 @@ type RemoveButtonProps = {
 export const RemoveButton = ({ workspace, agent, request }: RemoveButtonProps) => (
   <IconButton
     label={`Remove ${request.name}`}
-    className={dangerHoverClass}
+    danger
     onClick={() => void removeConfig(workspace, agent, request)}
   >
     <Trash2 />

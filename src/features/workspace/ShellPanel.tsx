@@ -14,7 +14,6 @@ import { terminalTone, useTerminal } from "@/hooks/useWorkspaceStatus";
 import { taskLabel, taskState, type TaskState } from "@/lib/agent-tasks";
 import { shellName, shellPath } from "@/lib/shells";
 import { shortcutLabel } from "@/lib/shortcuts";
-import { dangerHoverClass } from "@/lib/styles";
 import { clearTerminal } from "@/lib/terminal/registry";
 import { basename, cn } from "@/lib/utils";
 import { useAgentTasksStore } from "@/stores/agent-tasks-store";
@@ -139,7 +138,7 @@ export const ShellPanel = ({ workspace }: ShellPanelProps) => {
             </IconButton>
             <IconButton
               label="Kill shell"
-              className={dangerHoverClass}
+              danger
               onClick={() =>
                 void killShellWithConfirm(
                   workspace.id,

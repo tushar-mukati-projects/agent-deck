@@ -23,7 +23,6 @@ import { SearchInput } from "@/components/ui/search-input";
 import { useExternalLive } from "@/hooks/useWorkspaceStatus";
 import { isPersisted } from "@/lib/agents/launch";
 import { resumeLabel } from "@/lib/agents/registry";
-import { dangerHoverClass } from "@/lib/styles";
 import { revealInExplorer } from "@/lib/tauri/system";
 import { formatBytes, plural, shortenHome } from "@/lib/utils";
 import { findAgent } from "@/stores/agents";
@@ -209,8 +208,7 @@ export const PreviewHeader = ({
           {session && (
             <Button
               size="sm"
-              variant="ghost"
-              className={dangerHoverClass}
+              variant="ghostDanger"
               onClick={() => void deleteSessionWithConfirm(session)}
             >
               <Trash2 /> Delete
