@@ -30,7 +30,12 @@ interface FileToolbarProps {
   onReload: () => void;
 }
 
-const Breadcrumbs = ({ path, root }: { path: string; root: string }) => {
+type BreadcrumbsProps = {
+  path: string;
+  root: string;
+};
+
+const Breadcrumbs = ({ path, root }: BreadcrumbsProps) => {
   const segments = relativePath(path, root).split(/[\\/]/).filter(Boolean);
   return (
     <>

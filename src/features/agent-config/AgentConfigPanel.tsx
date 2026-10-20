@@ -22,51 +22,45 @@ import type { AgentOverview, ConfigAgent, Workspace } from "@/types";
 
 const DEFAULT_OPEN: SectionKey[] = ["memory", "mcp"];
 
-const Sections = memo(
-  ({
-    workspace,
-    agent,
-    overview,
-    query,
-    reload,
-  }: {
-    workspace: Workspace;
-    agent: ConfigAgent;
-    overview: AgentOverview;
-    query: string;
-    reload: () => void;
-  }) => {
-    const [open, toggle] = useToggleSet<SectionKey>(DEFAULT_OPEN);
-    const data = useMemo(() => filterOverview(overview, query), [overview, query]);
-    const profile = PROFILES[agent];
+type SectionsProps = {
+  workspace: Workspace;
+  agent: ConfigAgent;
+  overview: AgentOverview;
+  query: string;
+  reload: () => void;
+};
 
-    return (
-      <>
-        {profile.sections.map((key) => {
-          const { title, icon, count, Body } = SECTIONS[key];
-          return (
-            <CollapsibleSection
-              key={key}
-              title={profile.titles[key] ?? title}
-              icon={icon}
-              count={count(data)}
-              open={!!query || open.has(key)}
-              onToggle={() => toggle(key)}
-            >
-              <Body
-                workspace={workspace}
-                agent={agent}
-                profile={profile}
-                data={data}
-                reload={reload}
-              />
-            </CollapsibleSection>
-          );
-        })}
-      </>
-    );
-  },
-);
+const Sections = memo(({ workspace, agent, overview, query, reload }: SectionsProps) => {
+  const [open, toggle] = useToggleSet<SectionKey>(DEFAULT_OPEN);
+  const data = useMemo(() => filterOverview(overview, query), [overview, query]);
+  const profile = PROFILES[agent];
+
+  return (
+    <>
+      {profile.sections.map((key) => {
+        const { title, icon, count, Body } = SECTIONS[key];
+        return (
+          <CollapsibleSection
+            key={key}
+            title={profile.titles[key] ?? title}
+            icon={icon}
+            count={count(data)}
+            open={!!query || open.has(key)}
+            onToggle={() => toggle(key)}
+          >
+            <Body
+              workspace={workspace}
+              agent={agent}
+              profile={profile}
+              data={data}
+              reload={reload}
+            />
+          </CollapsibleSection>
+        );
+      })}
+    </>
+  );
+});
 Sections.displayName = "Sections";
 
 const useDistroStopped = (cwd: string, error: string | null) => {
@@ -82,7 +76,12 @@ const useDistroStopped = (cwd: string, error: string | null) => {
     : null;
 };
 
-const WorkspaceConfig = ({ workspace, agent }: { workspace: Workspace; agent: ConfigAgent }) => {
+type WorkspaceConfigProps = {
+  workspace: Workspace;
+  agent: ConfigAgent;
+};
+
+const WorkspaceConfig = ({ workspace, agent }: WorkspaceConfigProps) => {
   const { overview, error, loading, reload } = useOverview(workspace.cwd, agent);
   const stoppedDistro = useDistroStopped(workspace.cwd, error);
   const [query, setQuery] = useState("");

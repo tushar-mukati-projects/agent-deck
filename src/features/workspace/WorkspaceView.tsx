@@ -25,7 +25,11 @@ const useWatchedRoot = (root: string) =>
     return () => releaseWatch(root, api.unwatchDir);
   }, [root]);
 
-const WorkspaceLayout = ({ workspace }: { workspace: Workspace }) => {
+type WorkspaceLayoutProps = {
+  workspace: Workspace;
+};
+
+const WorkspaceLayout = ({ workspace }: WorkspaceLayoutProps) => {
   const hasFiles = workspace.openFiles.length > 0;
   const agentShells = useAgentShells(workspace);
   const shellOpen =
@@ -101,12 +105,20 @@ const WorkspaceLayout = ({ workspace }: { workspace: Workspace }) => {
   );
 };
 
-const AgentShellSync = ({ workspace }: { workspace: Workspace }) => {
+type AgentShellSyncProps = {
+  workspace: Workspace;
+};
+
+const AgentShellSync = ({ workspace }: AgentShellSyncProps) => {
   useAgentShellSync(workspace);
   return null;
 };
 
-export const WorkspaceView = ({ workspaceId }: { workspaceId: string }) => {
+type WorkspaceViewProps = {
+  workspaceId: string;
+};
+
+export const WorkspaceView = ({ workspaceId }: WorkspaceViewProps) => {
   const workspace = useWorkspace(workspaceId);
   return workspace ? (
     <>

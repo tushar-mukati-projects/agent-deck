@@ -71,15 +71,13 @@ const createMemory = async (workspace: Workspace, path: string, reload: () => vo
   }
 };
 
-const RemoveButton = ({
-  workspace,
-  agent,
-  request,
-}: {
+type RemoveButtonProps = {
   workspace: Workspace;
   agent: ConfigAgent;
   request: RemovalRequest;
-}) => (
+};
+
+const RemoveButton = ({ workspace, agent, request }: RemoveButtonProps) => (
   <IconButton
     label={`Remove ${request.name}`}
     className={dangerHoverClass}
@@ -151,17 +149,14 @@ const McpSection = ({ workspace, agent, profile, data }: SectionProps) => (
   </>
 );
 
-const ItemAction = ({
-  workspace,
-  profile,
-  item,
-  kind,
-}: {
+type ItemActionProps = {
   workspace: Workspace;
   profile: AgentProfile;
   item: ConfigItem;
   kind: "skill" | "command" | "agent";
-}) => {
+};
+
+const ItemAction = ({ workspace, profile, item, kind }: ItemActionProps) => {
   if (kind === "agent")
     return (
       <IconButton

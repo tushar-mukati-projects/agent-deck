@@ -25,7 +25,13 @@ const firstSelection = (description: McpDescription): Selection | null => {
   return null;
 };
 
-const ResourceView = ({ cwd, serverId, uri }: { cwd: string; serverId: string; uri: string }) => {
+type ResourceViewProps = {
+  cwd: string;
+  serverId: string;
+  uri: string;
+};
+
+const ResourceView = ({ cwd, serverId, uri }: ResourceViewProps) => {
   const { data, error } = useAsync(
     () => api.mcpReadResource(cwd, serverId, uri),
     [cwd, serverId, uri],
@@ -71,7 +77,12 @@ const useDescription = (cwd: string, serverId: string) => {
   return { description, error, connecting, connect, restart };
 };
 
-export const ToolsPane = ({ cwd, server }: { cwd: string; server: McpServer }) => {
+type ToolsPaneProps = {
+  cwd: string;
+  server: McpServer;
+};
+
+export const ToolsPane = ({ cwd, server }: ToolsPaneProps) => {
   const { description, error, connecting, connect, restart } = useDescription(cwd, server.id);
   const [filter, setFilter] = useState("");
   const [picked, setPicked] = useState<Selection | null>(null);

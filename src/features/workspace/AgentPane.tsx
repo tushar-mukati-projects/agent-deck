@@ -10,7 +10,11 @@ import { useTerminal } from "@/hooks/useWorkspaceStatus";
 import { findAgent } from "@/stores/agents";
 import type { Workspace } from "@/types";
 
-export const AgentPane = ({ workspace }: { workspace: Workspace }) => {
+type AgentPaneProps = {
+  workspace: Workspace;
+};
+
+export const AgentPane = ({ workspace }: AgentPaneProps) => {
   const terminalId = workspace.agentTerminalId;
   const terminal = useTerminal(terminalId);
   const agent = findAgent(workspace.agent);

@@ -54,15 +54,13 @@ const useRows = (root: string) => {
   }, [children, expanded, showHidden, root]);
 };
 
-const RowMenu = ({
-  row,
-  workspace,
-  children,
-}: {
+type RowMenuProps = {
   row: Row;
   workspace: Workspace;
   children: React.ReactNode;
-}) => {
+};
+
+const RowMenu = ({ row, workspace, children }: RowMenuProps) => {
   const { entry } = row;
   return (
     <ContextMenu>
@@ -107,7 +105,11 @@ const RowMenu = ({
   );
 };
 
-export const FileTree = ({ workspace }: { workspace: Workspace }) => {
+type FileTreeProps = {
+  workspace: Workspace;
+};
+
+export const FileTree = ({ workspace }: FileTreeProps) => {
   const root = workspace.cwd;
   const rows = useRows(root);
   const selected = useExplorerStore((s) => s.selected);

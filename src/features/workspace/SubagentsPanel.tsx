@@ -12,7 +12,12 @@ import { cn } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
 import type { Subagent, Workspace } from "@/types";
 
-const SubagentView = ({ workspace, agent }: { workspace: Workspace; agent: Subagent }) => {
+type SubagentViewProps = {
+  workspace: Workspace;
+  agent: Subagent;
+};
+
+const SubagentView = ({ workspace, agent }: SubagentViewProps) => {
   const { filePath, distro } = useSessionFile(workspace);
   const { items, error } = useSubagentTranscript(filePath, distro, agent.agentId ?? agent.id);
   return (
@@ -27,13 +32,12 @@ const SubagentView = ({ workspace, agent }: { workspace: Workspace; agent: Subag
   );
 };
 
-export const SubagentsPanel = ({
-  workspace,
-  agents,
-}: {
+type SubagentsPanelProps = {
   workspace: Workspace;
   agents: Subagent[];
-}) => {
+};
+
+export const SubagentsPanel = ({ workspace, agents }: SubagentsPanelProps) => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = agents.find((a) => a.id === selectedId) ?? agents[0];
   if (!selected) return null;

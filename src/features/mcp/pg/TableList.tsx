@@ -17,17 +17,14 @@ const groupBySchema = (tables: TableRef[], needle: string) => [
   ).entries(),
 ];
 
-export const TableList = ({
-  tables,
-  truncated,
-  selected,
-  onSelect,
-}: {
+type TableListProps = {
   tables: TableRef[];
   truncated: boolean;
   selected: TableRef | null;
   onSelect: (table: TableRef) => void;
-}) => {
+};
+
+export const TableList = ({ tables, truncated, selected, onSelect }: TableListProps) => {
   const [filter, setFilter] = useState("");
   const [closed, toggle] = useToggleSet<string>();
   const needle = filter.trim().toLowerCase();

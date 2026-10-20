@@ -29,13 +29,22 @@ import type { Workspace } from "@/types";
 
 type MediaKind = Exclude<ViewKind, "text" | "markdown">;
 
-const MediaFrame = ({ children }: { children: React.ReactNode }) => (
+type MediaFrameProps = {
+  children: React.ReactNode;
+};
+
+const MediaFrame = ({ children }: MediaFrameProps) => (
   <div className="flex h-full items-center justify-center overflow-auto bg-[radial-gradient(color-mix(in_srgb,var(--color-fg)_6%,transparent)_1px,transparent_1px)] [background-size:16px_16px] p-6">
     {children}
   </div>
 );
 
-const MediaFile = ({ path, kind }: { path: string; kind: MediaKind }) => {
+type MediaFileProps = {
+  path: string;
+  kind: MediaKind;
+};
+
+const MediaFile = ({ path, kind }: MediaFileProps) => {
   const version = useFileVersion(path);
   const src = version ? `${assetUrl(path)}?v=${version}` : assetUrl(path);
   if (kind === "pdf")
@@ -55,7 +64,12 @@ const MediaFile = ({ path, kind }: { path: string; kind: MediaKind }) => {
   );
 };
 
-const DocumentBody = ({ workspace, path }: { workspace: Workspace; path: string }) => {
+type DocumentBodyProps = {
+  workspace: Workspace;
+  path: string;
+};
+
+const DocumentBody = ({ workspace, path }: DocumentBodyProps) => {
   const kind = viewKind(path);
   const needsText = isTextKind(kind);
   const { state, reload, staleOnDisk, dismissStale } = useFileContent(path, needsText);
@@ -192,15 +206,13 @@ const DocumentBody = ({ workspace, path }: { workspace: Workspace; path: string 
   );
 };
 
-const TabBoundary = ({
-  workspace,
-  tab,
-  children,
-}: {
+type TabBoundaryProps = {
   workspace: Workspace;
   tab: string;
   children: React.ReactNode;
-}) => (
+};
+
+const TabBoundary = ({ workspace, tab, children }: TabBoundaryProps) => (
   <ErrorBoundary
     key={tab}
     fallback={(error, reset) => (
@@ -226,13 +238,22 @@ const TabBoundary = ({
   </ErrorBoundary>
 );
 
-const FileBody = ({ workspace, tab }: { workspace: Workspace; tab: string }) => {
+type FileBodyProps = {
+  workspace: Workspace;
+  tab: string;
+};
+
+const FileBody = ({ workspace, tab }: FileBodyProps) => {
   const diff = useMemo(() => decodeDiffTab(tab), [tab]);
   if (diff) return <DiffView tab={diff} workspace={workspace} />;
   return <DocumentBody workspace={workspace} path={tab} />;
 };
 
-export const FileViewer = ({ workspace }: { workspace: Workspace }) => {
+type FileViewerProps = {
+  workspace: Workspace;
+};
+
+export const FileViewer = ({ workspace }: FileViewerProps) => {
   const activeFile = workspace.activeFile ?? workspace.openFiles[0];
   const serverTabs = workspace.openFiles.filter((tab) => decodeMcpTab(tab) !== null);
   const activeIsServer = !!activeFile && decodeMcpTab(activeFile) !== null;

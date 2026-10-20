@@ -31,17 +31,14 @@ const TASK_TONE: Record<TaskState, DotTone> = {
   ended: "exited",
 };
 
-const ShellTabButton = ({
-  workspace,
-  shell,
-  index,
-  active,
-}: {
+type ShellTabButtonProps = {
   workspace: Workspace;
   shell: ShellTab;
   index: number;
   active: boolean;
-}) => {
+};
+
+const ShellTabButton = ({ workspace, shell, index, active }: ShellTabButtonProps) => {
   const tone = terminalTone(useTerminal(shell.id));
   const name = shellName(shell, index);
   return (
@@ -62,17 +59,14 @@ const ShellTabButton = ({
   );
 };
 
-const AgentShellTab = ({
-  workspace,
-  task,
-  state,
-  active,
-}: {
+type AgentShellTabProps = {
   workspace: Workspace;
   task: AgentTask;
   state: TaskState;
   active: boolean;
-}) => (
+};
+
+const AgentShellTab = ({ workspace, task, state, active }: AgentShellTabProps) => (
   <Tab
     selected={active}
     onSelect={() => useAgentTasksStore.getState().select(workspace.id, task.id)}
@@ -88,7 +82,11 @@ const AgentShellTab = ({
   </Tab>
 );
 
-export const ShellPanel = ({ workspace }: { workspace: Workspace }) => {
+type ShellPanelProps = {
+  workspace: Workspace;
+};
+
+export const ShellPanel = ({ workspace }: ShellPanelProps) => {
   const { openShell, setShellPanel, restartShell } = useWorkspaceStore.getState();
   const agentShells = useAgentShells(workspace);
   const agentStarted = useAgentStart(workspace);

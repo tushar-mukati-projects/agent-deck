@@ -10,40 +10,36 @@ import type { TranscriptItem } from "@/types";
 
 const PAGE = 30;
 
-const Message = memo(
-  ({
-    item,
-    baseDir,
-    onOpenPath,
-  }: {
-    item: TranscriptItem;
-    baseDir: string;
-    onOpenPath: (path: string) => void;
-  }) => {
-    if (item.kind === "tool") {
-      return (
-        <div className="ml-0.5 flex items-center gap-2 py-px pl-1 font-mono text-[10.5px] text-faint/80">
-          <Wrench className="size-3 shrink-0" />
-          <span className="truncate">{item.text}</span>
-        </div>
-      );
-    }
-    if (item.role === "user") {
-      return (
-        <div className="my-2.5 flex justify-end">
-          <div className="max-w-[85%] rounded-lg rounded-br-sm border border-accent/15 bg-accent/[0.08] px-3 py-1.5 text-[12.5px] leading-relaxed break-words whitespace-pre-wrap text-fg/90 select-text">
-            {item.text}
-          </div>
-        </div>
-      );
-    }
+type MessageProps = {
+  item: TranscriptItem;
+  baseDir: string;
+  onOpenPath: (path: string) => void;
+};
+
+const Message = memo(({ item, baseDir, onOpenPath }: MessageProps) => {
+  if (item.kind === "tool") {
     return (
-      <div className="my-2">
-        <MarkdownView source={item.text} compact baseDir={baseDir} onOpenPath={onOpenPath} />
+      <div className="ml-0.5 flex items-center gap-2 py-px pl-1 font-mono text-[10.5px] text-faint/80">
+        <Wrench className="size-3 shrink-0" />
+        <span className="truncate">{item.text}</span>
       </div>
     );
-  },
-);
+  }
+  if (item.role === "user") {
+    return (
+      <div className="my-2.5 flex justify-end">
+        <div className="max-w-[85%] rounded-lg rounded-br-sm border border-accent/15 bg-accent/[0.08] px-3 py-1.5 text-[12.5px] leading-relaxed break-words whitespace-pre-wrap text-fg/90 select-text">
+          {item.text}
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="my-2">
+      <MarkdownView source={item.text} compact baseDir={baseDir} onOpenPath={onOpenPath} />
+    </div>
+  );
+});
 Message.displayName = "Message";
 
 interface TranscriptListProps {

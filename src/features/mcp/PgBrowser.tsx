@@ -15,7 +15,12 @@ import { api } from "@/lib/tauri/commands";
 
 type Pane = "data" | "structure" | "sql";
 
-const ConnectionLabel = ({ cwd, serverId }: { cwd: string; serverId: string }) => {
+type ConnectionLabelProps = {
+  cwd: string;
+  serverId: string;
+};
+
+const ConnectionLabel = ({ cwd, serverId }: ConnectionLabelProps) => {
   const { data: info, error } = useAsync(() => api.pgInfo(cwd, serverId), [cwd, serverId]);
   const label = info
     ? `${info.user}@${info.host}:${info.port}/${info.database}`
@@ -29,7 +34,12 @@ const ConnectionLabel = ({ cwd, serverId }: { cwd: string; serverId: string }) =
   );
 };
 
-export const PgBrowser = ({ cwd, serverId }: { cwd: string; serverId: string }) => {
+type PgBrowserProps = {
+  cwd: string;
+  serverId: string;
+};
+
+export const PgBrowser = ({ cwd, serverId }: PgBrowserProps) => {
   const run = useCallback((sql: string) => api.pgQuery(cwd, serverId, sql), [cwd, serverId]);
   const cancel = useCallback(
     () => void api.pgCancel(cwd, serverId).catch(showError),

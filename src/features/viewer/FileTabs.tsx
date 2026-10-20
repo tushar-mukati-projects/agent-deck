@@ -25,15 +25,13 @@ const tabLabel = (tab: string) => {
   return server !== null ? (server.split(":").at(-1) ?? server) : basename(tabTargetPath(tab));
 };
 
-const TabMenu = ({
-  workspace,
-  tab,
-  children,
-}: {
+type TabMenuProps = {
   workspace: Workspace;
   tab: string;
   children: React.ReactNode;
-}) => {
+};
+
+const TabMenu = ({ workspace, tab, children }: TabMenuProps) => {
   const tabs = workspace.openFiles;
   const index = tabs.findIndex((t) => samePath(t, tab));
   const isFile = decodeMcpTab(tab) === null;
@@ -83,7 +81,12 @@ const TabMenu = ({
   );
 };
 
-const FileTab = ({ workspace, tab }: { workspace: Workspace; tab: string }) => {
+type FileTabProps = {
+  workspace: Workspace;
+  tab: string;
+};
+
+const FileTab = ({ workspace, tab }: FileTabProps) => {
   const active = !!workspace.activeFile && samePath(tab, workspace.activeFile);
   const dirty = useViewerStore((s) => normalizePath(tab) in s.drafts);
   const ref = useRef<HTMLDivElement>(null);
@@ -129,7 +132,11 @@ const FileTab = ({ workspace, tab }: { workspace: Workspace; tab: string }) => {
   );
 };
 
-export const FileTabs = ({ workspace }: { workspace: Workspace }) => (
+type FileTabsProps = {
+  workspace: Workspace;
+};
+
+export const FileTabs = ({ workspace }: FileTabsProps) => (
   <TabStrip
     label="Open files"
     className="h-9 shrink-0 items-stretch border-b border-border bg-panel"

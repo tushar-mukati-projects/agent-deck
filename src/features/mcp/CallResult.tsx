@@ -9,7 +9,11 @@ import {
   type ContentItem,
 } from "@/lib/mcp/results";
 
-export const TextResult = memo(({ text }: { text: string }) => {
+type TextResultProps = {
+  text: string;
+};
+
+export const TextResult = memo(({ text }: TextResultProps) => {
   const { parsed, grid } = useMemo(() => {
     const value = parseJson(text);
     return { parsed: value, grid: value !== undefined ? gridFromObjects(value) : null };
@@ -23,7 +27,11 @@ export const TextResult = memo(({ text }: { text: string }) => {
 });
 TextResult.displayName = "TextResult";
 
-const ContentView = ({ item }: { item: ContentItem }) => {
+type ContentViewProps = {
+  item: ContentItem;
+};
+
+const ContentView = ({ item }: ContentViewProps) => {
   if (item.type === "text" && typeof item.text === "string") return <TextResult text={item.text} />;
   if (item.type === "image" && typeof item.data === "string")
     return (
@@ -38,7 +46,11 @@ const ContentView = ({ item }: { item: ContentItem }) => {
   return <TextResult text={JSON.stringify(item, null, 2)} />;
 };
 
-export const CallResult = memo(({ result }: { result: unknown }) => {
+type CallResultProps = {
+  result: unknown;
+};
+
+export const CallResult = memo(({ result }: CallResultProps) => {
   const { content, isError, structured } = callResultParts(result);
   return (
     <div className="flex flex-col gap-2">

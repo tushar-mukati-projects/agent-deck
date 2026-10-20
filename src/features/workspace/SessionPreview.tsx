@@ -42,13 +42,12 @@ const startedLabel = (startedAt: string) => {
   return isValid(date) ? format(date, "d MMM yyyy, HH:mm") : null;
 };
 
-const Meta = ({
-  workspace,
-  session,
-}: {
+type MetaProps = {
   workspace: Workspace;
   session: SessionInfo | undefined;
-}) => {
+};
+
+const Meta = ({ workspace, session }: MetaProps) => {
   const home = useSessionsStore((s) => s.environment?.home ?? "");
   const started = session?.startedAt ? startedLabel(session.startedAt) : null;
   return (
@@ -80,7 +79,11 @@ const Meta = ({
   );
 };
 
-const TakeOverButton = ({ workspaceId }: { workspaceId: string }) => {
+type TakeOverButtonProps = {
+  workspaceId: string;
+};
+
+const TakeOverButton = ({ workspaceId }: TakeOverButtonProps) => {
   const [closing, setClosing] = useState(false);
   return (
     <Button
@@ -96,6 +99,16 @@ const TakeOverButton = ({ workspaceId }: { workspaceId: string }) => {
   );
 };
 
+type PreviewHeaderProps = {
+  workspace: Workspace;
+  session: SessionInfo | undefined;
+  folderExists: boolean;
+  folderError: string | null;
+  query: string;
+  onQuery: (query: string) => void;
+  hasItems: boolean;
+};
+
 const PreviewHeader = ({
   workspace,
   session,
@@ -104,15 +117,7 @@ const PreviewHeader = ({
   query,
   onQuery,
   hasItems,
-}: {
-  workspace: Workspace;
-  session: SessionInfo | undefined;
-  folderExists: boolean;
-  folderError: string | null;
-  query: string;
-  onQuery: (query: string) => void;
-  hasItems: boolean;
-}) => {
+}: PreviewHeaderProps) => {
   const agent = findAgent(workspace.agent);
   const external = useExternalLive(workspace.sessionId);
   return (
@@ -222,7 +227,11 @@ const PreviewHeader = ({
   );
 };
 
-export const SessionPreview = ({ workspace }: { workspace: Workspace }) => {
+type SessionPreviewProps = {
+  workspace: Workspace;
+};
+
+export const SessionPreview = ({ workspace }: SessionPreviewProps) => {
   const session = useSessionsStore((s) => s.byId[workspace.sessionId]);
   const sessionsLoaded = useSessionsStore((s) => s.loaded);
   const { filePath, distro } = useSessionFile(workspace);

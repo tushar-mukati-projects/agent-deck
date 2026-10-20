@@ -24,15 +24,13 @@ interface TerminalViewProps {
 const findButtonClass =
   "flex size-6 items-center justify-center rounded text-faint hover:bg-hover hover:text-fg";
 
-const FindBar = ({
-  terminalId,
-  request,
-  onClose,
-}: {
+type FindBarProps = {
   terminalId: string;
   request: number;
   onClose: () => void;
-}) => {
+};
+
+const FindBar = ({ terminalId, request, onClose }: FindBarProps) => {
   const [query, setQuery] = useState("");
   const [missing, setMissing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);

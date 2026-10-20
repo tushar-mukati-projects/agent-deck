@@ -45,15 +45,13 @@ const useOutput = (path: string | null, live: boolean) => {
   return { tail, error };
 };
 
-export const AgentShellView = ({
-  workspaceId,
-  task,
-  state,
-}: {
+type AgentShellViewProps = {
   workspaceId: string;
   task: AgentTask;
   state: TaskState;
-}) => {
+};
+
+export const AgentShellView = ({ workspaceId, task, state }: AgentShellViewProps) => {
   const { tail, error } = useOutput(task.outputPath, state === "running");
   const text = useMemo(() => cleanOutput(tail?.text ?? ""), [tail?.text]);
   const { scrollRef, contentRef, atBottom, onScroll, jumpToBottom } = useStickToBottom(text);

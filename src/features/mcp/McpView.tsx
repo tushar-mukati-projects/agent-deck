@@ -17,15 +17,13 @@ import type { McpServer, Workspace } from "@/types";
 
 type Mode = "database" | "tools";
 
-const ServerView = ({
-  workspace,
-  server,
-  agentName,
-}: {
+type ServerViewProps = {
   workspace: Workspace;
   server: McpServer;
   agentName: string;
-}) => {
+};
+
+const ServerView = ({ workspace, server, agentName }: ServerViewProps) => {
   const [mode, setMode] = useState<Mode>("database");
   const [toolsOpened, setToolsOpened] = useState(!server.postgres);
   const detail = serverDetail(server);
@@ -86,7 +84,12 @@ const ServerView = ({
   );
 };
 
-export const McpView = ({ workspace, serverId }: { workspace: Workspace; serverId: string }) => {
+type McpViewProps = {
+  workspace: Workspace;
+  serverId: string;
+};
+
+export const McpView = ({ workspace, serverId }: McpViewProps) => {
   const agent = serverAgent(serverId);
   const { overview, error, loading, reload } = useOverview(workspace.cwd, agent);
   const server = overview?.mcp.find((s) => s.id === serverId);

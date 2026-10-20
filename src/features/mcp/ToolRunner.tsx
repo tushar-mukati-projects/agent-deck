@@ -18,7 +18,11 @@ import type { JsonSchema, McpTool } from "@/types";
 const typeLabel = (schema: JsonSchema) =>
   Array.isArray(schema.type) ? schema.type.join(" | ") : (schema.type ?? "any");
 
-const Parameters = ({ schema }: { schema?: JsonSchema }) => {
+type ParametersProps = {
+  schema?: JsonSchema;
+};
+
+const Parameters = ({ schema }: ParametersProps) => {
   const properties = Object.entries(schema?.properties ?? {});
   if (!properties.length)
     return <p className="text-[11.5px] text-faint">This tool takes no arguments.</p>;
@@ -48,15 +52,13 @@ interface Outcome {
   elapsedMs: number;
 }
 
-export const ToolRunner = ({
-  cwd,
-  serverId,
-  tool,
-}: {
+type ToolRunnerProps = {
   cwd: string;
   serverId: string;
   tool: McpTool;
-}) => {
+};
+
+export const ToolRunner = ({ cwd, serverId, tool }: ToolRunnerProps) => {
   const [args, setArgs] = useState(() => exampleArguments(tool.inputSchema));
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);

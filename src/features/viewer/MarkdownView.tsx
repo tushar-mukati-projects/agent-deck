@@ -102,7 +102,11 @@ const buildComponents = (baseDir?: string, onOpenPath?: (path: string) => void):
   ),
 });
 
-const Frontmatter = ({ fields }: { fields: [string, string][] }) => (
+type FrontmatterProps = {
+  fields: [string, string][];
+};
+
+const Frontmatter = ({ fields }: FrontmatterProps) => (
   <dl className="not-prose mb-5 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 rounded-lg border border-border bg-panel px-3.5 py-2.5 text-[12px]">
     {fields.map(([key, value]) => (
       <div key={key} className="contents">

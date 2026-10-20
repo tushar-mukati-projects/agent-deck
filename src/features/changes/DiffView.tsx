@@ -94,7 +94,12 @@ const diffTheme = EditorView.theme({
   },
 });
 
-export const DiffView = ({ tab, workspace }: { tab: DiffTab; workspace: Workspace }) => {
+type DiffViewProps = {
+  tab: DiffTab;
+  workspace: Workspace;
+};
+
+export const DiffView = ({ tab, workspace }: DiffViewProps) => {
   const session = useSessionFile(workspace);
   const language = useLanguage(tab.path);
   const theme = useDeckTheme();
