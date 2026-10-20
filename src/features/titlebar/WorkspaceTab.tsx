@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/menu";
 import { Tab } from "@/components/ui/tabs";
 import { useWorkspaceTone } from "@/hooks/useWorkspaceStatus";
+import { scrollIntoViewNearest } from "@/lib/dom";
 import { copyText, revealInExplorer } from "@/lib/tauri/system";
 import { basename, cn } from "@/lib/utils";
 import { findAgent } from "@/stores/agents";
@@ -116,7 +117,7 @@ const TabBody = ({ workspace, isActive }: { workspace: Workspace; isActive: bool
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (isActive) ref.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    if (isActive) scrollIntoViewNearest(ref.current);
   }, [isActive]);
 
   return (
