@@ -21,7 +21,7 @@ export const agentStartedMs = (
 ) =>
   runningHere || openElsewhere(live, ownPids, sessionId) ? processStart(live, sessionId) : null;
 
-const fromThisRun = (task: { startedAt: string | null }, agentStartedMs: number) =>
+const fromThisRun = (task: Pick<AgentTask, "startedAt">, agentStartedMs: number) =>
   !(time(task.startedAt) < agentStartedMs - START_SLACK_MS);
 
 export const taskState = (task: AgentTask, agentStartedMs: number | null): TaskState => {

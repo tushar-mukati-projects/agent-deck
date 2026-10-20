@@ -20,6 +20,12 @@ export interface Order {
   desc: boolean;
 }
 
+type SelectOptions = {
+  where: string;
+  order: Order | null;
+  page: number;
+};
+
 export const orderValue = (order: Order | null) =>
   order ? `${order.column}:${order.desc ? "desc" : "asc"}` : "";
 
@@ -52,7 +58,7 @@ export const parseTables = (result: PgResult | undefined): TableRef[] =>
 
 export const buildSelect = (
   table: Pick<TableRef, "schema" | "name">,
-  { where, order, page }: { where: string; order: Order | null; page: number },
+  { where, order, page }: SelectOptions,
 ) =>
   [
     `select * from ${qualified(table)}`,

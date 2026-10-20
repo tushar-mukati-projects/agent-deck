@@ -21,6 +21,11 @@ import {
 
 import { basename, DOCKERFILE_NAME, extension } from "@/lib/utils";
 
+type FileIconProps = {
+  path: string;
+  className?: string;
+};
+
 interface IconSpec {
   icon: LucideIcon;
   color: string;
@@ -109,7 +114,7 @@ export const folderIcon = (name: string, open: boolean): IconSpec => {
   };
 };
 
-export const FileIcon = ({ path, className }: { path: string; className?: string }) => {
+export const FileIcon = ({ path, className }: FileIconProps) => {
   const { icon: Icon, color } = fileIcon(path);
   return <Icon className={`${color} ${className ?? "size-3.5 shrink-0"}`} />;
 };

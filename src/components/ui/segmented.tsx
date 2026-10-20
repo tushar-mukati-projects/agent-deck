@@ -1,8 +1,14 @@
 import { cn } from "@/lib/utils";
 
+type SegmentedOption<T extends string> = {
+  value: T;
+  label: string;
+  icon?: React.ReactNode;
+};
+
 interface SegmentedProps<T extends string> {
   value: T;
-  options: { value: T; label: string; icon?: React.ReactNode }[];
+  options: SegmentedOption<T>[];
   onChange: (value: T) => void;
   size?: "sm" | "md";
 }

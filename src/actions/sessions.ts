@@ -16,6 +16,11 @@ import { workspaceFromSession } from "@/stores/workspace-factory";
 import { findWorkspace, findWorkspaceBySession, useWorkspaceStore } from "@/stores/workspace-store";
 import type { AgentId, LiveSession, SessionInfo } from "@/types";
 
+type ResumeOptions = {
+  fork?: boolean;
+  takeOver?: boolean;
+};
+
 const confirmTakeOver = (live: LiveSession) =>
   useUiStore.getState().askConfirm({
     title: "This session is already open elsewhere",
@@ -45,10 +50,7 @@ const claimSession = async (sessionId: string, takeOver = false) => {
 export const previewSession = (session: SessionInfo) =>
   useWorkspaceStore.getState().openSession(session);
 
-export const resumeWorkspace = async (
-  workspaceId: string,
-  options: { fork?: boolean; takeOver?: boolean } = {},
-) => {
+export const resumeWorkspace = async (workspaceId: string, options: ResumeOptions = {}) => {
   const workspace = findWorkspace(workspaceId);
   if (!workspace) return;
   if (options.fork) {
