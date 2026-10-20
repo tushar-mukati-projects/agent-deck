@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
-import { Group, Panel, Separator, useDefaultLayout } from "react-resizable-panels";
+import { Group, Panel, useDefaultLayout } from "react-resizable-panels";
 
+import { ResizeHandle } from "@/components/ui/resize-handle";
 import { AgentPane } from "@/features/workspace/AgentPane";
 import { SessionPreview } from "@/features/workspace/SessionPreview";
 import { ShellPanel } from "@/features/workspace/ShellPanel";
@@ -9,20 +10,12 @@ import { FileViewer } from "@/features/viewer/FileViewer";
 import { useAgentShells, useAgentShellSync, useSubagents } from "@/hooks/useAgentShells";
 import { releaseWatch, retainWatch } from "@/lib/file-events";
 import { api } from "@/lib/tauri/commands";
-import { cn } from "@/lib/utils";
 import { useExplorerStore } from "@/stores/explorer-store";
 import { useUiStore } from "@/stores/ui-store";
 import { useWorkspace, useWorkspaceStore } from "@/stores/workspace-store";
 import type { Workspace } from "@/types";
 
-export const ResizeHandle = ({ orientation }: { orientation: "horizontal" | "vertical" }) => (
-  <Separator
-    className={cn(
-      "relative shrink-0 bg-border transition-colors duration-150 data-[separator=active]:bg-accent data-[separator=hover]:bg-accent/60",
-      orientation === "horizontal" ? "w-px" : "h-px",
-    )}
-  />
-);
+export { ResizeHandle } from "@/components/ui/resize-handle";
 
 const useSavedLayout = (id: string, panelIds: string[]) =>
   useDefaultLayout({ id, panelIds, onlySaveAfterUserInteractions: true });
