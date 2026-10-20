@@ -25,6 +25,7 @@ interface ExplorerState {
 
 const key = normalizePath;
 const requests = new Map<string, number>();
+let lastRequest = 0;
 let revealRequest = 0;
 
 const keepOutside = <T>(record: Record<string, T>, root: string) =>
@@ -40,7 +41,7 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
 
   load: async (dir) => {
     const k = key(dir);
-    const request = (requests.get(k) ?? 0) + 1;
+    const request = ++lastRequest;
     requests.set(k, request);
     if (!get().children[k]) set((s) => ({ loading: { ...s.loading, [k]: true } }));
     const result = await api.listDir(dir).then(
@@ -118,12 +119,15 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
     for (const [k, path] of Object.entries(paths)) if (isWithin(k, root)) void get().load(path);
   },
 
-  forget: (root) =>
+  forget: (root) => {
+    for (const k of requests.keys()) if (isWithin(k, root)) requests.delete(k);
     set((s) => ({
       children: keepOutside(s.children, root),
       paths: keepOutside(s.paths, root),
       errors: keepOutside(s.errors, root),
       expanded: keepOutside(s.expanded, root),
+      loading: keepOutside(s.loading, root),
       selected: s.selected && isWithin(s.selected, root) ? null : s.selected,
-    })),
+    }));
+  },
 }));
