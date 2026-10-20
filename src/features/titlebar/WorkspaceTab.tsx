@@ -142,7 +142,7 @@ const TabBody = ({ workspace, isActive }: TabBodyProps) => {
         onSelect={() => useWorkspaceStore.getState().activate(workspace.id)}
         onClose={() => void closeWorkspaces([workspace.id])}
         closeLabel={`Close ${workspace.title}`}
-        title={`${workspace.title} — ${workspace.cwd}`}
+        title={`${workspace.title} · ${workspace.cwd}`}
         draggable
         onDragStart={(e) => e.dataTransfer.setData(TAB_DRAG_TYPE, workspace.id)}
         onDragOver={(e) => {

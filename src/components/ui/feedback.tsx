@@ -36,7 +36,7 @@ const toneClass: Record<DotTone, string> = {
 const TONE_LABEL: Record<DotTone, string> = {
   running: "Running in Deck",
   busy: "Working",
-  attention: "Finished — needs your attention",
+  attention: "Finished, needs your attention",
   external: "Open in another terminal",
   exited: "Process exited",
   error: "Failed to start",
