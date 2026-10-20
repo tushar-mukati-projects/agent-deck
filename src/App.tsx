@@ -10,7 +10,8 @@ import { ConfirmDialog } from "@/features/settings/ConfirmDialog";
 import { SettingsDialog } from "@/features/settings/SettingsDialog";
 import { ShortcutsDialog } from "@/features/shortcuts/ShortcutsDialog";
 import { RenameDialog } from "@/features/sidebar/RenameDialog";
-import { ContextPanel, SessionsSidebar } from "@/features/sidebar/Sidebar";
+import { SessionsPanel } from "@/features/sidebar/SessionsPanel";
+import { ContextPanel } from "@/features/sidebar/Sidebar";
 import { StatusBar } from "@/features/statusbar/StatusBar";
 import { TitleBar } from "@/features/titlebar/TitleBar";
 import { Welcome } from "@/features/welcome/Welcome";
@@ -113,7 +114,9 @@ export const App = () => {
             onResize={sessions.onResize}
           >
             <ErrorBoundary>
-              <SessionsSidebar />
+              <aside className="h-full min-h-0 border-r border-border bg-panel">
+                <SessionsPanel />
+              </aside>
             </ErrorBoundary>
           </Panel>
           <ResizeHandle orientation="horizontal" />

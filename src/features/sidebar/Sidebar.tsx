@@ -6,7 +6,6 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { ChangesPanel } from "@/features/changes/ChangesPanel";
 import { AgentConfigPanel } from "@/features/agent-config/AgentConfigPanel";
 import { ExplorerPanel } from "@/features/explorer/ExplorerPanel";
-import { SessionsPanel } from "@/features/sidebar/SessionsPanel";
 import { shortcutLabel, type ShortcutAction } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
 import { agentName } from "@/stores/agents";
@@ -20,17 +19,11 @@ const TABS: { view: ContextView; label: string; icon: typeof Files; shortcut: Sh
   { view: "agent", label: "Agent", icon: BrainCircuit, shortcut: "showAgentConfig" },
 ];
 
-const PANELS: Record<ContextView, { render: () => React.ReactNode; keepMounted?: boolean }> = {
-  explorer: { render: () => <ExplorerPanel />, keepMounted: true },
-  changes: { render: () => <ChangesPanel /> },
-  agent: { render: () => <AgentConfigPanel /> },
+const PANELS: Record<ContextView, { Panel: React.ComponentType; keepMounted?: boolean }> = {
+  explorer: { Panel: ExplorerPanel, keepMounted: true },
+  changes: { Panel: ChangesPanel },
+  agent: { Panel: AgentConfigPanel },
 };
-
-export const SessionsSidebar = () => (
-  <aside className="h-full min-h-0 border-r border-border bg-panel">
-    <SessionsPanel />
-  </aside>
-);
 
 export const ContextPanel = () => {
   const view = useUiStore((s) => s.contextView);
@@ -78,8 +71,8 @@ export const ContextPanel = () => {
       </div>
       <div className="min-h-0 flex-1">
         {TABS.map(({ view: tab }) => {
-          const panel = PANELS[tab];
-          if (view !== tab && !panel.keepMounted) return null;
+          const { Panel, keepMounted } = PANELS[tab];
+          if (view !== tab && !keepMounted) return null;
           return (
             <div
               key={tab}
@@ -89,7 +82,7 @@ export const ContextPanel = () => {
               hidden={view !== tab}
               className="h-full"
             >
-              {panel.render()}
+              <Panel />
             </div>
           );
         })}

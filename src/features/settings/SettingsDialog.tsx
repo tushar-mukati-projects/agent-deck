@@ -377,42 +377,42 @@ const SECTIONS: {
   label: string;
   description: string;
   icon: React.ReactNode;
-  render: () => React.ReactNode;
+  Section: React.ComponentType;
 }[] = [
   {
     id: "appearance",
     label: "Appearance",
     description: "Theme and colors.",
     icon: <Palette />,
-    render: () => <AppearanceSection />,
+    Section: AppearanceSection,
   },
   {
     id: "agents",
     label: "Agents",
     description: "Which agent starts new sessions, and the flags each one gets.",
     icon: <Bot />,
-    render: () => <AgentsSection />,
+    Section: AgentsSection,
   },
   {
     id: "sessions",
     label: "Sessions",
     description: "How the sessions list behaves and which sessions it includes.",
     icon: <MessagesSquare />,
-    render: () => <SessionsSection />,
+    Section: SessionsSection,
   },
   {
     id: "terminal",
     label: "Terminal",
     description: "Shells and terminal text.",
     icon: <SquareTerminal />,
-    render: () => <TerminalSection />,
+    Section: TerminalSection,
   },
   {
     id: "notifications",
     label: "Notifications",
     description: "How Deck tells you an agent is done.",
     icon: <Bell />,
-    render: () => <NotificationsSection />,
+    Section: NotificationsSection,
   },
 ];
 
@@ -464,7 +464,7 @@ export const SettingsDialog = () => {
             <p className="mt-0.5 text-[12px] text-faint">{section.description}</p>
           </header>
           <div className="min-h-0 flex-1 divide-y divide-border overflow-y-auto px-6 py-3">
-            {section.render()}
+            <section.Section />
           </div>
           <footer className="flex shrink-0 justify-end border-t border-border px-6 py-3">
             <Button variant="primary" onClick={() => setOpen(false)}>
