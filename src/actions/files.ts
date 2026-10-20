@@ -15,8 +15,8 @@ import { dirtyPaths, useViewerStore } from "@/stores/viewer-store";
 import { findWorkspace, useWorkspaceStore } from "@/stores/workspace-store";
 import type { FileContent, Workspace } from "@/types";
 
-type TextContent = Extract<FileContent, { kind: "text" }>;
-type Reload = (quiet?: boolean) => Promise<void>;
+export type TextContent = Extract<FileContent, { kind: "text" }>;
+export type Reload = (quiet?: boolean) => Promise<void>;
 
 const saving = new Set<string>();
 
