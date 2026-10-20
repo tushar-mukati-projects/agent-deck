@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Database, FileText, Plug, Wrench } from "lucide-react";
+import { Database, FileText, Plug, RefreshCw, Wrench } from "lucide-react";
 
 import { ErrorAlert } from "@/components/ui/error-alert";
 import { EmptyState, LoadingState } from "@/components/ui/feedback";
@@ -94,7 +94,12 @@ export const McpView = ({ workspace, serverId }: { workspace: Workspace; serverI
   if (!overview)
     return error ? (
       <div className="p-4">
-        <ErrorAlert message={error} retrying={loading} onRetry={() => void reload()} />
+        <ErrorAlert
+          message={error}
+          retryIcon={<RefreshCw />}
+          retrying={loading}
+          onRetry={() => void reload()}
+        />
       </div>
     ) : (
       <LoadingState className="flex-1" />
