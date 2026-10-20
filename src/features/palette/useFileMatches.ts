@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useAsync } from "@/hooks/useAsync";
 import { subscribeFileChanges, watchedSince } from "@/lib/file-events";
 import { pathKey } from "@/lib/fuzzy";
-import { topFiles, type PreparedFile } from "@/lib/palette";
+import { foldersOf, topFiles, type PreparedFile } from "@/lib/palette";
 import { api } from "@/lib/tauri/commands";
 import { failedTo, normalizePath } from "@/lib/utils";
 
@@ -28,7 +28,11 @@ export const useFileMatches = (
 ) => {
   const { files, error } = useFileList(root, wanted);
   const prepared = useMemo(
-    () => files?.map((rel) => ({ rel, key: pathKey(rel) })) ?? null,
+    () =>
+      files && [
+        ...files.map((rel) => prepare(rel, false)),
+        ...foldersOf(files).map((rel) => prepare(rel, true)),
+      ],
     [files],
   );
   const narrowing = useRef<FileNarrowing | null>(null);
@@ -42,6 +46,8 @@ export const useFileMatches = (
   }, [wanted, prepared, query, limit]);
   return { matches, listed: files !== null, error };
 };
+
+const prepare = (rel: string, isDir: boolean): PreparedFile => ({ rel, key: pathKey(rel), isDir });
 
 const listFiles = async (root: string) => {
   const key = normalizePath(root);

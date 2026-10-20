@@ -6,10 +6,12 @@ export const MIN_CHAT_QUERY_CHARS = 2;
 export type PreparedFile = {
   rel: string;
   key: PathKey;
+  isDir: boolean;
 };
 
 export type ScoredFile = {
   rel: string;
+  isDir: boolean;
   score: number;
 };
 
@@ -25,9 +27,20 @@ export type EmptyHintState = {
 export const sortTop = <T extends { score: number }>(list: T[], limit: number) =>
   list.sort((a, b) => b.score - a.score).slice(0, limit);
 
+export const foldersOf = (files: string[]) => {
+  const folders = new Set<string>();
+  for (const rel of files)
+    for (let index = 1; index < rel.length; index++)
+      if (rel[index] === "\\" || rel[index] === "/") folders.add(rel.slice(0, index));
+  return [...folders];
+};
+
 export const topFiles = (files: PreparedFile[], query: string, limit: number) => {
   if (!query)
-    return { top: files.slice(0, limit).map(({ rel }) => ({ rel, score: 0 })), matched: files };
+    return {
+      top: files.slice(0, limit).map(({ rel, isDir }) => ({ rel, isDir, score: 0 })),
+      matched: files,
+    };
   const scoreOf = fuzzyPathKeyScorer(query);
   const top: ScoredFile[] = [];
   const matched: PreparedFile[] = [];
@@ -35,8 +48,9 @@ export const topFiles = (files: PreparedFile[], query: string, limit: number) =>
     const score = scoreOf(file.key);
     if (score === null) continue;
     matched.push(file);
-    if (top.length < limit) top.push({ rel: file.rel, score });
-    else if (score > top[top.length - 1].score) top[top.length - 1] = { rel: file.rel, score };
+    const scored = { rel: file.rel, isDir: file.isDir, score };
+    if (top.length < limit) top.push(scored);
+    else if (score > top[top.length - 1].score) top[top.length - 1] = scored;
     else continue;
     top.sort((a, b) => b.score - a.score);
   }

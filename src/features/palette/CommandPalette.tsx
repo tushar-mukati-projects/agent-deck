@@ -12,7 +12,7 @@ import type { PaletteItem } from "@/features/palette/items";
 
 const placeholders: Record<PaletteMode, string> = {
   all: "Search sessions, open tabs, files…   (type > for actions)",
-  files: "Go to file…",
+  files: "Go to file or folder…",
   chats: "Search inside every conversation…",
 };
 

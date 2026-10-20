@@ -61,7 +61,7 @@ export const ExplorerPanel = () => {
     <div className="flex h-full min-h-0 flex-col">
       <PanelHeader title={basename(root)}>
         <IconButton
-          label="Find file"
+          label="Find file or folder"
           shortcut={shortcutLabel("quickOpen")}
           onClick={() => useUiStore.getState().openPalette("files")}
         >

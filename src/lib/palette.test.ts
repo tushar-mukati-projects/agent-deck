@@ -1,9 +1,25 @@
 import { describe, expect, it } from "vitest";
 
 import { pathKey } from "@/lib/fuzzy";
-import { emptyHint, sortTop, topFiles, type EmptyHintState } from "@/lib/palette";
+import { emptyHint, foldersOf, sortTop, topFiles, type EmptyHintState } from "@/lib/palette";
 
-const prepare = (rels: string[]) => rels.map((rel) => ({ rel, key: pathKey(rel) }));
+const prepare = (rels: string[], isDir = false) =>
+  rels.map((rel) => ({ rel, key: pathKey(rel), isDir }));
+
+describe("foldersOf", () => {
+  it("lists every folder above the files once, keeping their separators", () => {
+    expect(foldersOf(["src\\lib\\a.ts", "src\\b.ts", "docs/guide/c.md", "README.md"])).toEqual([
+      "src",
+      "src\\lib",
+      "docs",
+      "docs/guide",
+    ]);
+  });
+
+  it("lists nothing for top-level files", () => {
+    expect(foldersOf(["README.md", "package.json"])).toEqual([]);
+  });
+});
 
 describe("topFiles", () => {
   const files = prepare(["src/app.ts", "src/main.ts", "README.md", "src/lib/palette.ts"]);
@@ -11,8 +27,8 @@ describe("topFiles", () => {
   it("keeps the listing order and every file without a query", () => {
     const { top, matched } = topFiles(files, "", 2);
     expect(top).toEqual([
-      { rel: "src/app.ts", score: 0 },
-      { rel: "src/main.ts", score: 0 },
+      { rel: "src/app.ts", isDir: false, score: 0 },
+      { rel: "src/main.ts", isDir: false, score: 0 },
     ]);
     expect(matched).toBe(files);
   });
@@ -26,6 +42,11 @@ describe("topFiles", () => {
       "src/main.ts",
       "src/lib/palette.ts",
     ]);
+  });
+
+  it("ranks folders with the files and keeps which is which", () => {
+    const { top } = topFiles([...files, ...prepare(["src/lib"], true)], "lib", 1);
+    expect(top).toEqual([{ rel: "src/lib", isDir: true, score: expect.any(Number) }]);
   });
 
   it("matches nothing for an unknown query", () => {

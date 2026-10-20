@@ -23,6 +23,7 @@ import { basename, DOCKERFILE_NAME, extension } from "@/lib/utils";
 
 type FileIconProps = {
   path: string;
+  isDir?: boolean;
   className?: string;
 };
 
@@ -114,7 +115,7 @@ export const folderIcon = (name: string, open: boolean): IconSpec => {
   };
 };
 
-export const FileIcon = ({ path, className }: FileIconProps) => {
-  const { icon: Icon, color } = fileIcon(path);
+export const FileIcon = ({ path, isDir, className }: FileIconProps) => {
+  const { icon: Icon, color } = isDir ? folderIcon(basename(path), false) : fileIcon(path);
   return <Icon className={`${color} ${className ?? "size-3.5 shrink-0"}`} />;
 };

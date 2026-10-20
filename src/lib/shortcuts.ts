@@ -54,7 +54,7 @@ export const SHORTCUTS: Shortcut[] = [
     key: "p",
     ctrl: true,
     label: "Ctrl P",
-    description: "Go to file",
+    description: "Go to file or folder",
     group: "General",
     passToShell: true,
   },

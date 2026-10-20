@@ -26,7 +26,7 @@ You need Windows 10 or 11 (x64) and Claude Code or Codex on your PATH. WSL sessi
 | Action | Keys |
 |---|---|
 | Command palette | `Ctrl+Shift+P` |
-| Go to file | `Ctrl+P` |
+| Go to file or folder | `Ctrl+P` |
 | Search inside conversations | `Ctrl+Shift+F` |
 | New session in this folder | `Ctrl+Shift+N` |
 | Next / previous tab | `Ctrl+Tab` / `Ctrl+Shift+Tab` |

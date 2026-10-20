@@ -49,15 +49,20 @@ export const commandItems = (commands: CommandDef[], query: string): PaletteItem
 
 export const fileItems = (workspace: Workspace | null, matches: ScoredFile[]): PaletteItem[] => {
   if (!workspace) return [];
-  return matches.map(({ rel, score }) => ({
-    id: `file:${rel}`,
-    group: "Files",
-    title: basename(rel),
-    subtitle: rel,
-    icon: <FileIcon path={rel} />,
-    score,
-    run: () => useWorkspaceStore.getState().openFile(workspace.id, joinPath(workspace.cwd, rel)),
-  }));
+  return matches.map(({ rel, isDir, score }) => {
+    const path = joinPath(workspace.cwd, rel);
+    return {
+      id: `${isDir ? "folder" : "file"}:${rel}`,
+      group: "Files and folders",
+      title: basename(rel),
+      subtitle: rel,
+      icon: <FileIcon path={rel} isDir={isDir} />,
+      score,
+      run: isDir
+        ? () => void openTypedPath(workspace, path)
+        : () => useWorkspaceStore.getState().openFile(workspace.id, path),
+    };
+  });
 };
 
 export const chatItems = (hits: SearchHit[], byId: Record<string, SessionInfo>): PaletteItem[] =>
