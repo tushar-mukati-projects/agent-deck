@@ -23,7 +23,11 @@ import {
 } from "@/lib/terminal/registry";
 import { newId, samePath } from "@/lib/utils";
 import { parseWslPath } from "@/lib/wsl";
-import { blankWorkspace, workspaceFromSession } from "@/stores/workspace-factory";
+import {
+  blankWorkspace,
+  workspaceFromSession,
+  workspaceTerminalIds,
+} from "@/stores/workspace-factory";
 import { restoredWorkspace, restoreSaved } from "@/stores/workspace-persist";
 import type { AgentId, SessionInfo, ShellTab, Workspace } from "@/types";
 
@@ -208,8 +212,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             ].slice(0, RECENTLY_CLOSED_LIMIT),
           }));
           if (closingActive && neighbor) focusAgent(neighbor);
-          const terminalIds = [workspace.agentTerminalId, ...workspace.shells.map((s) => s.id)];
-          await Promise.all(terminalIds.filter((id): id is string => !!id).map(disposeTerminal));
+          await Promise.all(workspaceTerminalIds(workspace).map(disposeTerminal));
         },
 
         activate: (workspaceId) => {
@@ -374,9 +377,4 @@ export const useActiveWorkspace = () =>
   useWorkspaceStore((s) => s.workspaces.find((w) => w.id === s.activeId) ?? null);
 
 export const referencedTerminalIds = () =>
-  new Set(
-    useWorkspaceStore
-      .getState()
-      .workspaces.flatMap((w) => [w.agentTerminalId, ...w.shells.map((s) => s.id)])
-      .filter((id): id is string => !!id),
-  );
+  new Set(useWorkspaceStore.getState().workspaces.flatMap(workspaceTerminalIds));

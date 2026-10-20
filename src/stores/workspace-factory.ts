@@ -18,6 +18,11 @@ export const blankWorkspace = (seed: WorkspaceSeed): Workspace => ({
   activeFile: null,
 });
 
+export const workspaceTerminalIds = (workspace: Workspace) =>
+  [workspace.agentTerminalId, ...workspace.shells.map((s) => s.id)].filter(
+    (id): id is string => !!id,
+  );
+
 export const workspaceFromSession = (session: SessionInfo) =>
   blankWorkspace({
     id: session.id,

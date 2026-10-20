@@ -1,27 +1,18 @@
 import { toast } from "sonner";
 
 import { SUBAGENT_NAME } from "@/lib/agents/registry";
-import { externalLive } from "@/lib/sessions";
+import { openElsewhere } from "@/lib/sessions";
 import { api } from "@/lib/tauri/commands";
 import { pickFolder } from "@/lib/tauri/system";
 import { errorMessage, plural } from "@/lib/utils";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore } from "@/stores/settings-store";
-import { isTerminalAlive, useTerminalStore } from "@/stores/terminal-store";
+import { isTerminalAlive, terminalPids } from "@/stores/terminal-store";
 import { useUiStore } from "@/stores/ui-store";
 import { useViewerStore } from "@/stores/viewer-store";
 import { workspaceFromSession } from "@/stores/workspace-factory";
 import { findWorkspace, findWorkspaceBySession, useWorkspaceStore } from "@/stores/workspace-store";
 import type { AgentId, LiveSession, SessionInfo } from "@/types";
-
-const openElsewhere = (sessionId: string) => {
-  const ownPids = Object.values(useTerminalStore.getState().terminals).map((t) => t.pid);
-  return (
-    externalLive(useSessionsStore.getState().live, ownPids).find(
-      (l) => l.sessionId === sessionId,
-    ) ?? null
-  );
-};
 
 const confirmTakeOver = (live: LiveSession) =>
   useUiStore.getState().askConfirm({
@@ -43,7 +34,7 @@ const closeElsewhere = async (live: LiveSession) => {
 };
 
 const claimSession = async (sessionId: string, takeOver = false) => {
-  const live = openElsewhere(sessionId);
+  const live = openElsewhere(useSessionsStore.getState().live, terminalPids(), sessionId);
   if (!live) return true;
   if (!takeOver && !(await confirmTakeOver(live))) return false;
   return closeElsewhere(live);

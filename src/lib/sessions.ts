@@ -5,6 +5,12 @@ export const externalLive = (live: LiveSession[], ownPids: (number | null)[]) =>
   return live.filter((entry) => !own.has(entry.pid));
 };
 
+export const openElsewhere = (
+  live: LiveSession[],
+  ownPids: (number | null)[],
+  sessionId: string,
+) => externalLive(live, ownPids).find((l) => l.sessionId === sessionId) ?? null;
+
 export const mergeSessions = (windows: SessionInfo[], wsl: SessionInfo[]) => {
   const wslIds = new Set(wsl.map((s) => s.id));
   return [...wsl, ...windows.filter((s) => !wslIds.has(s.id))].sort(

@@ -2,26 +2,25 @@ import { useEffect, useMemo } from "react";
 
 import { showError } from "@/components/ui/feedback";
 import { useSessionFile } from "@/hooks/useSessionFile";
-import { useExternalLive } from "@/hooks/useWorkspaceStatus";
-import { processStart, runningSubagents, shownTasks } from "@/lib/agent-tasks";
+import { useOwnPids } from "@/hooks/useWorkspaceStatus";
+import { agentShells, agentStartedMs, runningSubagents } from "@/lib/agent-tasks";
 import { CLAUDE } from "@/lib/agents/registry";
 import { api } from "@/lib/tauri/commands";
 import { useAgentTasksStore } from "@/stores/agent-tasks-store";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore } from "@/stores/settings-store";
-import { useTerminalStore } from "@/stores/terminal-store";
+import { isAgentRunning, useTerminalStore } from "@/stores/terminal-store";
 import type { Workspace } from "@/types";
 
 export const useAgentStart = (workspace: Workspace) => {
-  const running = useTerminalStore((s) => {
-    const status = workspace.agentTerminalId
-      ? s.terminals[workspace.agentTerminalId]?.status
-      : null;
-    return workspace.mode === "live" && (status === "running" || status === "starting");
-  });
-  const external = !!useExternalLive(workspace.sessionId);
-  const started = useSessionsStore((s) => processStart(s.live, workspace.sessionId));
-  return running || external ? started : null;
+  const running = useTerminalStore((s) => isAgentRunning(workspace, s.terminals));
+  const live = useSessionsStore((s) => s.live);
+  const pids = useOwnPids();
+  const { sessionId } = workspace;
+  return useMemo(
+    () => agentStartedMs(live, pids, sessionId, running),
+    [live, pids, sessionId, running],
+  );
 };
 
 export const useAgentShells = (workspace: Workspace) => {
@@ -29,7 +28,7 @@ export const useAgentShells = (workspace: Workspace) => {
   const hidden = useSettingsStore((s) => s.hideMode);
   const started = useAgentStart(workspace);
   return useMemo(
-    () => (hidden ? [] : shownTasks(tasks ?? [], started, Date.now())),
+    () => agentShells(tasks, started, hidden, Date.now()),
     [tasks, started, hidden],
   );
 };

@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 
 import type { DotTone } from "@/components/ui/feedback";
-import { externalLive } from "@/lib/sessions";
+import { openElsewhere } from "@/lib/sessions";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useTerminalStore } from "@/stores/terminal-store";
 import type { TerminalState, Workspace } from "@/types";
@@ -26,7 +26,7 @@ export const useExternalLive = (sessionId: string | null | undefined) => {
   const live = useSessionsStore((s) => s.live);
   const pids = useOwnPids();
   return useMemo(
-    () => (sessionId ? externalLive(live, pids).find((l) => l.sessionId === sessionId) : undefined),
+    () => (sessionId ? openElsewhere(live, pids, sessionId) : null),
     [live, pids, sessionId],
   );
 };

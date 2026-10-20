@@ -9,7 +9,7 @@ import { revealInExplorer } from "@/lib/tauri/system";
 import { basename, isWithin, relativePath } from "@/lib/utils";
 import { useExplorerStore } from "@/stores/explorer-store";
 import { useSessionsStore } from "@/stores/sessions-store";
-import { isTerminalAlive } from "@/stores/terminal-store";
+import { isAgentRunning } from "@/stores/terminal-store";
 import { useUiStore } from "@/stores/ui-store";
 import { dirtyPaths, useViewerStore } from "@/stores/viewer-store";
 import { findWorkspace, useWorkspaceStore } from "@/stores/workspace-store";
@@ -21,9 +21,7 @@ export const mentionText = (path: string, root: string) => {
 };
 
 const liveAgentTerminal = (workspace: Workspace) =>
-  workspace.mode === "live" && isTerminalAlive(workspace.agentTerminalId)
-    ? workspace.agentTerminalId
-    : null;
+  isAgentRunning(workspace) ? workspace.agentTerminalId : null;
 
 export const canMention = (workspace: Workspace) => !!liveAgentTerminal(workspace);
 

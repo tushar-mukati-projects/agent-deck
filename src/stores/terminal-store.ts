@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 import { omitKey } from "@/lib/utils";
-import type { TerminalState } from "@/types";
+import type { TerminalState, Workspace } from "@/types";
 
 interface TerminalStore {
   terminals: Record<string, TerminalState>;
@@ -10,7 +10,7 @@ interface TerminalStore {
   remove: (id: string) => void;
 }
 
-const isAlive = (terminal: TerminalState | undefined) =>
+export const isAlive = (terminal: TerminalState | undefined) =>
   terminal?.status === "running" || terminal?.status === "starting";
 
 export const useTerminalStore = create<TerminalStore>((set) => ({
@@ -32,3 +32,14 @@ export const isTerminalAlive = (id: string | null | undefined) =>
   !!id && isAlive(useTerminalStore.getState().terminals[id]);
 
 export const aliveTerminals = (ids: (string | null)[]) => ids.filter(isTerminalAlive).length;
+
+export const isAgentRunning = (
+  workspace: Workspace,
+  terminals = useTerminalStore.getState().terminals,
+) =>
+  workspace.mode === "live" &&
+  !!workspace.agentTerminalId &&
+  isAlive(terminals[workspace.agentTerminalId]);
+
+export const terminalPids = () =>
+  Object.values(useTerminalStore.getState().terminals).map((t) => t.pid);

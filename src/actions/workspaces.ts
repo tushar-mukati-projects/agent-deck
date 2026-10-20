@@ -1,15 +1,21 @@
 import { toast } from "sonner";
 
-import { processStart, shownTasks } from "@/lib/agent-tasks";
+import { agentShells, agentStartedMs } from "@/lib/agent-tasks";
 import { appName } from "@/lib/hide-mode";
 import { plural, samePath } from "@/lib/utils";
 import { useAgentTasksStore } from "@/stores/agent-tasks-store";
 import { useExplorerStore } from "@/stores/explorer-store";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore } from "@/stores/settings-store";
-import { aliveTerminals, isTerminalAlive, useTerminalStore } from "@/stores/terminal-store";
+import {
+  aliveTerminals,
+  isAgentRunning,
+  terminalPids,
+  useTerminalStore,
+} from "@/stores/terminal-store";
 import { useUiStore } from "@/stores/ui-store";
 import { dirtyPaths, useViewerStore } from "@/stores/viewer-store";
+import { workspaceTerminalIds } from "@/stores/workspace-factory";
 import { getActiveWorkspace, useWorkspaceStore } from "@/stores/workspace-store";
 import type { Workspace } from "@/types";
 
@@ -88,7 +94,7 @@ export const closeIdleWorkspaces = () =>
   closeWorkspaces(
     useWorkspaceStore
       .getState()
-      .workspaces.filter((w) => !aliveTerminals([w.agentTerminalId, ...w.shells.map((s) => s.id)]))
+      .workspaces.filter((w) => !aliveTerminals(workspaceTerminalIds(w)))
       .map((w) => w.id),
   );
 
@@ -120,23 +126,19 @@ export const focusNextAttention = () => {
   else toast("No sessions are waiting for you");
 };
 
-const agentShellsNow = (workspace: Workspace) => {
-  if (useSettingsStore.getState().hideMode) return [];
-  const { live } = useSessionsStore.getState();
-  const alive =
-    (workspace.mode === "live" && isTerminalAlive(workspace.agentTerminalId)) ||
-    live.some((l) => l.sessionId === workspace.sessionId);
-  return shownTasks(
-    useAgentTasksStore.getState().bySession[workspace.sessionId] ?? [],
-    alive ? processStart(live, workspace.sessionId) : null,
-    Date.now(),
-  );
-};
-
 export const toggleShellPanel = () => {
   const workspace = getActiveWorkspace();
   if (!workspace) return;
-  const open = !workspace.shellPanelOpen;
-  const spawn = agentShellsNow(workspace).length === 0;
-  useWorkspaceStore.getState().setShellPanel(workspace.id, open, spawn);
+  const { sessionId } = workspace;
+  const { live } = useSessionsStore.getState();
+  const started = agentStartedMs(live, terminalPids(), sessionId, isAgentRunning(workspace));
+  const shells = agentShells(
+    useAgentTasksStore.getState().bySession[sessionId],
+    started,
+    useSettingsStore.getState().hideMode,
+    Date.now(),
+  );
+  useWorkspaceStore
+    .getState()
+    .setShellPanel(workspace.id, !workspace.shellPanelOpen, shells.length === 0);
 };

@@ -1,3 +1,4 @@
+import { openElsewhere } from "@/lib/sessions";
 import type { AgentTask, AgentTaskStatus, LiveSession, Subagent } from "@/types";
 
 export type TaskState = AgentTaskStatus | "ended";
@@ -11,6 +12,14 @@ const time = (value: string | null) => Date.parse(value ?? "");
 
 export const processStart = (live: LiveSession[], sessionId: string) =>
   Math.max(0, ...live.filter((l) => l.sessionId === sessionId).map((l) => l.startedAt ?? 0));
+
+export const agentStartedMs = (
+  live: LiveSession[],
+  ownPids: (number | null)[],
+  sessionId: string,
+  runningHere: boolean,
+) =>
+  runningHere || openElsewhere(live, ownPids, sessionId) ? processStart(live, sessionId) : null;
 
 const fromThisRun = (task: { startedAt: string | null }, agentStartedMs: number) =>
   !(time(task.startedAt) < agentStartedMs - START_SLACK_MS);
@@ -29,6 +38,13 @@ export const shownTasks = (tasks: AgentTask[], agentStartedMs: number | null, no
     .slice(0, MAX_FINISHED);
   return [...running, ...finished];
 };
+
+export const agentShells = (
+  tasks: AgentTask[] | undefined,
+  agentStartedMs: number | null,
+  hidden: boolean,
+  now: number,
+) => (hidden ? [] : shownTasks(tasks ?? [], agentStartedMs, now));
 
 export const taskLabel = (task: AgentTask) => task.description?.trim() || task.command;
 
