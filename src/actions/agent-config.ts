@@ -11,7 +11,7 @@ import type { ConfigAgent, Workspace } from "@/types";
 const closeTabs = (workspaceId: string, target: string) => {
   const { closeFile } = useWorkspaceStore.getState();
   for (const file of findWorkspace(workspaceId)?.openFiles ?? []) {
-    if (file === target || isWithin(file, target)) closeFile(workspaceId, file);
+    if (isWithin(file, target)) closeFile(workspaceId, file);
   }
 };
 
