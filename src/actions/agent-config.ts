@@ -1,11 +1,11 @@
 import { toast } from "sonner";
 
-import type { RemovalRequest } from "@/lib/agent-config/removals";
 import { api } from "@/lib/tauri/commands";
 import { failedTo, isWithin } from "@/lib/utils";
 import { refreshOverview } from "@/stores/overview-store";
 import { useUiStore } from "@/stores/ui-store";
 import { findWorkspace, useWorkspaceStore } from "@/stores/workspace-store";
+import type { RemovalRequest } from "@/lib/agent-config/removals";
 import type { ConfigAgent, Workspace } from "@/types";
 
 const closeTabs = (workspaceId: string, target: string) => {
