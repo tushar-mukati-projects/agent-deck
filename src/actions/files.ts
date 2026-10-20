@@ -1,12 +1,12 @@
 import { toast } from "sonner";
 
 import { showError } from "@/components/ui/feedback";
-import { agentName } from "@/lib/agents/registry";
 import { candidatePaths, type PathLinkTarget } from "@/lib/terminal/links";
 import { pasteIntoTerminal } from "@/lib/terminal/registry";
 import { api } from "@/lib/tauri/commands";
 import { revealInExplorer } from "@/lib/tauri/system";
 import { basename, isWithin, relativePath } from "@/lib/utils";
+import { agentName } from "@/stores/agents";
 import { useExplorerStore } from "@/stores/explorer-store";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { isAgentRunning } from "@/stores/terminal-store";

@@ -8,9 +8,10 @@ import {
   isPersisted,
   planLaunch,
   shellSpec,
+  type LaunchEnvironment,
   type LaunchPlan,
 } from "@/lib/agents/launch";
-import { agentName, CLAUDE, findAgent, getAgent } from "@/lib/agents/registry";
+import { CLAUDE } from "@/lib/agents/registry";
 import {
   disposeTerminal,
   hasTerminal,
@@ -22,6 +23,7 @@ import {
 } from "@/lib/terminal/registry";
 import { neighborAt, newId } from "@/lib/utils";
 import { parseWslPath } from "@/lib/wsl";
+import { agentName, findAgent, getAgent, launchEnvironment } from "@/stores/agents";
 import {
   blankWorkspace,
   closeFileFields,
@@ -82,7 +84,7 @@ const withAgent = (workspace: Workspace, plan: LaunchPlan) => {
     mode: "live" as const,
     agentTerminalId: newId(),
   };
-  startTerminal(agentSpec(next), { focus: true });
+  startTerminal(agentSpec(next, launchEnvironment()), { focus: true });
   return next;
 };
 
@@ -102,11 +104,11 @@ const newSessionTitle = (agent: AgentId, subagent?: string) => {
   return agent === CLAUDE ? "New session" : `New ${agentName(agent)} session`;
 };
 
-const terminalSpecs = (workspace: Workspace): TerminalSpec[] => [
+const terminalSpecs = (workspace: Workspace, launch: LaunchEnvironment): TerminalSpec[] => [
   ...(workspace.agentTerminalId
-    ? [agentSpec({ ...workspace, agentTerminalId: workspace.agentTerminalId })]
+    ? [agentSpec({ ...workspace, agentTerminalId: workspace.agentTerminalId }, launch)]
     : []),
-  ...workspace.shells.map((shell) => shellSpec(workspace.id, shell)),
+  ...workspace.shells.map((shell) => shellSpec(workspace.id, shell, launch)),
 ];
 
 export const useWorkspaceStore = create<WorkspaceState>()(
@@ -145,7 +147,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             get().activate(workspaceId);
             return;
           }
-          const next = withAgent(workspace, planLaunch(workspace));
+          const next = withAgent(workspace, planLaunch(workspace, launchEnvironment()));
           set((s) => ({
             workspaces: s.workspaces.map((w) => (w.id === workspaceId ? next : w)),
             activeId: workspaceId,
@@ -158,11 +160,12 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             toast.error(`${agentName(source.agent)} sessions can't be forked.`);
             return;
           }
-          if (!isPersisted(source)) {
+          const launch = launchEnvironment();
+          if (!isPersisted(source, launch.sessions)) {
             toast.error("Nothing to fork yet — send a prompt in this session first.");
             return;
           }
-          const plan = planLaunch(source, { fork: true });
+          const plan = planLaunch(source, launch, { fork: true });
           const base = blankWorkspace({
             id: newId(),
             sessionId: plan.sessionId,
@@ -185,19 +188,20 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             filePath: null,
             agent,
           });
-          add(withAgent(base, planLaunch(base, { subagent })));
+          add(withAgent(base, planLaunch(base, launchEnvironment(), { subagent })));
         },
 
         restartAgent: (workspaceId, focus = true) => {
           const workspace = find(workspaceId);
           const terminalId = workspace?.agentTerminalId;
           if (!workspace || !terminalId || !agentAvailable(workspace.agent)) return;
-          const fields = launchFields(planLaunch(workspace));
+          const launch = launchEnvironment();
+          const fields = launchFields(planLaunch(workspace, launch));
           patch(workspaceId, () => fields);
           if (focus) requestFocus(terminalId);
           void restartTerminal(
             terminalId,
-            agentSpec({ ...workspace, ...fields, agentTerminalId: terminalId }),
+            agentSpec({ ...workspace, ...fields, agentTerminalId: terminalId }, launch),
           );
         },
 
@@ -243,12 +247,13 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           const workspace = find(workspaceId);
           if (!workspace) return;
           const root = cwd ?? workspace.cwd;
+          const launch = launchEnvironment();
           const shell: ShellTab = {
             id: newId(),
             cwd: root,
-            program: parseWslPath(root) ? "wsl.exe" : defaultShellProgram(),
+            program: parseWslPath(root) ? "wsl.exe" : defaultShellProgram(launch),
           };
-          startTerminal(shellSpec(workspaceId, shell), { focus: true });
+          startTerminal(shellSpec(workspaceId, shell, launch), { focus: true });
           patch(workspaceId, (w) => ({
             shells: [...w.shells, shell],
             activeShellId: shell.id,
@@ -270,7 +275,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           const shell = find(workspaceId)?.shells.find((s) => s.id === shellId);
           if (!shell) return;
           requestFocus(shellId);
-          void restartTerminal(shellId, shellSpec(workspaceId, shell));
+          void restartTerminal(shellId, shellSpec(workspaceId, shell, launchEnvironment()));
         },
 
         setActiveShell: (workspaceId, shellId) => {
@@ -307,7 +312,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         restore: () => {
           const workspaces = get().workspaces.map((w) => restoredWorkspace(w, isPtyRunning));
           set({ workspaces });
-          for (const spec of workspaces.flatMap(terminalSpecs))
+          const launch = launchEnvironment();
+          for (const spec of workspaces.flatMap((w) => terminalSpecs(w, launch)))
             if (!hasTerminal(spec.id)) startTerminal(spec);
         },
       };

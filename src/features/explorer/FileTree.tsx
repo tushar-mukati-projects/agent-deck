@@ -11,7 +11,6 @@ import {
 
 import { canMention, mentionInAgent } from "@/actions/files";
 import { startNewSession } from "@/actions/sessions";
-import { agentName } from "@/lib/agents/registry";
 import { showError } from "@/components/ui/feedback";
 import {
   ContextMenu,
@@ -26,6 +25,7 @@ import { api } from "@/lib/tauri/commands";
 import { copyText, openExternal, revealInExplorer } from "@/lib/tauri/system";
 import { DECK_PATH_MIME } from "@/lib/terminal/input";
 import { cn, normalizePath, relativePath } from "@/lib/utils";
+import { agentName } from "@/stores/agents";
 import { useExplorerStore } from "@/stores/explorer-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";

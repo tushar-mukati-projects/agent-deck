@@ -32,10 +32,11 @@ import {
 } from "@/components/ui/menu";
 import { TimeAgo } from "@/components/ui/time-ago";
 import { resumeCommandLine } from "@/lib/agents/launch";
-import { CLAUDE, findAgent } from "@/lib/agents/registry";
+import { CLAUDE } from "@/lib/agents/registry";
 import { sessionTitle } from "@/lib/sessions";
 import { copyText, revealInExplorer } from "@/lib/tauri/system";
 import { cn } from "@/lib/utils";
+import { findAgent } from "@/stores/agents";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useUiStore } from "@/stores/ui-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
@@ -114,7 +115,10 @@ const SessionMenu = ({
         Copy session ID
       </ContextMenuItem>
       {agent.history && (
-        <ContextMenuItem icon={<Copy />} onSelect={() => void copyText(resumeCommandLine(session))}>
+        <ContextMenuItem
+          icon={<Copy />}
+          onSelect={() => void copyText(resumeCommandLine(session, useSettingsStore.getState()))}
+        >
           Copy resume command
         </ContextMenuItem>
       )}

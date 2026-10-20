@@ -6,7 +6,7 @@ import { IconButton } from "@/components/ui/icon-button";
 import { Chevron, CollapsibleSection, PanelHeader } from "@/components/ui/panel";
 import { useAsync, useThrottledCallback } from "@/hooks/useAsync";
 import { useSessionFile } from "@/hooks/useSessionFile";
-import { agentName, CLAUDE } from "@/lib/agents/registry";
+import { CLAUDE } from "@/lib/agents/registry";
 import { buildChangeTree, type ChangeFolder, type ChangeNode } from "@/lib/change-tree";
 import { encodeDiffTab } from "@/lib/diff-tabs";
 import { subscribeFileChanges } from "@/lib/file-events";
@@ -22,6 +22,7 @@ import {
   shortenHome,
   toggled,
 } from "@/lib/utils";
+import { agentName } from "@/stores/agents";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useActiveWorkspace, useWorkspaceStore } from "@/stores/workspace-store";
 import type { ChangedFile, ChangeStatus, GitChange, Workspace } from "@/types";

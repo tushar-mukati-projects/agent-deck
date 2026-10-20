@@ -1,12 +1,13 @@
-import { isPersisted, planLaunch } from "@/lib/agents/launch";
+import { isPersisted, planLaunch, type LaunchEnvironment } from "@/lib/agents/launch";
 import { CLAUDE } from "@/lib/agents/registry";
-import type { LiveSession, TerminalState, Workspace } from "@/types";
+import type { LiveSession, SessionInfo, TerminalState, Workspace } from "@/types";
 
 const TYPING_GRACE_MS = 5_000;
 
 export interface RestartContext {
   terminal: TerminalState | undefined;
   live: LiveSession[];
+  sessions: Record<string, SessionInfo>;
   input: { typedAt: number; hasDraft: boolean } | null;
   now: number;
 }
@@ -22,11 +23,11 @@ export const launchTheme = (args: string[]) => {
   }
 };
 
-export const themeOutdated = (workspace: Workspace) =>
+export const themeOutdated = (workspace: Workspace, launch: LaunchEnvironment) =>
   workspace.agent === CLAUDE &&
   workspace.mode === "live" &&
   !!workspace.agentTerminalId &&
-  launchTheme(workspace.agentArgs) !== launchTheme(planLaunch(workspace).args);
+  launchTheme(workspace.agentArgs) !== launchTheme(planLaunch(workspace, launch).args);
 
 const claudeIsIdle = (workspace: Workspace, terminal: TerminalState, live: LiveSession[]) => {
   const records = live.filter((l) => l.sessionId === workspace.sessionId);
@@ -37,11 +38,11 @@ const claudeIsIdle = (workspace: Workspace, terminal: TerminalState, live: LiveS
 
 export const readyToRestart = (
   workspace: Workspace,
-  { terminal, live, input, now }: RestartContext,
+  { terminal, live, sessions, input, now }: RestartContext,
 ) => {
   if (terminal?.status !== "running" || terminal.busy || !input) return false;
   if (input.hasDraft || now - input.typedAt < TYPING_GRACE_MS) return false;
-  const resumable = isPersisted(workspace);
+  const resumable = isPersisted(workspace, sessions);
   if (!resumable && (input.typedAt > 0 || workspace.agentArgs.includes("--resume"))) return false;
   return claudeIsIdle(workspace, terminal, live);
 };

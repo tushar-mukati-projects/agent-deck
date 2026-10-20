@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import {
   launchTheme,
@@ -6,14 +6,14 @@ import {
   themeOutdated,
   type RestartContext,
 } from "@/lib/agents/theme-restart";
-import { useSessionsStore } from "@/stores/sessions-store";
-import { useSettingsStore } from "@/stores/settings-store";
+import { testLaunch } from "@/lib/agents/settings-fixture";
 import { blankWorkspace } from "@/stores/workspace-factory";
 import type { LiveSession, TerminalState, Workspace } from "@/types";
 
 const id = "00000000-0000-4000-8000-000000000002";
 const now = 1_000_000;
 const dark = ["--settings", '{"theme":"dark-ansi"}'];
+const sakura = testLaunch({ matchAgentTheme: true, themeId: "sakura" });
 
 const workspace = (extra: Partial<Workspace> = {}): Workspace => ({
   ...blankWorkspace({
@@ -52,19 +52,13 @@ const live = (status: string, pid = 42): LiveSession => ({
 const context = (extra: Partial<RestartContext> = {}): RestartContext => ({
   terminal: terminal(),
   live: [live("idle")],
+  sessions: {},
   input: { typedAt: now - 60_000, hasDraft: false },
   now,
   ...extra,
 });
 
 describe("restarting Claude for a new theme", () => {
-  beforeEach(() => {
-    useSettingsStore
-      .getState()
-      .set({ claudeArgs: "", matchAgentTheme: true, themeId: "sakura", customAgents: [] });
-    useSessionsStore.setState({ byId: {} });
-  });
-
   it("reads the theme Deck launched Claude with", () => {
     expect(launchTheme(dark)).toBe("dark-ansi");
     expect(launchTheme(["--settings", "my.json"])).toBeNull();
@@ -72,18 +66,21 @@ describe("restarting Claude for a new theme", () => {
   });
 
   it("flags live Claude sessions whose theme no longer matches Deck", () => {
-    expect(themeOutdated(workspace())).toBe(true);
-    useSettingsStore.getState().set({ themeId: "aurora" });
-    expect(themeOutdated(workspace())).toBe(false);
-    expect(themeOutdated(workspace({ mode: "preview" }))).toBe(false);
-    expect(themeOutdated(workspace({ agent: "codex" }))).toBe(false);
+    expect(themeOutdated(workspace(), sakura)).toBe(true);
+    const aurora = testLaunch({ matchAgentTheme: true, themeId: "aurora" });
+    expect(themeOutdated(workspace(), aurora)).toBe(false);
+    expect(themeOutdated(workspace({ mode: "preview" }), sakura)).toBe(false);
+    expect(themeOutdated(workspace({ agent: "codex" }), sakura)).toBe(false);
   });
 
   it("leaves sessions alone when the user's own --settings decides the theme", () => {
-    useSettingsStore.getState().set({ claudeArgs: "--settings my.json" });
-    expect(themeOutdated(workspace({ agentArgs: ["--resume", id, "--settings", "my.json"] }))).toBe(
-      false,
-    );
+    const own = testLaunch({
+      matchAgentTheme: true,
+      themeId: "sakura",
+      claudeArgs: "--settings my.json",
+    });
+    const agentArgs = ["--resume", id, "--settings", "my.json"];
+    expect(themeOutdated(workspace({ agentArgs }), own)).toBe(false);
   });
 
   it("restarts only when Claude reports idle and nothing unsent would be lost", () => {

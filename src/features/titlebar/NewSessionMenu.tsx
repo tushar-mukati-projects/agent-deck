@@ -11,9 +11,9 @@ import {
 } from "@/components/ui/menu";
 import { useAgents } from "@/hooks/useAgents";
 import { useFolders } from "@/hooks/useFolders";
-import { agentName } from "@/lib/agents/registry";
 import { shortcutLabel } from "@/lib/shortcuts";
 import { basename, samePath, shortenHome } from "@/lib/utils";
+import { agentName } from "@/stores/agents";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useActiveWorkspace } from "@/stores/workspace-store";

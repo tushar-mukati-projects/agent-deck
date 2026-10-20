@@ -25,10 +25,11 @@ import { useAsync } from "@/hooks/useAsync";
 import { useSessionFile } from "@/hooks/useSessionFile";
 import { useExternalLive } from "@/hooks/useWorkspaceStatus";
 import { isPersisted } from "@/lib/agents/launch";
-import { CLAUDE, findAgent } from "@/lib/agents/registry";
+import { CLAUDE } from "@/lib/agents/registry";
 import { api } from "@/lib/tauri/commands";
 import { revealInExplorer } from "@/lib/tauri/system";
 import { formatBytes, shortenHome } from "@/lib/utils";
+import { findAgent } from "@/stores/agents";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useUiStore } from "@/stores/ui-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
@@ -80,7 +81,8 @@ const Meta = ({
 
 const resumeLabel = (workspace: Workspace) => {
   const agent = findAgent(workspace.agent);
-  if (!isPersisted(workspace) || !agent.history) return `Start ${agent.name}`;
+  if (!isPersisted(workspace, useSessionsStore.getState().byId) || !agent.history)
+    return `Start ${agent.name}`;
   return agent.id === CLAUDE ? "Resume session" : `Resume in ${agent.name}`;
 };
 

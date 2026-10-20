@@ -3,6 +3,7 @@ import { toast } from "sonner";
 
 import { readyToRestart, themeOutdated } from "@/lib/agents/theme-restart";
 import { terminalInput } from "@/lib/terminal/registry";
+import { launchEnvironment } from "@/stores/agents";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useTerminalStore } from "@/stores/terminal-store";
@@ -18,11 +19,18 @@ const restartReady = () => {
   const { workspaces, restartAgent } = useWorkspaceStore.getState();
   const { live } = useSessionsStore.getState();
   const { terminals } = useTerminalStore.getState();
+  const launch = launchEnvironment();
   const now = Date.now();
-  const outdated = workspaces.filter(themeOutdated);
+  const outdated = workspaces.filter((w) => themeOutdated(w, launch));
   const ready = outdated.filter((w) => {
     const id = w.agentTerminalId ?? "";
-    return readyToRestart(w, { terminal: terminals[id], live, input: terminalInput(id), now });
+    return readyToRestart(w, {
+      terminal: terminals[id],
+      live,
+      sessions: launch.sessions,
+      input: terminalInput(id),
+      now,
+    });
   });
   ready.forEach((w) => restartAgent(w.id, false));
   if (ready.length)
@@ -46,7 +54,8 @@ export const useAgentThemeSync = () => {
     };
 
     const check = async (run: number) => {
-      if (!useWorkspaceStore.getState().workspaces.some(themeOutdated)) return;
+      const launch = launchEnvironment();
+      if (!useWorkspaceStore.getState().workspaces.some((w) => themeOutdated(w, launch))) return;
       if (useUiStore.getState().settingsOpen) return;
       await useSessionsStore.getState().refreshLive();
       if (run !== generation || restartReady() === 0) return;

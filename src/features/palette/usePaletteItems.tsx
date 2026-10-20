@@ -45,10 +45,10 @@ import { shortcutLabel, type ShortcutAction } from "@/lib/shortcuts";
 import { api } from "@/lib/tauri/commands";
 import { copyText, revealInExplorer } from "@/lib/tauri/system";
 import { resumeCommandLine } from "@/lib/agents/launch";
-import { agentName, findAgent, listAgents } from "@/lib/agents/registry";
 import { THEMES } from "@/lib/themes";
 import { parseTypedPath } from "@/lib/typed-path";
 import { basename, joinPath, normalizePath, shortenHome, timeAgo } from "@/lib/utils";
+import { agentName, findAgent, listAgents } from "@/stores/agents";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import type { PaletteMode } from "@/stores/ui-store";
@@ -250,7 +250,7 @@ const buildCommands = (workspace: Workspace | null): CommandDef[] => {
             id: "copy-resume",
             title: "Copy resume command",
             icon: <Copy />,
-            run: () => void copyText(resumeCommandLine(session)),
+            run: () => void copyText(resumeCommandLine(session, useSettingsStore.getState())),
           },
         ]
       : []),

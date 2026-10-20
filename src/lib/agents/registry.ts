@@ -1,7 +1,12 @@
 import { parseArgs } from "@/lib/args";
 import { findTheme } from "@/lib/themes";
-import { useSettingsStore } from "@/stores/settings-store";
+import type { SettingsData } from "@/stores/settings-store";
 import type { AgentId, ConfigAgent, CustomAgent } from "@/types";
+
+export type AgentSettings = Pick<
+  SettingsData,
+  "claudeArgs" | "codexArgs" | "matchAgentTheme" | "themeId" | "customAgents"
+>;
 
 export interface LaunchContext {
   subagent?: string;
@@ -24,15 +29,12 @@ interface AgentDefinition {
 export const CLAUDE: AgentId = "claude";
 export const CODEX: AgentId = "codex";
 
-const settings = () => useSettingsStore.getState();
-
-const claudeThemeArgs = () => {
-  const { matchAgentTheme, claudeArgs, themeId } = settings();
+const claudeThemeArgs = ({ matchAgentTheme, claudeArgs, themeId }: AgentSettings) => {
   if (!matchAgentTheme || /(^|\s)--settings(\s|=|$)/.test(claudeArgs)) return [];
   return ["--settings", JSON.stringify({ theme: `${findTheme(themeId).kind}-ansi` })];
 };
 
-const claude: AgentDefinition = {
+const claude = (settings: AgentSettings): AgentDefinition => ({
   id: CLAUDE,
   name: "Claude",
   command: ["claude"],
@@ -54,12 +56,12 @@ const claude: AgentDefinition = {
     newSessionId,
   ],
   extraArgs: (options) => [
-    ...(options?.deckTheme ? claudeThemeArgs() : []),
-    ...parseArgs(settings().claudeArgs),
+    ...(options?.deckTheme ? claudeThemeArgs(settings) : []),
+    ...parseArgs(settings.claudeArgs),
   ],
-};
+});
 
-const codex: AgentDefinition = {
+const codex = (settings: AgentSettings): AgentDefinition => ({
   id: CODEX,
   name: "Codex",
   command: ["codex"],
@@ -70,8 +72,8 @@ const codex: AgentDefinition = {
   newArgs: () => [],
   resumeArgs: (sessionId) => ["resume", sessionId],
   forkArgs: (sessionId) => ["fork", sessionId],
-  extraArgs: () => parseArgs(settings().codexArgs),
-};
+  extraArgs: () => parseArgs(settings.codexArgs),
+});
 
 const fromCustom = (agent: CustomAgent): AgentDefinition => ({
   id: `custom:${agent.id}`,
@@ -87,19 +89,19 @@ const fromCustom = (agent: CustomAgent): AgentDefinition => ({
   extraArgs: () => [],
 });
 
-export const listAgents = (): AgentDefinition[] => [
-  claude,
-  codex,
-  ...settings()
-    .customAgents.filter((a) => a.command.trim())
-    .map(fromCustom),
+export const listAgents = (settings: AgentSettings): AgentDefinition[] => [
+  claude(settings),
+  codex(settings),
+  ...settings.customAgents.filter((a) => a.command.trim()).map(fromCustom),
 ];
 
-export const getAgent = (id: AgentId | undefined): AgentDefinition | null =>
-  listAgents().find((a) => a.id === id) ?? null;
+export const getAgent = (id: AgentId | undefined, settings: AgentSettings) =>
+  listAgents(settings).find((a) => a.id === id) ?? null;
 
-export const findAgent = (id: AgentId | undefined): AgentDefinition => getAgent(id) ?? claude;
+export const findAgent = (id: AgentId | undefined, settings: AgentSettings) =>
+  getAgent(id, settings) ?? claude(settings);
 
-export const agentName = (id: AgentId | undefined) => findAgent(id).name;
+export const agentName = (id: AgentId | undefined, settings: AgentSettings) =>
+  findAgent(id, settings).name;
 
 export const SUBAGENT_NAME = /^[\w:.-]+$/;

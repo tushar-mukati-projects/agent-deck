@@ -1,19 +1,17 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { CODEX, findAgent, getAgent, listAgents } from "@/lib/agents/registry";
-import { useSettingsStore } from "@/stores/settings-store";
+import { agentSettings } from "@/lib/agents/settings-fixture";
+import type { AgentSettings } from "@/lib/agents/registry";
 
 const id = "019a0000-0000-7000-8000-000000000001";
 
-describe("agent registry", () => {
-  beforeEach(() =>
-    useSettingsStore
-      .getState()
-      .set({ claudeArgs: "", codexArgs: "", customAgents: [], matchAgentTheme: false }),
-  );
+const themedClaude = (extra: Partial<AgentSettings>) =>
+  findAgent("claude", agentSettings({ matchAgentTheme: true, ...extra }));
 
+describe("agent registry", () => {
   it("builds Claude commands with its own session ids", () => {
-    const claude = findAgent("claude");
+    const claude = findAgent("claude", agentSettings());
     expect(claude.newArgs(id, { subagent: "reviewer" })).toEqual([
       "--session-id",
       id,
@@ -32,8 +30,7 @@ describe("agent registry", () => {
   });
 
   it("builds Codex commands and learns ids from its files", () => {
-    useSettingsStore.getState().set({ codexArgs: "--model gpt-5" });
-    const codex = findAgent(CODEX);
+    const codex = findAgent(CODEX, agentSettings({ codexArgs: "--model gpt-5" }));
     expect(codex.command).toEqual(["codex"]);
     expect(codex.newArgs(id, {})).toEqual([]);
     expect(codex.resumeArgs(id)).toEqual(["resume", id]);
@@ -43,13 +40,13 @@ describe("agent registry", () => {
   });
 
   it("adds custom agents without history", () => {
-    useSettingsStore.getState().set({
+    const settings = agentSettings({
       customAgents: [
         { id: "g1", name: "", command: "gemini --yolo" },
         { id: "blank", name: "Empty", command: "  " },
       ],
     });
-    const custom = listAgents().filter((a) => a.id.startsWith("custom:"));
+    const custom = listAgents(settings).filter((a) => a.id.startsWith("custom:"));
     expect(custom.map((a) => a.id)).toEqual(["custom:g1"]);
     expect(custom[0].name).toBe("gemini");
     expect(custom[0].command).toEqual(["gemini", "--yolo"]);
@@ -57,18 +54,17 @@ describe("agent registry", () => {
   });
 
   it("tells Claude to use the Deck theme's light or dark colors when Deck launches it", () => {
-    const claude = findAgent("claude");
-    useSettingsStore.getState().set({ matchAgentTheme: true, themeId: "sakura" });
-    expect(claude.extraArgs({ deckTheme: true })).toEqual(["--settings", '{"theme":"light-ansi"}']);
-    expect(claude.extraArgs()).toEqual([]);
-    useSettingsStore.getState().set({ themeId: "aurora" });
-    expect(claude.extraArgs({ deckTheme: true })).toEqual(["--settings", '{"theme":"dark-ansi"}']);
-    useSettingsStore.getState().set({ claudeArgs: "--settings my.json" });
-    expect(claude.extraArgs({ deckTheme: true })).toEqual(["--settings", "my.json"]);
+    const sakura = themedClaude({ themeId: "sakura" });
+    expect(sakura.extraArgs({ deckTheme: true })).toEqual(["--settings", '{"theme":"light-ansi"}']);
+    expect(sakura.extraArgs()).toEqual([]);
+    const aurora = themedClaude({ themeId: "aurora" });
+    expect(aurora.extraArgs({ deckTheme: true })).toEqual(["--settings", '{"theme":"dark-ansi"}']);
+    const own = themedClaude({ themeId: "aurora", claudeArgs: "--settings my.json" });
+    expect(own.extraArgs({ deckTheme: true })).toEqual(["--settings", "my.json"]);
   });
 
   it("falls back to Claude for display but reports removed agents", () => {
-    expect(findAgent("custom:missing").id).toBe("claude");
-    expect(getAgent("custom:missing")).toBeNull();
+    expect(findAgent("custom:missing", agentSettings()).id).toBe("claude");
+    expect(getAgent("custom:missing", agentSettings())).toBeNull();
   });
 });

@@ -27,9 +27,9 @@ import {
 } from "@/components/ui/menu";
 import { Tab } from "@/components/ui/tabs";
 import { useWorkspaceTone } from "@/hooks/useWorkspaceStatus";
-import { findAgent } from "@/lib/agents/registry";
 import { copyText, revealInExplorer } from "@/lib/tauri/system";
 import { basename, cn } from "@/lib/utils";
+import { findAgent } from "@/stores/agents";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useUiStore } from "@/stores/ui-store";

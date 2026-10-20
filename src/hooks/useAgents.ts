@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 
-import { listAgents } from "@/lib/agents/registry";
+import { listAgents } from "@/stores/agents";
 import { useSettingsStore } from "@/stores/settings-store";
 
 export const useAgents = () => {

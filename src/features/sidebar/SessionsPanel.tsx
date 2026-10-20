@@ -11,7 +11,6 @@ import { FolderFilter } from "@/features/sidebar/FolderFilter";
 import { SessionItem } from "@/features/sidebar/SessionItem";
 import { useSessionTones } from "@/features/sidebar/useSessionTones";
 import { WslStatus } from "@/features/sidebar/WslStatus";
-import { agentName } from "@/lib/agents/registry";
 import { folderIcon } from "@/lib/file-icons";
 import {
   agentsIn,
@@ -23,6 +22,7 @@ import {
 } from "@/lib/session-list";
 import { basename, cn, normalizePath, samePath, toggled } from "@/lib/utils";
 import { parseWslPath } from "@/lib/wsl";
+import { agentName } from "@/stores/agents";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { activeWorkspaceOf, useWorkspaceStore } from "@/stores/workspace-store";

@@ -9,7 +9,7 @@ import { toast } from "sonner";
 
 import { sessionFileNow } from "@/hooks/useSessionFile";
 import { processStart, runningSubagents } from "@/lib/agent-tasks";
-import { agentName, CLAUDE } from "@/lib/agents/registry";
+import { CLAUDE } from "@/lib/agents/registry";
 import { alertStatus, announcement } from "@/lib/announce";
 import { playChime, unlockAudio } from "@/lib/chime";
 import { speak } from "@/lib/speech";
@@ -18,6 +18,7 @@ import { api } from "@/lib/tauri/commands";
 import { appWindow } from "@/lib/tauri/system";
 import { basename } from "@/lib/utils";
 import { useAgentTasksStore } from "@/stores/agent-tasks-store";
+import { agentName } from "@/stores/agents";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useTerminalStore } from "@/stores/terminal-store";

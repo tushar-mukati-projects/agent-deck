@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/feedback";
 import { TerminalView } from "@/features/terminal/TerminalView";
 import { useTerminal } from "@/hooks/useWorkspaceStatus";
-import { findAgent } from "@/lib/agents/registry";
+import { findAgent } from "@/stores/agents";
 import type { Workspace } from "@/types";
 
 export const AgentPane = ({ workspace }: { workspace: Workspace }) => {

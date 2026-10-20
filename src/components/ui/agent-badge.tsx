@@ -1,5 +1,5 @@
-import { agentName } from "@/lib/agents/registry";
 import { cn } from "@/lib/utils";
+import { agentName } from "@/stores/agents";
 import type { AgentId } from "@/types";
 
 export const AgentBadge = ({ agent, className }: { agent: AgentId; className?: string }) => (

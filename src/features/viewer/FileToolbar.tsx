@@ -14,7 +14,6 @@ import {
 import { canMention, mentionInAgent } from "@/actions/files";
 import { Button } from "@/components/ui/button";
 import { showError } from "@/components/ui/feedback";
-import { agentName } from "@/lib/agents/registry";
 import { IconButton } from "@/components/ui/icon-button";
 import {
   DropdownMenu,
@@ -26,6 +25,7 @@ import { Segmented } from "@/components/ui/panel";
 import { api } from "@/lib/tauri/commands";
 import { copyText, openExternal, revealInExplorer } from "@/lib/tauri/system";
 import { cn, formatBytes, relativePath } from "@/lib/utils";
+import { agentName } from "@/stores/agents";
 import type { MarkdownMode } from "@/stores/viewer-store";
 import type { Workspace } from "@/types";
 
