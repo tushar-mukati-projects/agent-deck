@@ -6,7 +6,7 @@ type NavRow = {
   entry: Pick<DirEntry, "isDir">;
 };
 
-export type TreeKeyAction =
+type TreeKeyAction =
   | { kind: "select"; index: number }
   | { kind: "expand" }
   | { kind: "collapse" }

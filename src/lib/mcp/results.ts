@@ -1,6 +1,6 @@
 export type Cell = string | null;
 
-export type Grid = {
+type Grid = {
   columns: string[];
   rows: Cell[][];
 };

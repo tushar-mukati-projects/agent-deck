@@ -10,7 +10,7 @@ interface TerminalStore {
   remove: (id: string) => void;
 }
 
-export const isAlive = (terminal: TerminalState | undefined) =>
+const isAlive = (terminal: TerminalState | undefined) =>
   terminal?.status === "running" || terminal?.status === "starting";
 
 export const useTerminalStore = create<TerminalStore>((set) => ({
