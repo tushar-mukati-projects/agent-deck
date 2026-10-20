@@ -18,7 +18,7 @@ use super::is_valid_reply;
 use crate::{
     agent_config::{Launch, ResolvedServer},
     process::Managed,
-    util::{hidden, wslenv_with},
+    util::hidden,
     wsl,
 };
 
@@ -49,7 +49,9 @@ fn stdio_command(server: &ResolvedServer, launch: &Launch) -> anyhow::Result<Com
             for name in &names {
                 cmd.env(name, &launch.env[*name]);
             }
-            cmd.env("WSLENV", wslenv_with(names.iter().map(|k| format!("{k}/u"))));
+            let existing = std::env::var("WSLENV").unwrap_or_default();
+            let forwarded = names.iter().map(|k| format!("{k}/u")).chain((!existing.is_empty()).then_some(existing)).collect::<Vec<_>>();
+            cmd.env("WSLENV", forwarded.join(":"));
             cmd
         }
         None => {
