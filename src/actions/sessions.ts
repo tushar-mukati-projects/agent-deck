@@ -1,10 +1,11 @@
 import { toast } from "sonner";
 
+import { showError } from "@/components/ui/feedback";
 import { CLAUDE, SUBAGENT_NAME } from "@/lib/agents/registry";
 import { openElsewhere, sessionTitle } from "@/lib/sessions";
 import { api } from "@/lib/tauri/commands";
 import { pickFolder } from "@/lib/tauri/system";
-import { errorMessage, failedTo, plural } from "@/lib/utils";
+import { failedTo, plural } from "@/lib/utils";
 import { parseWslPath } from "@/lib/wsl";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -127,7 +128,7 @@ export const deleteSessionWithConfirm = async (session: SessionInfo) => {
     useSettingsStore.getState().forgetSession(session.id);
     toast.success(session.distro ? "Session deleted" : "Session moved to the Recycle Bin");
   } catch (error) {
-    toast.error(errorMessage(error));
+    showError(error);
   }
 };
 
