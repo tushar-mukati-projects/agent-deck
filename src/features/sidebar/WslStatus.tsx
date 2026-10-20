@@ -9,38 +9,27 @@ import { failedTo } from "@/lib/utils";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore } from "@/stores/settings-store";
 
-const useStartDistro = () => {
-  const [starting, setStarting] = useState<string | null>(null);
-  const start = async (name: string) => {
-    setStarting(name);
-    try {
-      await useSessionsStore.getState().startDistro(name);
-      return true;
-    } catch (error) {
-      toast.error(failedTo(`start WSL ${name}`, error));
-      return false;
-    } finally {
-      setStarting(null);
-    }
-  };
-  return { starting, start };
-};
-
-export const StartDistroButton = ({
-  distro,
-  onStarted,
-}: {
+type StartDistroButtonProps = {
   distro: string;
   onStarted?: () => void;
-}) => {
-  const { starting, start } = useStartDistro();
+};
+
+export const StartDistroButton = ({ distro, onStarted }: StartDistroButtonProps) => {
+  const [starting, setStarting] = useState(false);
+  const start = async () => {
+    setStarting(true);
+    try {
+      await useSessionsStore.getState().startDistro(distro);
+    } catch (error) {
+      toast.error(failedTo(`start WSL ${distro}`, error));
+      return;
+    } finally {
+      setStarting(false);
+    }
+    onStarted?.();
+  };
   return (
-    <Button
-      size="xs"
-      variant="ghost"
-      disabled={!!starting}
-      onClick={() => void start(distro).then((ok) => ok && onStarted?.())}
-    >
+    <Button size="xs" variant="ghost" disabled={starting} onClick={() => void start()}>
       {starting ? <Spinner className="size-3" /> : <Power />} Start
     </Button>
   );

@@ -23,8 +23,6 @@ import { shortcutLabel } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
 
-const saveNow = () => void flushNotes();
-
 const NameInput = ({ title, onDone }: { title: string; onDone: (name: string | null) => void }) => {
   const [value, setValue] = useState(title);
   const cancelled = useRef(false);
@@ -178,7 +176,7 @@ export const NotesDialog = () => {
                 plain
                 placeholder="Write anything…"
                 onChange={editNote}
-                onSave={saveNow}
+                onSave={flushNotes}
               />
             ) : (
               <LoadingState className="h-full" />
