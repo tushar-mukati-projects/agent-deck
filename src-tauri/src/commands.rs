@@ -42,12 +42,11 @@ pub struct Environment {
 #[tauri::command]
 pub async fn environment() -> CmdResult<Environment> {
     blocking(|| {
-        let home = dirs::home_dir().unwrap_or_default();
         Ok(Environment {
-            home: home.to_string_lossy().to_string(),
+            home: dirs::home_dir().unwrap_or_default().to_string_lossy().to_string(),
             shell: pty::default_shell(),
-            claude_found: which::which("claude").is_ok() || home.join(".local").join("bin").join("claude.exe").is_file(),
-            codex_found: which::which("codex").is_ok(),
+            claude_found: pty::resolve_program("claude").is_ok(),
+            codex_found: pty::resolve_program("codex").is_ok(),
         })
     })
     .await
