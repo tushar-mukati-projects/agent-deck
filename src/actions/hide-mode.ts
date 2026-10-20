@@ -1,7 +1,7 @@
 import { hideModePatch } from "@/lib/hide-mode";
 import { api } from "@/lib/tauri/commands";
-import { useHideModeStore } from "@/stores/hide-mode-store";
 import { useSettingsStore } from "@/stores/settings-store";
+import { useWarpLogoStore } from "@/stores/warp-logo-store";
 
 export const toggleHideMode = () => {
   const settings = useSettingsStore.getState();
@@ -10,5 +10,5 @@ export const toggleHideMode = () => {
 
 export const syncHideMode = async (enabled: boolean) => {
   const src = await api.applyHideMode(enabled);
-  if (src) useHideModeStore.setState({ warpLogo: src });
+  if (src) useWarpLogoStore.setState({ warpLogo: src });
 };

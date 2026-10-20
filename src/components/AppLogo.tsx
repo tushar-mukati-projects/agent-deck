@@ -1,7 +1,7 @@
 import { SquareTerminal } from "lucide-react";
 
-import { useHideModeStore } from "@/stores/hide-mode-store";
 import { useSettingsStore } from "@/stores/settings-store";
+import { useWarpLogoStore } from "@/stores/warp-logo-store";
 
 type AppLogoProps = {
   className?: string;
@@ -9,7 +9,7 @@ type AppLogoProps = {
 
 export const AppLogo = ({ className }: AppLogoProps) => {
   const hidden = useSettingsStore((s) => s.hideMode);
-  const warpLogo = useHideModeStore((s) => s.warpLogo);
+  const warpLogo = useWarpLogoStore((s) => s.warpLogo);
   const src = hidden ? warpLogo : "/app-icon.svg";
   return src ? (
     <img src={src} alt="" className={className} />
