@@ -33,6 +33,7 @@ const RUNNING_TTL: Duration = Duration::from_secs(5);
 const LIVE_TTL: Duration = Duration::from_secs(30);
 const UNC_PREFIX: &str = r"\\wsl.localhost\";
 const FORWARDED_VARS: [&str; 2] = ["CLAUDE_CONFIG_DIR", "CODEX_HOME"];
+const CACHE_DIR: &str = "agent-deck";
 
 static SCRIPT: LazyLock<String> = LazyLock::new(|| base64::engine::general_purpose::STANDARD.encode(AGENT));
 
@@ -121,7 +122,7 @@ struct ErrorReply {
 
 #[cfg(not(test))]
 fn cache_file() -> PathBuf {
-    dirs::cache_dir().unwrap_or_else(std::env::temp_dir).join(crate::legacy_data::CACHE_DIR).join("wsl-index.json")
+    dirs::cache_dir().unwrap_or_else(std::env::temp_dir).join(CACHE_DIR).join("wsl-index.json")
 }
 
 #[cfg(test)]

@@ -1,4 +1,3 @@
-import "@/carry-over-storage";
 import "@fontsource-variable/inter";
 import "@fontsource-variable/jetbrains-mono";
 import "@/index.css";
