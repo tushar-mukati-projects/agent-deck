@@ -142,7 +142,7 @@ struct WslMessage {
 fn start_wsl(tx: mpsc::Sender<Signal>, distro: &str, linux_root: &str) -> anyhow::Result<WslWatch> {
     let mut spawned = wsl::spawn_watch(distro, linux_root)?;
     let stdout = spawned.child.stdout.take();
-    let process = Managed::new(spawned.child);
+    let process = Managed::new(spawned.child)?;
     let distro = distro.to_string();
     if let Some(stdout) = stdout {
         thread::spawn(move || {

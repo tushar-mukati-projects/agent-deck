@@ -219,7 +219,7 @@ fn wsl_relay(distro: &str, host: &str, port: u16) -> anyhow::Result<(StdTcpStrea
         child.stdout.take().context("missing stdout")?,
         child.stderr.take().context("missing stderr")?,
     );
-    let process = Arc::new(Managed::new(child));
+    let process = Arc::new(Managed::new(child)?);
     let stderr: Arc<Mutex<String>> = Arc::default();
     let collected = stderr.clone();
     thread::spawn(move || {
@@ -237,7 +237,7 @@ fn wsl_relay(distro: &str, host: &str, port: u16) -> anyhow::Result<(StdTcpStrea
         let _ = io::copy(&mut stdout, &mut writer);
         let _ = writer.flush();
         let _ = writer.shutdown(Shutdown::Both);
-        owner.stop();
+        let _ = owner.stop();
     });
     Ok((client, Relay { process, stderr }))
 }

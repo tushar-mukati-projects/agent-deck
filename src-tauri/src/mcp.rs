@@ -182,7 +182,7 @@ fn spawn_stdio(server: &ResolvedServer, launch: &Launch) -> anyhow::Result<Stdio
     let stdin = Arc::new(Mutex::new(child.stdin.take().context("missing stdin")?));
     let stdout = child.stdout.take().context("missing stdout")?;
     let stderr_pipe = child.stderr.take().context("missing stderr")?;
-    let process = Managed::new(child);
+    let process = Managed::new(child)?;
 
     let pending: Pending = Arc::default();
     let stderr: Arc<Mutex<VecDeque<String>>> = Arc::default();
@@ -354,7 +354,7 @@ impl Client {
 
     fn shutdown(&self) {
         if let Connection::Stdio(stdio) = &self.connection {
-            stdio.process.stop();
+            let _ = stdio.process.stop();
         }
     }
 

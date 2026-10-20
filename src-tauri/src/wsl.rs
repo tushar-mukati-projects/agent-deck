@@ -692,7 +692,7 @@ mod tests {
         while !seen.contains("inner.txt") {
             seen = lines.next().unwrap().unwrap();
         }
-        let process = crate::process::Managed::new(spawned.child);
+        let process = crate::process::Managed::new(spawned.child).unwrap();
         drop(process);
         drop(spawned.stdin);
         std::thread::sleep(Duration::from_millis(800));
