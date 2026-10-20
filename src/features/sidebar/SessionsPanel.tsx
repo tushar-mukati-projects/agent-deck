@@ -2,7 +2,7 @@ import { memo, useDeferredValue, useEffect, useMemo, useRef, useState } from "re
 import { AlertTriangle, Archive, Pin, Plus, RefreshCw, Sparkles } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 
-import { startNewSession, startSessionInPickedFolder } from "@/actions/sessions";
+import { refreshAll, startNewSession, startSessionInPickedFolder } from "@/actions/sessions";
 import { Button } from "@/components/ui/button";
 import { EmptyState, LoadingState, StatusDot, type DotTone } from "@/components/ui/feedback";
 import { IconButton } from "@/components/ui/icon-button";
@@ -144,14 +144,7 @@ const emptyMessage = (query: string, folderFilter: string | null) => {
 const RefreshButton = () => {
   const refreshing = useSessionsStore((s) => s.refreshing);
   return (
-    <IconButton
-      label="Refresh"
-      onClick={() => {
-        const store = useSessionsStore.getState();
-        void store.refresh();
-        void store.refreshWsl();
-      }}
-    >
+    <IconButton label="Refresh" onClick={() => void refreshAll()}>
       <RefreshCw className={cn(refreshing && "animate-spin")} />
     </IconButton>
   );

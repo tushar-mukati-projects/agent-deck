@@ -141,3 +141,8 @@ export const renameSession = async (session: SessionInfo, title: string) => {
     return false;
   }
 };
+
+export const refreshAll = async () => {
+  const sessions = useSessionsStore.getState();
+  await Promise.all([sessions.refresh(), sessions.refreshWsl()]);
+};

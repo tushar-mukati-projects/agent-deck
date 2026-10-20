@@ -7,6 +7,7 @@ import { createRoot } from "react-dom/client";
 
 import { openPathFromTerminal } from "@/actions/files";
 import { syncHideMode } from "@/actions/hide-mode";
+import { refreshAll } from "@/actions/sessions";
 import { App } from "@/App";
 import { CrashScreen, ErrorBoundary } from "@/components/ErrorBoundary";
 import { showError } from "@/components/ui/feedback";
@@ -63,11 +64,10 @@ const render = () =>
   );
 
 const bootstrap = async () => {
-  const sessions = useSessionsStore.getState();
   try {
     await Promise.all([
       reattachTerminals(),
-      sessions.loadEnvironment().catch(keepStartupError),
+      useSessionsStore.getState().loadEnvironment().catch(keepStartupError),
       loadFonts(),
       syncHideMode(useSettingsStore.getState().hideMode),
     ]);
@@ -75,9 +75,8 @@ const bootstrap = async () => {
     render();
     requestAnimationFrame(() => void appWindow.show().then(() => appWindow.setFocus()));
   }
-  await sessions.refresh();
+  await refreshAll();
   startupErrors.forEach(showError);
-  await sessions.refreshWsl();
 };
 
 void bootstrap();
