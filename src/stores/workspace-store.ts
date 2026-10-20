@@ -24,7 +24,7 @@ import {
 import { newId, samePath } from "@/lib/utils";
 import { parseWslPath } from "@/lib/wsl";
 import { blankWorkspace, workspaceFromSession } from "@/stores/workspace-factory";
-import { restoreSaved } from "@/stores/workspace-persist";
+import { restoredWorkspace, restoreSaved } from "@/stores/workspace-persist";
 import type { AgentId, SessionInfo, ShellTab, Workspace } from "@/types";
 
 interface WorkspaceState {
@@ -90,22 +90,6 @@ const agentAvailable = (agent: AgentId) => {
 const newSessionTitle = (agent: AgentId, subagent?: string) => {
   if (subagent) return `New ${subagent} session`;
   return agent === CLAUDE ? "New session" : `New ${agentName(agent)} session`;
-};
-
-const restoredWorkspace = (workspace: Workspace) => {
-  const shells = workspace.shells.filter((shell) => isPtyRunning(shell.id));
-  const agentAlive = !!workspace.agentTerminalId && isPtyRunning(workspace.agentTerminalId);
-  return {
-    ...workspace,
-    mode: agentAlive ? ("live" as const) : ("preview" as const),
-    agentTerminalId: agentAlive ? workspace.agentTerminalId : null,
-    pendingSince: agentAlive ? workspace.pendingSince : null,
-    shells,
-    activeShellId: shells.some((shell) => shell.id === workspace.activeShellId)
-      ? workspace.activeShellId
-      : (shells[0]?.id ?? null),
-    shellPanelOpen: workspace.shellPanelOpen && shells.length > 0,
-  };
 };
 
 const terminalSpecs = (workspace: Workspace): TerminalSpec[] => [
@@ -356,7 +340,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           }),
 
         restore: () => {
-          const workspaces = get().workspaces.map(restoredWorkspace);
+          const workspaces = get().workspaces.map((w) => restoredWorkspace(w, isPtyRunning));
           set({ workspaces });
           for (const spec of workspaces.flatMap(terminalSpecs))
             if (!hasTerminal(spec.id)) startTerminal(spec);

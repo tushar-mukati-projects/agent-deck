@@ -24,3 +24,22 @@ export const restoreSaved = (persisted: unknown): SavedWorkspaces => {
     : (workspaces[0]?.id ?? null);
   return { workspaces, activeId };
 };
+
+export const restoredWorkspace = (
+  workspace: Workspace,
+  isRunning: (terminalId: string) => boolean,
+): Workspace => {
+  const shells = workspace.shells.filter((shell) => isRunning(shell.id));
+  const agentAlive = !!workspace.agentTerminalId && isRunning(workspace.agentTerminalId);
+  return {
+    ...workspace,
+    mode: agentAlive ? "live" : "preview",
+    agentTerminalId: agentAlive ? workspace.agentTerminalId : null,
+    pendingSince: agentAlive || !workspace.filePath ? workspace.pendingSince : null,
+    shells,
+    activeShellId: shells.some((shell) => shell.id === workspace.activeShellId)
+      ? workspace.activeShellId
+      : (shells[0]?.id ?? null),
+    shellPanelOpen: workspace.shellPanelOpen && shells.length > 0,
+  };
+};
