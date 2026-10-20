@@ -99,7 +99,7 @@ export const DocumentView = ({ workspace, path }: DocumentViewProps) => {
         path={path}
         value={draft ?? text}
         editable={editing && !readOnly}
-        line={line}
+        line={line ?? undefined}
         onLineShown={clearLine}
         onChange={handleChange}
         onSave={save}

@@ -99,7 +99,7 @@ interface CodeViewProps {
   editable: boolean;
   plain?: boolean;
   placeholder?: string;
-  line?: number | null;
+  line?: number;
   onLineShown?: () => void;
   onChange: (value: string) => void;
   onSave: () => void;
