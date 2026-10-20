@@ -5,11 +5,11 @@ import { ErrorAlert } from "@/components/ui/error-alert";
 import { EmptyState, LoadingState } from "@/components/ui/feedback";
 import { IconButton } from "@/components/ui/icon-button";
 import { Alert, ScopeBadge, Segmented } from "@/components/ui/panel";
-import { serverDetail } from "@/features/agent-config/filter-overview";
-import { useOverview } from "@/features/agent-config/overview-store";
-import { PROFILES, serverAgent } from "@/features/agent-config/profiles";
 import { PgBrowser } from "@/features/mcp/PgBrowser";
 import { ToolsPane } from "@/features/mcp/ToolsPane";
+import { serverDetail } from "@/lib/agent-config/filter-overview";
+import { PROFILES, serverAgent } from "@/lib/agent-config/profiles";
+import { useOverview } from "@/stores/overview-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import type { McpServer, Workspace } from "@/types";
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { filterOverview, invocation, scopeLabel } from "@/features/agent-config/filter-overview";
+import { filterOverview, invocation, scopeLabel } from "@/lib/agent-config/filter-overview";
 import type { AgentOverview, SettingsFile } from "@/types";
 
 const settings = (extra: Partial<SettingsFile>): SettingsFile => ({

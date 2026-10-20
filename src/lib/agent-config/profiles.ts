@@ -1,4 +1,4 @@
-import { invocation } from "@/features/agent-config/filter-overview";
+import { invocation } from "@/lib/agent-config/filter-overview";
 import { basename } from "@/lib/utils";
 import type { ConfigAgent, ConfigItem } from "@/types";
 

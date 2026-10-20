@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildSelect, parseTables, structureSql } from "@/features/mcp/pg/queries";
+import { buildSelect, parseTables, structureSql } from "@/lib/mcp/pg-queries";
 import { isMutating } from "@/lib/sql";
 
 const table = { schema: "public", name: 'we"ird' };

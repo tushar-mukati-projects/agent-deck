@@ -6,11 +6,11 @@ import { Hint, LoadingState, showError } from "@/components/ui/feedback";
 import { IconButton } from "@/components/ui/icon-button";
 import { Segmented } from "@/components/ui/panel";
 import { DataPane } from "@/features/mcp/pg/DataPane";
-import { parseTables, TABLES_SQL, tableKey, type TableRef } from "@/features/mcp/pg/queries";
 import { SqlPane } from "@/features/mcp/pg/SqlPane";
 import { StructurePane } from "@/features/mcp/pg/StructurePane";
 import { TableList } from "@/features/mcp/pg/TableList";
 import { useAsync } from "@/hooks/useAsync";
+import { parseTables, TABLES_SQL, tableKey, type TableRef } from "@/lib/mcp/pg-queries";
 import { api } from "@/lib/tauri/commands";
 
 type Pane = "data" | "structure" | "sql";

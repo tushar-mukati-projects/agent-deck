@@ -15,6 +15,7 @@ import {
   Webhook,
 } from "lucide-react";
 
+import { removeConfig } from "@/actions/agent-config";
 import { sendToAgent } from "@/actions/files";
 import { startAgentSession } from "@/actions/sessions";
 import { Hint, showError } from "@/components/ui/feedback";
@@ -27,26 +28,25 @@ import {
   scopeLabel,
   serverDetail,
   type FilteredOverview,
-} from "@/features/agent-config/filter-overview";
-import type { AgentProfile, SectionKey } from "@/features/agent-config/profiles";
+} from "@/lib/agent-config/filter-overview";
 import {
   canRemove,
   fileRemoval,
   hookRemoval,
   memoryRemoval,
   pluginRemoval,
-  removeConfig,
   ruleRemoval,
-  type RemovalRequest,
   serverRemoval,
   skillRemoval,
-} from "@/features/agent-config/remove-config";
+  type RemovalRequest,
+} from "@/lib/agent-config/removals";
 import { encodeMcpTab } from "@/lib/diff-tabs";
 import { dangerHoverClass } from "@/lib/styles";
 import { api } from "@/lib/tauri/commands";
 import { revealInExplorer } from "@/lib/tauri/system";
 import { useViewerStore } from "@/stores/viewer-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
+import type { AgentProfile, SectionKey } from "@/lib/agent-config/profiles";
 import type { ConfigAgent, ConfigItem, Workspace } from "@/types";
 
 interface SectionProps {

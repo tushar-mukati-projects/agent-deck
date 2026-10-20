@@ -1,8 +1,8 @@
 import { LoadingState } from "@/components/ui/feedback";
 import { Alert, SectionLabel } from "@/components/ui/panel";
 import { ResultGrid } from "@/features/mcp/ResultGrid";
-import { structureSql, type TableRef } from "@/features/mcp/pg/queries";
 import { useAsync } from "@/hooks/useAsync";
+import { structureSql, type TableRef } from "@/lib/mcp/pg-queries";
 import type { PgOutput } from "@/types";
 
 const TITLES = ["Columns", "Indexes", "Constraints"];

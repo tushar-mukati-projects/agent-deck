@@ -3,8 +3,8 @@ import { Eye, Table2 } from "lucide-react";
 
 import { Hint } from "@/components/ui/feedback";
 import { Chevron, SearchInput } from "@/components/ui/panel";
-import { tableKey, type TableRef } from "@/features/mcp/pg/queries";
 import { useToggleSet } from "@/hooks/useToggleSet";
+import { tableKey, type TableRef } from "@/lib/mcp/pg-queries";
 import { cn } from "@/lib/utils";
 
 const RENDER_LIMIT = 400;

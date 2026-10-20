@@ -6,7 +6,7 @@ import { Spinner } from "@/components/ui/feedback";
 import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/panel";
 import { ResultGrid } from "@/features/mcp/ResultGrid";
-import { buildSelect, PAGE_SIZE, type Order, type TableRef } from "@/features/mcp/pg/queries";
+import { buildSelect, PAGE_SIZE, type Order, type TableRef } from "@/lib/mcp/pg-queries";
 import { isMutating } from "@/lib/sql";
 import { errorMessage, plural } from "@/lib/utils";
 import type { PgOutput, PgResult } from "@/types";

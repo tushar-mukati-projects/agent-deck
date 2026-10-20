@@ -1,13 +1,7 @@
-import { toast } from "sonner";
-
-import type { PermissionRule } from "@/features/agent-config/filter-overview";
-import { refreshOverview } from "@/features/agent-config/overview-store";
 import { encodeMcpTab } from "@/lib/diff-tabs";
-import { api } from "@/lib/tauri/commands";
-import { basename, dirname, errorMessage, isWithin } from "@/lib/utils";
+import { basename, dirname } from "@/lib/utils";
 import { parseWslPath } from "@/lib/wsl";
-import { useUiStore } from "@/stores/ui-store";
-import { findWorkspace, useWorkspaceStore } from "@/stores/workspace-store";
+import type { PermissionRule } from "@/lib/agent-config/filter-overview";
 import type {
   ConfigAgent,
   ConfigHook,
@@ -17,7 +11,6 @@ import type {
   ConfigScope,
   McpServer,
   MemoryFile,
-  Workspace,
 } from "@/types";
 
 export interface RemovalRequest {
@@ -88,33 +81,3 @@ export const pluginRemoval = (plugin: ConfigPlugin, agent: ConfigAgent): Removal
       ? "Uninstalls it with claude plugin uninstall, along with its skills, agents, commands, hooks and servers."
       : "Removes it from config.toml and deletes its cached files.",
 });
-
-const closeTabs = (workspaceId: string, target: string) => {
-  const { closeFile } = useWorkspaceStore.getState();
-  for (const file of findWorkspace(workspaceId)?.openFiles ?? []) {
-    if (file === target || isWithin(file, target)) closeFile(workspaceId, file);
-  }
-};
-
-export const removeConfig = async (
-  workspace: Workspace,
-  agent: ConfigAgent,
-  { removal, name, description, closes }: RemovalRequest,
-) => {
-  const confirmed = await useUiStore.getState().askConfirm({
-    title: `Remove ${name}?`,
-    description,
-    confirmLabel: "Remove",
-    destructive: true,
-  });
-  if (!confirmed) return;
-  try {
-    await api.removeAgentConfig(workspace.cwd, agent, removal);
-  } catch (error) {
-    toast.error(`Couldn't remove ${name}: ${errorMessage(error)}`);
-    return;
-  }
-  if (closes) closeTabs(workspace.id, closes);
-  toast.success(`Removed ${name}`);
-  void refreshOverview(workspace.cwd, agent);
-};

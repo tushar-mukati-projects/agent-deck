@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { confirmReason, exampleArguments } from "@/features/mcp/schema";
+import { confirmReason, exampleArguments } from "@/lib/mcp/schema";
 import type { McpTool } from "@/types";
 
 describe("exampleArguments", () => {
