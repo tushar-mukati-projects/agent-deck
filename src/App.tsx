@@ -1,5 +1,4 @@
-import { useEffect, useState } from "react";
-import { Group, Panel, usePanelRef, type PanelSize } from "react-resizable-panels";
+import { Group, Panel } from "react-resizable-panels";
 import { Toaster } from "sonner";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -20,68 +19,12 @@ import { useAgentThemeSync } from "@/hooks/useAgentThemeSync";
 import { useAppEvents } from "@/hooks/useAppEvents";
 import { useAttentionAlerts } from "@/hooks/useAttentionAlerts";
 import { useGlobalShortcuts } from "@/hooks/useGlobalShortcuts";
+import { useSidePanel } from "@/hooks/useSidePanel";
 import { useWindowActivity } from "@/hooks/useWindowActivity";
 import { DESKTOP_AGENT_OPT_IN_ID } from "@/lib/desktopAgent";
-import { holdTerminalFits } from "@/lib/terminal/registry";
 import { findTheme } from "@/lib/themes";
 import { useSettingsStore } from "@/stores/settings-store";
-import { useUiStore, type SidePanel } from "@/stores/ui-store";
 import { activeWorkspaceOf, useWorkspaceStore } from "@/stores/workspace-store";
-
-const FLAG = { sessions: "sessionsOpen", context: "contextOpen" } as const;
-const WIDTH = { sessions: "sessionsWidth", context: "contextWidth" } as const;
-const PANEL_ANIMATION_MS = 180;
-
-let panelTimer: number | undefined;
-const animatePanels = () => {
-  const root = document.documentElement;
-  root.style.setProperty("--panel-animation", `${PANEL_ANIMATION_MS}ms`);
-  root.classList.add("panels-animating");
-  holdTerminalFits(PANEL_ANIMATION_MS);
-  window.clearTimeout(panelTimer);
-  panelTimer = window.setTimeout(
-    () => root.classList.remove("panels-animating"),
-    PANEL_ANIMATION_MS + 20,
-  );
-};
-
-let draggingSeparator = false;
-window.addEventListener(
-  "pointerdown",
-  (event) => {
-    draggingSeparator = !!(event.target as Element | null)?.closest?.("[data-separator]");
-  },
-  true,
-);
-window.addEventListener("pointerup", () => (draggingSeparator = false), true);
-
-const useSidePanel = (panel: SidePanel, available = true) => {
-  const panelRef = usePanelRef();
-  const open = useUiStore((s) => s[FLAG[panel]]) && available;
-  const [initialWidth] = useState(() => useUiStore.getState()[WIDTH[panel]]);
-
-  useEffect(() => {
-    const frame = requestAnimationFrame(() => {
-      const handle = panelRef.current;
-      if (!handle) return;
-      if (open === !handle.isCollapsed()) return;
-      animatePanels();
-      if (open) handle.resize(useUiStore.getState()[WIDTH[panel]]);
-      else handle.collapse();
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [open, panel, panelRef]);
-
-  const onResize = (size: PanelSize) => {
-    if (!available || !draggingSeparator) return;
-    const collapsed = size.inPixels < 1;
-    const state = useUiStore.getState();
-    if (collapsed === state[FLAG[panel]]) useUiStore.setState({ [FLAG[panel]]: !collapsed });
-    if (!collapsed) state.setPanelWidth(panel, Math.round(size.inPixels));
-  };
-
-  return { panelRef, onResize, initialWidth };
-};
 
 export const App = () => {
   const activeId = useWorkspaceStore((s) => activeWorkspaceOf(s)?.id ?? null);
