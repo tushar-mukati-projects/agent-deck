@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { FileText, Power, Wrench } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { EmptyState, LoadingState, Spinner } from "@/components/ui/feedback";
+import { EmptyState, LoadingState, showError, Spinner } from "@/components/ui/feedback";
 import { IconButton } from "@/components/ui/icon-button";
 import { ListRow } from "@/components/ui/list-row";
 import { Alert, SearchInput, SectionLabel } from "@/components/ui/panel";
@@ -60,7 +60,7 @@ const useDescription = (cwd: string, serverId: string) => {
   }, [connect]);
 
   const restart = async () => {
-    await api.mcpDisconnect(cwd, serverId).catch(() => undefined);
+    await api.mcpDisconnect(cwd, serverId).catch(showError);
     setDescription(null);
     await connect();
   };

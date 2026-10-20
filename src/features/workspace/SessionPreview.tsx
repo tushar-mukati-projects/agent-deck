@@ -106,6 +106,7 @@ const PreviewHeader = ({
   workspace,
   session,
   folderExists,
+  folderError,
   query,
   onQuery,
   hasItems,
@@ -113,6 +114,7 @@ const PreviewHeader = ({
   workspace: Workspace;
   session: SessionInfo | undefined;
   folderExists: boolean;
+  folderError: string | null;
   query: string;
   onQuery: (query: string) => void;
   hasItems: boolean;
@@ -147,6 +149,7 @@ const PreviewHeader = ({
         <Alert tone="danger" className="mt-3">
           This folder isn't reachable from this machine. It may be on another host, in a stopped WSL
           distro, or it was moved, so the session can't be resumed here.
+          {folderError && <span className="mt-1 block whitespace-pre-wrap">{folderError}</span>}
         </Alert>
       )}
       {external && (
@@ -234,12 +237,8 @@ export const SessionPreview = ({ workspace }: { workspace: Workspace }) => {
     session?.modifiedMs ?? 0,
     sessionsLoaded,
   );
-  const { data: folderExists = true } = useAsync(
-    () =>
-      api
-        .statPath(workspace.cwd)
-        .then((stat) => stat?.kind === "dir")
-        .catch(() => false),
+  const { data: isFolder = true, error: folderError } = useAsync(
+    () => api.statPath(workspace.cwd).then((stat) => stat?.kind === "dir"),
     [workspace.cwd],
     { keepPrevious: true },
   );
@@ -251,7 +250,8 @@ export const SessionPreview = ({ workspace }: { workspace: Workspace }) => {
       <PreviewHeader
         workspace={workspace}
         session={session}
-        folderExists={folderExists}
+        folderExists={isFolder && !folderError}
+        folderError={folderError}
         query={query}
         onQuery={setQuery}
         hasItems={!!items?.length}

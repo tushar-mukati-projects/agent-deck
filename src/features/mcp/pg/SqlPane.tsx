@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { Play, Square } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/feedback";
@@ -13,23 +14,20 @@ import { useUiStore } from "@/stores/ui-store";
 import type { PgOutput } from "@/types";
 
 const DEFAULT_SQL = "select now();";
-const draftKey = (serverId: string) => `agent-deck:sql:${serverId}`;
+const SQL_DRAFT_KEY_PREFIX = "agent-deck:sql:";
+const draftKey = (serverId: string) => `${SQL_DRAFT_KEY_PREFIX}${serverId}`;
 
 const useSqlDraft = (serverId: string) => {
-  const [sql, setSql] = useState(() => {
-    try {
-      return localStorage.getItem(draftKey(serverId)) ?? DEFAULT_SQL;
-    } catch {
-      return DEFAULT_SQL;
-    }
-  });
+  const [sql, setSql] = useState(() => localStorage.getItem(draftKey(serverId)) ?? DEFAULT_SQL);
   const update = useCallback(
     (value: string) => {
       setSql(value);
       try {
         localStorage.setItem(draftKey(serverId), value);
-      } catch {
-        return;
+      } catch (error) {
+        toast.error(`Couldn't save the SQL draft: ${errorMessage(error)}`, {
+          id: draftKey(serverId),
+        });
       }
     },
     [serverId],

@@ -5,6 +5,7 @@ import { tags as t } from "@lezer/highlight";
 import { createTheme } from "@uiw/codemirror-themes";
 import CodeMirror from "@uiw/react-codemirror";
 
+import { showError } from "@/components/ui/feedback";
 import { findLanguage } from "@/lib/languages";
 import { findTheme } from "@/lib/themes";
 import { basename, lruSet, normalizePath } from "@/lib/utils";
@@ -70,7 +71,7 @@ export const useLanguage = (path: string) => {
     description
       .load()
       .then((support) => !cancelled && setLoaded({ path, support }))
-      .catch(() => undefined);
+      .catch(showError);
     return () => {
       cancelled = true;
     };
