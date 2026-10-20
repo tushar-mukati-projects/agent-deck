@@ -1,8 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { ExternalLink, FileQuestion, FileWarning } from "lucide-react";
-import { toast } from "sonner";
 
-import { closeFilesWithConfirm, openPathInWorkspace } from "@/actions/files";
+import {
+  closeFilesWithConfirm,
+  discardAndReload,
+  openPathInWorkspace,
+  reloadWithConfirm,
+  saveFile,
+} from "@/actions/files";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Button } from "@/components/ui/button";
 import { EmptyState, LoadingState, showError } from "@/components/ui/feedback";
@@ -15,11 +20,9 @@ import { FileToolbar } from "@/features/viewer/FileToolbar";
 import { MarkdownView } from "@/features/viewer/MarkdownView";
 import { useFileContent, useFileVersion } from "@/features/viewer/useFileContent";
 import { decodeDiffTab, decodeMcpTab } from "@/lib/diff-tabs";
-import { api } from "@/lib/tauri/commands";
 import { assetUrl, openExternal } from "@/lib/tauri/system";
-import { basename, dirname, failedTo, normalizePath, samePath } from "@/lib/utils";
+import { basename, dirname, normalizePath, samePath } from "@/lib/utils";
 import { isTextKind, viewKind, type ViewKind } from "@/lib/view-kind";
-import { useUiStore } from "@/stores/ui-store";
 import { useViewerStore } from "@/stores/viewer-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import type { Workspace } from "@/types";
@@ -52,23 +55,6 @@ const MediaFile = ({ path, kind }: { path: string; kind: MediaKind }) => {
   );
 };
 
-const confirmDiscard = (path: string) =>
-  useUiStore.getState().askConfirm({
-    title: `Discard changes to ${basename(path)}?`,
-    description: "Reloading replaces your unsaved edits with the file on disk.",
-    confirmLabel: "Discard and reload",
-    destructive: true,
-  });
-
-const confirmOverwrite = (path: string) =>
-  useUiStore.getState().askConfirm({
-    title: `Overwrite ${basename(path)}?`,
-    description:
-      "The file changed on disk after you started editing. Saving replaces those changes with yours.",
-    confirmLabel: "Overwrite",
-    destructive: true,
-  });
-
 const DocumentBody = ({ workspace, path }: { workspace: Workspace; path: string }) => {
   const kind = viewKind(path);
   const needsText = isTextKind(kind);
@@ -80,7 +66,6 @@ const DocumentBody = ({ workspace, path }: { workspace: Workspace; path: string 
   const markdownMode = useViewerStore((s) => s.markdownMode[key] ?? "preview");
   const line = useViewerStore((s) => s.lines[key] ?? null);
   const { setDraft, setEditing, setMarkdownMode } = useViewerStore.getState();
-  const savingRef = useRef(false);
 
   const content = state.status === "ready" && state.content.kind === "text" ? state.content : null;
   const contentRef = useRef(content);
@@ -95,38 +80,10 @@ const DocumentBody = ({ workspace, path }: { workspace: Workspace; path: string 
 
   const clearLine = useCallback(() => void useViewerStore.getState().takeLine(path), [path]);
 
-  const save = useCallback(async () => {
-    const current = useViewerStore.getState().drafts[key];
+  const save = useCallback(() => {
     const base = contentRef.current;
-    if (current === undefined || !base || base.encoding === "lossy" || savingRef.current) return;
-    savingRef.current = true;
-    try {
-      const write = (expectedModifiedMs: number | null) =>
-        api.writeFile(path, current, { encoding: base.encoding, expectedModifiedMs });
-      const outcome = await write(base.modifiedMs);
-      if (outcome.kind === "conflict") {
-        if (!(await confirmOverwrite(path))) return;
-        await write(null);
-      }
-      await reload(true);
-      if (useViewerStore.getState().drafts[key] === current) setDraft(path, null);
-      toast.success(`Saved ${basename(path)}`);
-    } catch (error) {
-      toast.error(failedTo("save", error));
-    } finally {
-      savingRef.current = false;
-    }
-  }, [key, path, reload, setDraft]);
-
-  const discardAndReload = useCallback(async () => {
-    setDraft(path, null);
-    await reload(true);
-  }, [path, reload, setDraft]);
-
-  const reloadWithConfirm = async () => {
-    if (!dirty) return reload();
-    if (await confirmDiscard(path)) await discardAndReload();
-  };
+    if (base) void saveFile(path, base, reload);
+  }, [path, reload]);
 
   const textRef = useRef(text);
   textRef.current = text;
@@ -183,7 +140,7 @@ const DocumentBody = ({ workspace, path }: { workspace: Workspace; path: string 
         line={line}
         onLineShown={clearLine}
         onChange={handleChange}
-        onSave={() => void save()}
+        onSave={save}
       />
     );
   };
@@ -200,8 +157,8 @@ const DocumentBody = ({ workspace, path }: { workspace: Workspace; path: string 
         editing={editing}
         onToggleEdit={() => setEditing(path, !editing)}
         dirty={dirty}
-        onSave={() => void save()}
-        onReload={() => void reloadWithConfirm()}
+        onSave={save}
+        onReload={() => void reloadWithConfirm(path, dirty, reload)}
       />
 
       {readOnly && (
@@ -217,7 +174,7 @@ const DocumentBody = ({ workspace, path }: { workspace: Workspace; path: string 
           className="m-2 mb-0"
           action={
             <>
-              <Button size="sm" variant="ghost" onClick={() => void discardAndReload()}>
+              <Button size="sm" variant="ghost" onClick={() => void discardAndReload(path, reload)}>
                 Reload from disk
               </Button>
               <Button size="sm" variant="ghost" onClick={dismissStale}>

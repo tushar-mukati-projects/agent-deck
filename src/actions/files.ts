@@ -5,7 +5,7 @@ import { candidatePaths, type PathLinkTarget } from "@/lib/terminal/links";
 import { pasteIntoTerminal } from "@/lib/terminal/registry";
 import { api } from "@/lib/tauri/commands";
 import { revealInExplorer } from "@/lib/tauri/system";
-import { basename, isWithin, relativePath } from "@/lib/utils";
+import { basename, failedTo, isWithin, normalizePath, relativePath } from "@/lib/utils";
 import { agentName } from "@/stores/agents";
 import { useExplorerStore } from "@/stores/explorer-store";
 import { useSessionsStore } from "@/stores/sessions-store";
@@ -13,7 +13,12 @@ import { isAgentRunning } from "@/stores/terminal-store";
 import { useUiStore } from "@/stores/ui-store";
 import { dirtyPaths, useViewerStore } from "@/stores/viewer-store";
 import { findWorkspace, useWorkspaceStore } from "@/stores/workspace-store";
-import type { Workspace } from "@/types";
+import type { FileContent, Workspace } from "@/types";
+
+type TextContent = Extract<FileContent, { kind: "text" }>;
+type Reload = (quiet?: boolean) => Promise<void>;
+
+const saving = new Set<string>();
 
 export const mentionText = (path: string, root: string) => {
   const rel = relativePath(path, root).replace(/\\/g, "/");
@@ -54,6 +59,57 @@ export const closeFilesWithConfirm = async (workspaceId: string, tabs: string[])
   const { closeFile } = useWorkspaceStore.getState();
   for (const tab of tabs) closeFile(workspaceId, tab);
   useViewerStore.getState().forget(tabs);
+};
+
+const confirmDiscard = (path: string) =>
+  useUiStore.getState().askConfirm({
+    title: `Discard changes to ${basename(path)}?`,
+    description: "Reloading replaces your unsaved edits with the file on disk.",
+    confirmLabel: "Discard and reload",
+    destructive: true,
+  });
+
+const confirmOverwrite = (path: string) =>
+  useUiStore.getState().askConfirm({
+    title: `Overwrite ${basename(path)}?`,
+    description:
+      "The file changed on disk after you started editing. Saving replaces those changes with yours.",
+    confirmLabel: "Overwrite",
+    destructive: true,
+  });
+
+export const saveFile = async (path: string, base: TextContent, reload: Reload) => {
+  const key = normalizePath(path);
+  const current = useViewerStore.getState().drafts[key];
+  if (current === undefined || base.encoding === "lossy" || saving.has(key)) return;
+  saving.add(key);
+  try {
+    const write = (expectedModifiedMs: number | null) =>
+      api.writeFile(path, current, { encoding: base.encoding, expectedModifiedMs });
+    const outcome = await write(base.modifiedMs);
+    if (outcome.kind === "conflict") {
+      if (!(await confirmOverwrite(path))) return;
+      await write(null);
+    }
+    await reload(true);
+    if (useViewerStore.getState().drafts[key] === current)
+      useViewerStore.getState().setDraft(path, null);
+    toast.success(`Saved ${basename(path)}`);
+  } catch (error) {
+    toast.error(failedTo("save", error));
+  } finally {
+    saving.delete(key);
+  }
+};
+
+export const discardAndReload = async (path: string, reload: Reload) => {
+  useViewerStore.getState().setDraft(path, null);
+  await reload(true);
+};
+
+export const reloadWithConfirm = async (path: string, dirty: boolean, reload: Reload) => {
+  if (!dirty) return reload();
+  if (await confirmDiscard(path)) await discardAndReload(path, reload);
 };
 
 const openFileAt = (workspaceId: string, path: string, line: number | null = null) => {
