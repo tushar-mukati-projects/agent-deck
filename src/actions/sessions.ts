@@ -1,6 +1,6 @@
 import { toast } from "sonner";
 
-import { SUBAGENT_NAME } from "@/lib/agents/registry";
+import { CLAUDE, SUBAGENT_NAME } from "@/lib/agents/registry";
 import { openElsewhere, sessionTitle } from "@/lib/sessions";
 import { api } from "@/lib/tauri/commands";
 import { pickFolder } from "@/lib/tauri/system";
@@ -125,5 +125,19 @@ export const deleteSessionWithConfirm = async (session: SessionInfo) => {
     toast.success(session.distro ? "Session deleted" : "Session moved to the Recycle Bin");
   } catch (error) {
     toast.error(errorMessage(error));
+  }
+};
+
+export const renameSession = async (session: SessionInfo, title: string) => {
+  try {
+    if (session.agent === CLAUDE) await api.renameSession(session.filePath, session.distro, title);
+    else useSettingsStore.getState().setSessionTitle(session.id, title);
+    const sessions = useSessionsStore.getState();
+    sessions.patchSession(session.id, { title });
+    void (session.distro ? sessions.refreshWsl() : sessions.refresh());
+    return true;
+  } catch (error) {
+    toast.error(failedTo("rename", error));
+    return false;
   }
 };

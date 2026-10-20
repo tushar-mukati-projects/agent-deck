@@ -1,15 +1,11 @@
 import { useRef, useState } from "react";
-import { toast } from "sonner";
 
+import { renameSession } from "@/actions/sessions";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { CLAUDE } from "@/lib/agents/registry";
-import { api } from "@/lib/tauri/commands";
-import { failedTo } from "@/lib/utils";
 import { agentName } from "@/stores/agents";
-import { useSessionsStore } from "@/stores/sessions-store";
-import { useSettingsStore } from "@/stores/settings-store";
 import { useUiStore } from "@/stores/ui-store";
 import type { SessionInfo } from "@/types";
 
@@ -28,18 +24,8 @@ const RenameForm = ({
     const next = title.trim();
     if (!next || saving) return;
     setSaving(true);
-    try {
-      if (target.agent === CLAUDE) await api.renameSession(target.filePath, target.distro, next);
-      else useSettingsStore.getState().setSessionTitle(target.id, next);
-      useSessionsStore.getState().patchSession(target.id, { title: next });
-      close();
-      const sessions = useSessionsStore.getState();
-      void (target.distro ? sessions.refreshWsl() : sessions.refresh());
-    } catch (error) {
-      toast.error(failedTo("rename", error));
-    } finally {
-      setSaving(false);
-    }
+    if (await renameSession(target, next)) close();
+    setSaving(false);
   };
 
   return (
