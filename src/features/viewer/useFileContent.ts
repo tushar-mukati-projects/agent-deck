@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { subscribeFileChanges } from "@/lib/file-events";
 import { api } from "@/lib/tauri/commands";
-import { onWindowFocused } from "@/lib/tauri/focus";
+import { onWindowFocused } from "@/lib/tauri/system";
 import { errorMessage, lruSet, normalizePath } from "@/lib/utils";
 import { isDirty } from "@/stores/viewer-store";
 import type { FileContent } from "@/types";

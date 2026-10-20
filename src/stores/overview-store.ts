@@ -3,7 +3,7 @@ import { create } from "zustand";
 
 import { singleFlight } from "@/lib/single-flight";
 import { api } from "@/lib/tauri/commands";
-import { onWindowFocused } from "@/lib/tauri/focus";
+import { onWindowFocused } from "@/lib/tauri/system";
 import { errorMessage, normalizePath, sameJson } from "@/lib/utils";
 import type { AgentOverview, ConfigAgent } from "@/types";
 

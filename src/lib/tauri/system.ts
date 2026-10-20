@@ -9,6 +9,13 @@ import { api } from "@/lib/tauri/commands";
 
 export const appWindow = getCurrentWindow();
 
+export const onWindowFocused = (callback: () => void) => {
+  const unlisten = appWindow.onFocusChanged(({ payload: focused }) => {
+    if (focused) callback();
+  });
+  return () => void unlisten.then((fn) => fn());
+};
+
 export const pickFolder = async (defaultPath?: string) => {
   const selected = await open({ directory: true, multiple: false, defaultPath });
   return typeof selected === "string" ? selected : null;

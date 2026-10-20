@@ -5,6 +5,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/feedback";
 import { Kbd } from "@/components/ui/kbd";
 import { usePaletteItems } from "@/features/palette/usePaletteItems";
+import { scrollIntoViewNearest } from "@/lib/dom";
 import { cn } from "@/lib/utils";
 import { useUiStore, type PaletteMode } from "@/stores/ui-store";
 import type { PaletteItem } from "@/features/palette/items";
@@ -91,9 +92,7 @@ const PaletteList = ({ mode, onClose, inputRef }: PaletteListProps) => {
   useEffect(() => setSelected(0), [query]);
 
   useEffect(() => {
-    listRef.current
-      ?.querySelector(`[data-index="${current}"]`)
-      ?.scrollIntoView({ block: "nearest" });
+    scrollIntoViewNearest(listRef.current?.querySelector(`[data-index="${current}"]`) ?? null);
   }, [current]);
 
   const run = useCallback(

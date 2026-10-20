@@ -15,7 +15,7 @@ import { playChime, unlockAudio } from "@/lib/chime";
 import { speak } from "@/lib/speech";
 import { onAgentIdle, type IdleEvent } from "@/lib/terminal/activity";
 import { api } from "@/lib/tauri/commands";
-import { appWindow } from "@/lib/tauri/system";
+import { appWindow, onWindowFocused } from "@/lib/tauri/system";
 import { basename } from "@/lib/utils";
 import { useAgentTasksStore } from "@/stores/agent-tasks-store";
 import { agentName } from "@/stores/agents";
@@ -89,9 +89,7 @@ export const useAttentionAlerts = () => {
   useEffect(() => {
     unlockAudio();
     const unsubscribeIdle = onAgentIdle((event) => void handleIdle(event));
-    const unlistenFocus = appWindow.onFocusChanged(
-      ({ payload: focused }) => focused && clearVisibleAttention(),
-    );
+    const unlistenFocus = onWindowFocused(clearVisibleAttention);
 
     let badge = false;
     const syncBadge = () => {
@@ -113,7 +111,7 @@ export const useAttentionAlerts = () => {
       unsubscribeTerminals();
       unsubscribeSettings();
       unsubscribeWorkspaces();
-      void unlistenFocus.then((fn) => fn());
+      unlistenFocus();
     };
   }, []);
 };
