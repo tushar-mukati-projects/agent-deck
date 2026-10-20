@@ -1,39 +1,31 @@
+mod accumulator;
+mod search;
+mod transcript;
+
 use std::{
     collections::{HashMap, HashSet},
     fs,
     io::{self, BufRead, BufReader, Read, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
-    process::Command,
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        LazyLock,
-    },
-    time::{Duration, Instant},
+    sync::LazyLock,
+    time::Duration,
 };
 
-use aho_corasick::AhoCorasick;
 use anyhow::Context;
 use parking_lot::Mutex;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use serde_json::value::RawValue;
+
+pub(crate) use accumulator::Accumulator;
+pub(crate) use search::{begin_search, search, search_is_current, search_lines, Needle, SearchHit};
+pub(crate) use transcript::{is_agent_id, subagent_transcript, transcript, transcript_from_lines, TranscriptPage};
 
 use crate::{
     codex,
-    process::{is_agent_process, process_start},
-    util::{canonical, config_home, is_session_id, lenient, lenient_bool, lenient_u64, mtime_ms, raw_lines, run_with_timeout, READ_BUFFER_BYTES},
+    util::{canonical, config_home, is_session_id, lenient_u64, mtime_ms, READ_BUFFER_BYTES},
 };
 
-const PROMPT_PREVIEW_CHARS: usize = 280;
-const TITLE_CHARS: usize = 80;
-const TOOL_DETAIL_CHARS: usize = 160;
-const TRANSCRIPT_TEXT_CHARS: usize = 24_000;
-const AGENT_ID_MAX_LEN: usize = 64;
-const TASKKILL_TIMEOUT: Duration = Duration::from_secs(10);
-const EXIT_WAIT: Duration = Duration::from_secs(5);
-const EXIT_POLL: Duration = Duration::from_millis(100);
 const PARTIAL_LINE_WAIT: Duration = Duration::from_millis(300);
-const TOOL_RESULT: &[u8] = br#""type":"tool_result""#;
 const SYSTEM_PREFIXES: &[&str] = &["Caveat:", "[Request interrupted", "This session is being continued"];
 const SYSTEM_TAGS: &[&str] = &[
     "command-",
@@ -76,7 +68,6 @@ pub struct SessionInfo {
     pub recent_cwds: Vec<String>,
 }
 
-const RECENT_CWDS: usize = 6;
 
 fn default_agent() -> String {
     "claude".into()
@@ -98,129 +89,6 @@ pub struct LiveSession {
     pub started_at: Option<u64>,
 }
 
-#[derive(Serialize, Clone, Debug, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct TranscriptItem {
-    pub role: String,
-    pub kind: String,
-    pub text: String,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TranscriptPage {
-    pub items: Vec<TranscriptItem>,
-    pub offset: u64,
-    pub reset: bool,
-}
-
-#[derive(Deserialize)]
-struct RawLine<'a> {
-    #[serde(rename = "type", default, deserialize_with = "lenient")]
-    kind: Option<String>,
-    #[serde(default, deserialize_with = "lenient")]
-    cwd: Option<String>,
-    #[serde(rename = "gitBranch", default, deserialize_with = "lenient")]
-    git_branch: Option<String>,
-    #[serde(default, deserialize_with = "lenient")]
-    timestamp: Option<String>,
-    #[serde(rename = "aiTitle", default, deserialize_with = "lenient")]
-    ai_title: Option<String>,
-    #[serde(rename = "customTitle", default, deserialize_with = "lenient")]
-    custom_title: Option<String>,
-    #[serde(rename = "lastPrompt", default, deserialize_with = "lenient")]
-    last_prompt: Option<String>,
-    #[serde(rename = "isMeta", default, deserialize_with = "lenient_bool")]
-    is_meta: bool,
-    #[serde(rename = "isSidechain", default, deserialize_with = "lenient_bool")]
-    is_sidechain: bool,
-    #[serde(default, deserialize_with = "lenient")]
-    version: Option<String>,
-    #[serde(borrow, default)]
-    message: Option<RawMessage<'a>>,
-    #[serde(borrow, default)]
-    payload: Option<&'a RawValue>,
-}
-
-#[derive(Deserialize)]
-struct RawMessage<'a> {
-    #[serde(borrow, default)]
-    content: Option<&'a RawValue>,
-}
-
-enum Parsed<'a> {
-    Claude(RawLine<'a>),
-    Codex(codex::Record),
-}
-
-fn parse_line(line: &str, detailed: bool) -> Option<Parsed<'_>> {
-    let raw: RawLine = serde_json::from_str(line).ok()?;
-    match raw.kind.as_deref() {
-        Some(kind) if codex::is_codex_kind(kind) => codex::from_parts(kind, raw.timestamp, raw.payload, detailed).map(Parsed::Codex),
-        _ => Some(Parsed::Claude(raw)),
-    }
-}
-
-enum Content<'a> {
-    Text(String),
-    Blocks(Vec<Block<'a>>),
-}
-
-#[derive(Deserialize)]
-struct Block<'a> {
-    #[serde(rename = "type", default, deserialize_with = "lenient")]
-    kind: Option<String>,
-    #[serde(default, deserialize_with = "lenient")]
-    text: Option<String>,
-    #[serde(default, deserialize_with = "lenient")]
-    name: Option<String>,
-    #[serde(borrow, default)]
-    input: Option<&'a RawValue>,
-}
-
-impl Block<'_> {
-    fn is(&self, kind: &str) -> bool {
-        self.kind.as_deref() == Some(kind)
-    }
-}
-
-fn parse_content(raw: &RawValue) -> Option<Content<'_>> {
-    let text = raw.get();
-    match text.as_bytes().first()? {
-        b'"' => serde_json::from_str(text).ok().map(Content::Text),
-        b'[' => serde_json::from_str(text).ok().map(Content::Blocks),
-        _ => None,
-    }
-}
-
-#[derive(Deserialize, Default)]
-struct ToolInput {
-    #[serde(default, deserialize_with = "lenient")]
-    description: Option<String>,
-    #[serde(default, deserialize_with = "lenient")]
-    command: Option<String>,
-    #[serde(default, deserialize_with = "lenient")]
-    file_path: Option<String>,
-    #[serde(default, deserialize_with = "lenient")]
-    pattern: Option<String>,
-    #[serde(default, deserialize_with = "lenient")]
-    url: Option<String>,
-    #[serde(default, deserialize_with = "lenient")]
-    query: Option<String>,
-    #[serde(default, deserialize_with = "lenient")]
-    prompt: Option<String>,
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-pub(crate) struct Accumulator {
-    info: SessionInfo,
-    ai_title: Option<String>,
-    last_user_text: Option<String>,
-    offset: u64,
-    #[serde(default)]
-    seen_meta: bool,
-}
-
 struct CacheEntry {
     modified_ms: u64,
     size: u64,
@@ -229,7 +97,6 @@ struct CacheEntry {
 }
 
 static CACHE: LazyLock<Mutex<HashMap<String, CacheEntry>>> = LazyLock::new(Mutex::default);
-static SEARCH_GENERATION: AtomicU64 = AtomicU64::new(0);
 
 pub fn claude_home() -> PathBuf {
     config_home("CLAUDE_CONFIG_DIR", ".claude")
@@ -270,22 +137,6 @@ fn is_system_text(text: &str) -> bool {
         || trimmed.strip_prefix('<').is_some_and(|rest| SYSTEM_TAGS.iter().any(|tag| rest.starts_with(tag)))
 }
 
-fn user_prompt_text(content: &RawValue) -> Option<String> {
-    if content.get().starts_with('[') && memchr::memmem::find(content.get().as_bytes(), TOOL_RESULT).is_some() {
-        return None;
-    }
-    let text = match parse_content(content)? {
-        Content::Text(text) => text,
-        Content::Blocks(blocks) => {
-            if blocks.iter().any(|b| b.is("tool_result")) {
-                return None;
-            }
-            blocks.into_iter().filter(|b| b.is("text")).filter_map(|b| b.text).find(|t| !is_system_text(t))?
-        }
-    };
-    (!is_system_text(&text)).then_some(text)
-}
-
 fn decode_project_key(key: &str) -> String {
     let mut chars = key.chars();
     match (chars.next(), chars.next(), chars.next()) {
@@ -322,170 +173,6 @@ pub(crate) fn complete_lines(file: fs::File, start: u64, mut on_line: impl FnMut
     }
 }
 
-impl Accumulator {
-    fn new(path: &Path, project_key: &str) -> Self {
-        Self::with_ids(session_id_of(&path.to_string_lossy()), path.to_string_lossy().to_string(), project_key, None)
-    }
-
-    pub(crate) fn with_ids(id: String, file_path: String, project_key: &str, distro: Option<String>) -> Self {
-        Self {
-            info: SessionInfo {
-                id,
-                agent: default_agent(),
-                distro,
-                file_path,
-                project_key: project_key.to_string(),
-                ..SessionInfo::default()
-            },
-            ai_title: None,
-            last_user_text: None,
-            offset: 0,
-            seen_meta: false,
-        }
-    }
-
-    fn restarted(&self) -> Self {
-        let info = &self.info;
-        Self::with_ids(session_id_of(&info.file_path), info.file_path.clone(), &info.project_key, info.distro.clone())
-    }
-
-    pub(crate) fn offset(&self) -> u64 {
-        self.offset
-    }
-
-    pub(crate) fn set_offset(&mut self, offset: u64) {
-        self.offset = offset;
-    }
-
-    fn note_prompt(&mut self, text: &str) {
-        self.info.prompt_count += 1;
-        let preview = preview(text, PROMPT_PREVIEW_CHARS);
-        if self.info.first_prompt.is_none() {
-            self.info.first_prompt = Some(preview.clone());
-        }
-        self.last_user_text = Some(preview);
-    }
-
-    fn note_cwd(&mut self, cwd: String) {
-        if cwd.is_empty() {
-            return;
-        }
-        if self.info.cwd.is_empty() {
-            self.info.cwd = cwd.clone();
-        }
-        let recent = &mut self.info.recent_cwds;
-        if recent.first() == Some(&cwd) {
-            return;
-        }
-        recent.retain(|c| *c != cwd);
-        recent.insert(0, cwd);
-        recent.truncate(RECENT_CWDS);
-    }
-
-    fn note_time(&mut self, timestamp: Option<String>) {
-        if self.info.started_at.is_none() {
-            self.info.started_at = timestamp;
-        }
-    }
-
-    fn feed_codex(&mut self, record: codex::Record) {
-        self.info.agent = codex::AGENT.into();
-        self.note_time(record.timestamp);
-        match record.event {
-            codex::Event::Meta { id, cwd, version, branch, started } => {
-                if !std::mem::replace(&mut self.seen_meta, true) {
-                    if let Some(started) = started {
-                        self.info.started_at = Some(started);
-                    }
-                }
-                if let Some(id) = id.filter(|i| is_session_id(i) && !is_session_id(&self.info.id)) {
-                    self.info.id = id;
-                }
-                if let Some(cwd) = cwd {
-                    self.note_cwd(cwd);
-                }
-                self.info.version = version.or(self.info.version.take());
-                self.info.git_branch = branch.filter(|b| !b.is_empty()).or(self.info.git_branch.take());
-            }
-            codex::Event::Cwd(cwd) => self.note_cwd(cwd),
-            codex::Event::User(text) if !is_system_text(&text) => self.note_prompt(&text),
-            _ => {}
-        }
-    }
-
-    fn feed_claude(&mut self, raw: RawLine) {
-        let kind = raw.kind.as_deref().unwrap_or("");
-        match kind {
-            "custom-title" => self.info.custom_title = raw.custom_title.filter(|t| !t.trim().is_empty()),
-            "ai-title" => self.ai_title = raw.ai_title.or(self.ai_title.take()),
-            "last-prompt" => {
-                if let Some(p) = raw.last_prompt.filter(|p| !p.trim().is_empty()) {
-                    self.info.last_prompt = Some(preview(&p, PROMPT_PREVIEW_CHARS));
-                }
-            }
-            "user" | "assistant" if !raw.is_sidechain => {
-                let is_user = kind == "user";
-                if let Some(cwd) = raw.cwd {
-                    self.note_cwd(cwd);
-                }
-                if let Some(branch) = raw.git_branch {
-                    self.info.git_branch = Some(branch).filter(|b| !b.is_empty());
-                }
-                if raw.version.is_some() {
-                    self.info.version = raw.version;
-                }
-                self.note_time(raw.timestamp);
-                if is_user && !raw.is_meta {
-                    if let Some(text) = raw.message.and_then(|m| m.content).and_then(user_prompt_text) {
-                        self.note_prompt(&text);
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
-
-    pub(crate) fn feed(&mut self, line: &str) {
-        match parse_line(line, false) {
-            Some(Parsed::Codex(record)) => self.feed_codex(record),
-            Some(Parsed::Claude(raw)) => self.feed_claude(raw),
-            None => {}
-        }
-    }
-
-    fn read_from_offset(&mut self, path: &Path) -> io::Result<()> {
-        let mut file = fs::File::open(path)?;
-        if !ends_line(&mut file, self.offset)? {
-            *self = self.restarted();
-        }
-        complete_lines(file, self.offset, |line, end| {
-            self.feed(line);
-            self.offset = end;
-        })
-    }
-
-    pub(crate) fn finish_with(&self, modified_ms: u64, size: u64) -> Option<SessionInfo> {
-        let mut info = self.info.clone();
-        if info.prompt_count == 0 && info.custom_title.is_none() {
-            return None;
-        }
-        if info.cwd.is_empty() {
-            info.cwd = decode_project_key(&info.project_key);
-        }
-        if info.last_prompt.is_none() {
-            info.last_prompt = self.last_user_text.clone();
-        }
-        info.modified_ms = modified_ms;
-        info.size = size;
-        info.title = info
-            .custom_title
-            .clone()
-            .or_else(|| self.ai_title.clone())
-            .or_else(|| info.first_prompt.as_ref().map(|p| truncate_chars(p, TITLE_CHARS)));
-        Some(info)
-    }
-}
-
 fn session_files() -> Vec<(PathBuf, String, fs::Metadata)> {
     let mut files = Vec::new();
     for project in fs::read_dir(projects_dir()).into_iter().flatten().flatten() {
@@ -518,7 +205,7 @@ pub fn list_sessions() -> Vec<SessionInfo> {
             .iter()
             .filter_map(|(path, key, meta)| match cache.get(&cache_key(path)) {
                 Some(c) if c.modified_ms == mtime_ms(meta) && c.size == meta.len() => None,
-                Some(c) if meta.len() >= c.acc.offset => Some((path, meta, c.acc.clone())),
+                Some(c) if meta.len() >= c.acc.offset() => Some((path, meta, c.acc.clone())),
                 _ => Some((path, meta, Accumulator::new(path, key))),
             })
             .collect()
@@ -529,7 +216,7 @@ pub fn list_sessions() -> Vec<SessionInfo> {
         .map(|(path, meta, mut acc)| {
             let complete = acc.read_from_offset(path).is_ok();
             let info = acc.finish_with(mtime_ms(meta), meta.len());
-            let (modified_ms, size) = if complete { (mtime_ms(meta), meta.len()) } else { (0, acc.offset) };
+            let (modified_ms, size) = if complete { (mtime_ms(meta), meta.len()) } else { (0, acc.offset()) };
             (cache_key(path), CacheEntry { modified_ms, size, acc, info })
         })
         .collect();
@@ -542,88 +229,6 @@ pub fn list_sessions() -> Vec<SessionInfo> {
     let mut sessions: Vec<_> = cache.values().filter_map(|c| c.info.clone()).collect();
     sessions.sort_by_key(|s| std::cmp::Reverse(s.modified_ms));
     sessions
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct LiveFile {
-    pid: Option<u32>,
-    #[serde(default, deserialize_with = "lenient")]
-    session_id: Option<String>,
-    #[serde(default, deserialize_with = "lenient")]
-    status: Option<String>,
-    #[serde(default, deserialize_with = "lenient_u64")]
-    started_at: Option<u64>,
-    #[serde(default, deserialize_with = "lenient")]
-    proc_start: Option<String>,
-}
-
-pub fn live_sessions() -> Vec<LiveSession> {
-    let Ok(entries) = fs::read_dir(live_dir()) else { return Vec::new() };
-    entries
-        .flatten()
-        .filter(|e| e.path().extension().is_some_and(|x| x == "json"))
-        .filter_map(|e| {
-            let text = fs::read_to_string(e.path()).ok()?;
-            let live: LiveFile = serde_json::from_str(&text).ok()?;
-            let pid = live.pid?;
-            is_agent_process(pid).then_some(LiveSession {
-                distro: None,
-                session_id: live.session_id?,
-                pid,
-                status: live.status,
-                started_at: live.started_at,
-            })
-        })
-        .collect()
-}
-
-fn end_process_tree(pid: u32) -> anyhow::Result<()> {
-    let pid_text = pid.to_string();
-    let output = run_with_timeout(Command::new("taskkill").args(["/PID", &pid_text, "/T", "/F"]), None, TASKKILL_TIMEOUT)?;
-    if output.status.success() || !is_agent_process(pid) {
-        return Ok(());
-    }
-    let reason = String::from_utf8_lossy(&output.stderr);
-    anyhow::bail!("Couldn't close Claude (PID {pid}): {}", reason.trim())
-}
-
-pub fn terminate_live(session_id: &str, pid: u32) -> anyhow::Result<()> {
-    let record = fs::read_to_string(live_dir().join(format!("{pid}.json"))).ok();
-    let Some(record) = record.and_then(|text| serde_json::from_str::<LiveFile>(&text).ok()) else { return Ok(()) };
-    if !is_agent_process(pid) {
-        return Ok(());
-    }
-    anyhow::ensure!(record.session_id.as_deref() == Some(session_id), "PID {pid} is running a different session");
-    let recorded = record.proc_start.and_then(|start| start.parse::<u64>().ok());
-    anyhow::ensure!(recorded.is_some() && recorded == process_start(pid), "Couldn't confirm PID {pid} is that Claude session, so it was left running");
-    end_process_tree(pid)?;
-    let deadline = Instant::now() + EXIT_WAIT;
-    while is_agent_process(pid) {
-        anyhow::ensure!(Instant::now() < deadline, "Claude (PID {pid}) is still running");
-        std::thread::sleep(EXIT_POLL);
-    }
-    Ok(())
-}
-
-fn summarize_tool(name: &str, input: Option<&RawValue>) -> String {
-    let input: ToolInput = input.and_then(|i| serde_json::from_str(i.get()).ok()).unwrap_or_default();
-    let detail = input
-        .description
-        .or(input.command)
-        .or(input.file_path)
-        .or(input.pattern)
-        .or(input.url)
-        .or(input.query)
-        .or(input.prompt);
-    tool_text(name.to_string(), detail)
-}
-
-fn tool_text(name: String, detail: Option<String>) -> String {
-    match detail {
-        Some(d) => format!("{name} · {}", preview(&d, TOOL_DETAIL_CHARS)),
-        None => name,
-    }
 }
 
 pub fn session_file(file_path: &str) -> anyhow::Result<(PathBuf, String)> {
@@ -645,210 +250,6 @@ pub fn session_file(file_path: &str) -> anyhow::Result<(PathBuf, String)> {
     Ok((path, session_id))
 }
 
-fn item(role: &str, kind: &str, text: String) -> TranscriptItem {
-    TranscriptItem { role: role.into(), kind: kind.into(), text }
-}
-
-fn claude_items(raw: RawLine, sidechain: bool, out: &mut Vec<TranscriptItem>) {
-    let kind = raw.kind.as_deref().unwrap_or("");
-    if (raw.is_sidechain && !sidechain) || !(kind == "user" || kind == "assistant") {
-        return;
-    }
-    if kind == "user" && raw.is_meta {
-        return;
-    }
-    let Some(content) = raw.message.and_then(|m| m.content) else { return };
-    if kind == "user" {
-        if let Some(text) = user_prompt_text(content) {
-            out.push(item("user", "text", truncate_chars(&text, TRANSCRIPT_TEXT_CHARS)));
-        }
-        return;
-    }
-    let blocks = match parse_content(content) {
-        Some(Content::Text(text)) => vec![Block { kind: Some("text".into()), text: Some(text), name: None, input: None }],
-        Some(Content::Blocks(blocks)) => blocks,
-        None => return,
-    };
-    for block in blocks {
-        if block.is("text") {
-            if let Some(text) = block.text.filter(|t| !t.trim().is_empty()) {
-                out.push(item("assistant", "text", truncate_chars(&text, TRANSCRIPT_TEXT_CHARS)));
-            }
-        } else if block.is("tool_use") {
-            let summary = summarize_tool(block.name.as_deref().unwrap_or("tool"), block.input);
-            out.push(item("assistant", "tool", summary));
-        }
-    }
-}
-
-fn codex_item(record: codex::Record) -> Option<TranscriptItem> {
-    Some(match record.event {
-        codex::Event::User(text) if !is_system_text(&text) => item("user", "text", truncate_chars(&text, TRANSCRIPT_TEXT_CHARS)),
-        codex::Event::Assistant(text) if !text.trim().is_empty() => {
-            item("assistant", "text", truncate_chars(&text, TRANSCRIPT_TEXT_CHARS))
-        }
-        codex::Event::Tool { name, detail } => item("assistant", "tool", tool_text(name, detail)),
-        codex::Event::Patch(patch) => {
-            let files: Vec<&str> =
-                patch.lines().filter_map(|l| codex::PATCH_HEADERS.iter().find_map(|p| l.strip_prefix(p))).collect();
-            item("assistant", "tool", format!("apply_patch · {}", truncate_chars(&files.join(", "), TOOL_DETAIL_CHARS)))
-        }
-        _ => return None,
-    })
-}
-
-fn line_items(line: &str, sidechain: bool, out: &mut Vec<TranscriptItem>) {
-    match parse_line(line, true) {
-        Some(Parsed::Codex(record)) => out.extend(codex_item(record)),
-        Some(Parsed::Claude(raw)) => claude_items(raw, sidechain, out),
-        None => {}
-    }
-}
-
-pub(crate) fn transcript_from_lines<S: AsRef<str>>(lines: impl Iterator<Item = S>, sidechain: bool) -> Vec<TranscriptItem> {
-    let mut items = Vec::new();
-    for line in lines {
-        line_items(line.as_ref(), sidechain, &mut items);
-    }
-    items
-}
-
-fn read_page(path: &Path, from_offset: u64, sidechain: bool) -> anyhow::Result<TranscriptPage> {
-    let mut file = fs::File::open(path)?;
-    let len = file.metadata()?.len();
-    let start = if from_offset <= len && ends_line(&mut file, from_offset)? { from_offset } else { 0 };
-    let (mut items, mut offset) = (Vec::new(), start);
-    complete_lines(file, start, |line, end| {
-        line_items(line, sidechain, &mut items);
-        offset = end;
-    })?;
-    Ok(TranscriptPage { items, offset, reset: start == 0 })
-}
-
-pub fn transcript(file_path: &str, from_offset: u64) -> anyhow::Result<TranscriptPage> {
-    read_page(&session_file(file_path)?.0, from_offset, false)
-}
-
-pub fn is_agent_id(id: &str) -> bool {
-    !id.is_empty() && id.len() <= AGENT_ID_MAX_LEN && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
-}
-
-fn subagent_file(dir: &Path, id: &str) -> Option<PathBuf> {
-    let direct = dir.join(format!("agent-{id}.jsonl"));
-    if direct.is_file() {
-        return Some(direct);
-    }
-    fs::read_dir(dir).ok()?.flatten().map(|entry| entry.path()).find_map(|meta| {
-        let name = meta.file_name()?.to_str()?.strip_suffix(".meta.json")?.to_string();
-        let parsed: serde_json::Value = serde_json::from_slice(&fs::read(&meta).ok()?).ok()?;
-        (parsed["toolUseId"] == id).then(|| dir.join(format!("{name}.jsonl"))).filter(|path| path.is_file())
-    })
-}
-
-pub fn subagent_transcript(file_path: &str, id: &str, from_offset: u64) -> anyhow::Result<TranscriptPage> {
-    anyhow::ensure!(is_agent_id(id), "not a subagent id");
-    let (session, _) = session_file(file_path)?;
-    anyhow::ensure!(!codex::is_rollout(&session), "not a Claude session file");
-    match subagent_file(&session.with_extension("").join("subagents"), id) {
-        Some(path) => read_page(&path, from_offset, true),
-        None => Ok(TranscriptPage { items: Vec::new(), offset: 0, reset: true }),
-    }
-}
-
-#[derive(Serialize, Clone, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct SearchHit {
-    pub session_id: String,
-    pub role: String,
-    pub snippet: String,
-}
-
-const SEARCH_HITS_PER_SESSION: usize = 3;
-const SNIPPET_RADIUS: usize = 90;
-
-pub struct Needle {
-    pub lower: String,
-    pub prefilter: String,
-    pub fold_ascii: bool,
-    finder: AhoCorasick,
-}
-
-impl Needle {
-    pub fn new(query: &str) -> Option<Self> {
-        let lower = query.trim().to_lowercase();
-        if lower.chars().count() < 2 {
-            return None;
-        }
-        let escaped = serde_json::to_string(&lower).ok()?;
-        let escaped = &escaped[1..escaped.len() - 1];
-        let ascii_run = escaped.split(|c: char| !c.is_ascii()).max_by_key(|run| run.len()).filter(|run| run.len() >= 2);
-        let (prefilter, fold_ascii) = match ascii_run {
-            Some(run) => (run.to_string(), true),
-            None => (escaped.to_string(), false),
-        };
-        let finder = AhoCorasick::builder().ascii_case_insensitive(fold_ascii).build([&prefilter]).ok()?;
-        Some(Self { lower, prefilter, fold_ascii, finder })
-    }
-
-    fn may_match(&self, line: &[u8]) -> bool {
-        self.finder.is_match(line)
-    }
-}
-
-fn snippet_around(text: &str, needle_lower: &str) -> Option<String> {
-    let chars: Vec<char> = text.chars().collect();
-    let lower: Vec<char> = chars.iter().flat_map(|c| c.to_lowercase()).collect();
-    let needle: Vec<char> = needle_lower.chars().collect();
-    if lower.len() != chars.len() || needle.is_empty() {
-        return text.to_lowercase().contains(needle_lower).then(|| preview(text, SNIPPET_RADIUS * 2));
-    }
-    let index = lower.windows(needle.len()).position(|w| w == needle.as_slice())?;
-    let start = index.saturating_sub(SNIPPET_RADIUS);
-    let end = (index + needle.len() + SNIPPET_RADIUS).min(chars.len());
-    let body = preview(&chars[start..end].iter().collect::<String>(), usize::MAX);
-    Some(format!("{}{}{}", if start > 0 { "…" } else { "" }, body, if end < chars.len() { "…" } else { "" }))
-}
-
-pub fn search_lines<S: AsRef<str>>(session_id: &str, lines: impl Iterator<Item = S>, needle: &Needle) -> Vec<SearchHit> {
-    let mut hits = Vec::new();
-    for line in lines {
-        let mut items = Vec::new();
-        line_items(line.as_ref(), false, &mut items);
-        for item in items.into_iter().filter(|i| i.kind == "text") {
-            if let Some(snippet) = snippet_around(&item.text, &needle.lower) {
-                hits.push(SearchHit { session_id: session_id.to_string(), role: item.role, snippet });
-            }
-        }
-        if hits.len() >= SEARCH_HITS_PER_SESSION {
-            break;
-        }
-    }
-    hits.truncate(SEARCH_HITS_PER_SESSION);
-    hits
-}
-
-fn search_file(path: &Path, needle: &Needle, generation: u64) -> Vec<SearchHit> {
-    let Ok(file) = fs::File::open(path) else { return Vec::new() };
-    let session_id = session_id_of(&path.to_string_lossy());
-    let candidates = raw_lines(file)
-        .take_while(|_| SEARCH_GENERATION.load(Ordering::Relaxed) == generation)
-        .filter(|line| needle.may_match(line))
-        .filter_map(|line| String::from_utf8(line).ok());
-    search_lines(&session_id, candidates, needle)
-}
-
-pub fn begin_search() -> u64 {
-    SEARCH_GENERATION.fetch_add(1, Ordering::Relaxed) + 1
-}
-
-pub fn search_is_current(generation: u64) -> bool {
-    SEARCH_GENERATION.load(Ordering::Relaxed) == generation
-}
-
-pub fn search(needle: &Needle, generation: u64) -> Vec<SearchHit> {
-    session_files().par_iter().flat_map_iter(|(path, _, _)| search_file(path, needle, generation)).collect()
-}
-
 pub fn delete_session(file_path: &str) -> anyhow::Result<()> {
     let (path, id) = session_file(file_path)?;
     if codex::is_rollout(&path) {
@@ -856,7 +257,7 @@ pub fn delete_session(file_path: &str) -> anyhow::Result<()> {
         CACHE.lock().remove(file_path);
         return Ok(());
     }
-    anyhow::ensure!(!live_sessions().iter().any(|l| l.session_id == id), "This session is still running. Close it first.");
+    anyhow::ensure!(!crate::process::live_sessions().iter().any(|l| l.session_id == id), "This session is still running. Close it first.");
     let project = path.parent().context("invalid session path")?.to_path_buf();
     let home = claude_home();
     let targets: Vec<PathBuf> =
@@ -921,141 +322,4 @@ mod tests {
         assert!(!is_system_text("<pasted_content>code</pasted_content> fix this"));
     }
 
-    fn feed_all(lines: &[&str]) -> Accumulator {
-        let mut acc = Accumulator::with_ids("00000000-0000-4000-8000-000000000001".into(), "f.jsonl".into(), "-w", None);
-        for line in lines {
-            acc.feed(line);
-        }
-        acc
-    }
-
-    #[test]
-    fn accumulates_claude_sessions() {
-        let acc = feed_all(&[
-            r#"{"type":"user","cwd":"/w","gitBranch":"main","version":"2.1","timestamp":"t0","message":{"content":"first prompt"}}"#,
-            r#"{"type":"assistant","timestamp":"t1","gitBranch":"","version":3,"message":{"content":[{"type":"text","text":"ok"}]}}"#,
-            r#"{"type":"user","timestamp":"t2","message":{"content":[{"type":"tool_result","content":"x"}]}}"#,
-            r#"{"type":"user","timestamp":"t3","isMeta":true,"message":{"content":"meta"}}"#,
-            r#"{"type":"user","timestamp":"t4","isSidechain":true,"message":{"content":"side"}}"#,
-            r#"{"type":"user","timestamp":"t5","message":{"content":[{"type":"text","text":"<system-reminder>x</system-reminder>"},{"type":"text","text":"second"}]}}"#,
-            r#"{"type":"ai-title","aiTitle":"Generated"}"#,
-            "not json",
-        ]);
-        let info = acc.finish_with(1, 2).unwrap();
-        assert_eq!(info.prompt_count, 2);
-        assert_eq!((info.first_prompt.as_deref(), info.last_prompt.as_deref()), (Some("first prompt"), Some("second")));
-        assert_eq!(info.started_at.as_deref(), Some("t0"));
-        assert_eq!((info.cwd.as_str(), info.git_branch.as_deref(), info.version.as_deref()), ("/w", None, Some("2.1")));
-        assert_eq!(info.title.as_deref(), Some("Generated"));
-    }
-
-    #[test]
-    fn remembers_recent_working_directories_newest_first() {
-        let acc = feed_all(&[
-            r#"{"type":"user","cwd":"/w","message":{"content":"a"}}"#,
-            r#"{"type":"assistant","cwd":"/w/app","message":{"content":[]}}"#,
-            r#"{"type":"assistant","cwd":"/w/app","message":{"content":[]}}"#,
-            r#"{"type":"user","cwd":"/w","message":{"content":"b"}}"#,
-            r#"{"type":"user","cwd":"","message":{"content":"c"}}"#,
-        ]);
-        let info = acc.finish_with(0, 0).unwrap();
-        assert_eq!(info.cwd, "/w");
-        assert_eq!(info.recent_cwds, ["/w", "/w/app"]);
-    }
-
-    #[test]
-    fn codex_start_time_comes_from_session_meta() {
-        let id = "019a0000-0000-7000-8000-000000000001";
-        let mut acc = Accumulator::with_ids(id.into(), format!("/s/rollout-x-{id}.jsonl"), "", None);
-        acc.feed(r#"{"timestamp":"10:39:03","type":"session_meta","payload":{"id":"11111111-1111-4111-8111-111111111111","timestamp":"10:38:22","cwd":"/w"}}"#);
-        acc.feed(r#"{"timestamp":"10:39:04","type":"event_msg","payload":{"type":"user_message","message":"go"}}"#);
-        acc.feed(r#"{"timestamp":"10:40:00","type":"session_meta","payload":{"timestamp":"09:00:00","cwd":"/other"}}"#);
-        let info = acc.finish_with(0, 0).unwrap();
-        assert_eq!((info.id.as_str(), info.agent.as_str(), info.cwd.as_str()), (id, "codex", "/w"));
-        assert_eq!(info.started_at.as_deref(), Some("10:38:22"));
-    }
-
-    #[test]
-    fn reads_only_complete_lines_and_restarts_rewritten_files() {
-        let dir = std::env::temp_dir().join(format!("deck-sessions-{}", std::process::id()));
-        fs::create_dir_all(&dir).unwrap();
-        let path = dir.join("00000000-0000-4000-8000-000000000002.jsonl");
-        let first = r#"{"type":"user","message":{"content":"one"}}"#;
-        fs::write(&path, format!("{first}\n{{\"type\":\"user\",\"mess")).unwrap();
-        let mut acc = Accumulator::new(&path, "-w");
-        acc.read_from_offset(&path).unwrap();
-        assert_eq!((acc.info.prompt_count, acc.offset), (1, first.len() as u64 + 1));
-        fs::write(&path, format!("{first}\n{{\"type\":\"user\",\"message\":{{\"content\":\"two\"}}}}\n")).unwrap();
-        acc.read_from_offset(&path).unwrap();
-        assert_eq!(acc.info.prompt_count, 2);
-        fs::write(&path, format!("{{\"type\":\"user\",\"message\":{{\"content\":\"rewritten prompt here\"}}}}\n{first}\n")).unwrap();
-        acc.offset = first.len() as u64 + 1;
-        acc.read_from_offset(&path).unwrap();
-        assert_eq!((acc.info.prompt_count, acc.info.first_prompt.as_deref()), (2, Some("rewritten prompt here")));
-        fs::remove_dir_all(&dir).unwrap();
-    }
-
-    #[test]
-    fn builds_transcripts() {
-        let items = transcript_from_lines(
-            [
-                r#"{"type":"user","timestamp":"a","message":{"content":"hello"}}"#,
-                r#"{"type":"assistant","timestamp":"b","message":{"content":[{"type":"thinking","thinking":"x"},{"type":"text","text":"hi"},{"type":"tool_use","name":"Bash","input":{"command":"ls   -la","content":"big"}}]}}"#,
-                r#"{"type":"user","message":{"content":[{"type":"tool_result","content":[{"type":"text","text":"out"}]}]}}"#,
-                r#"{"type":"response_item","timestamp":"c","payload":{"type":"custom_tool_call","name":"apply_patch","input":"*** Begin Patch\n*** Update File: a.rs\n*** Move to: b.rs\n*** End Patch"}}"#,
-            ]
-            .into_iter(),
-            false,
-        );
-        let summary: Vec<_> = items.iter().map(|i| (i.role.as_str(), i.kind.as_str(), i.text.as_str())).collect();
-        assert_eq!(
-            summary,
-            [
-                ("user", "text", "hello"),
-                ("assistant", "text", "hi"),
-                ("assistant", "tool", "Bash · ls -la"),
-                ("assistant", "tool", "apply_patch · a.rs, b.rs")
-            ]
-        );
-    }
-
-    #[test]
-    fn reads_subagent_records_only_when_asked() {
-        let lines = [
-            r#"{"type":"user","isSidechain":true,"message":{"content":"research themes"}}"#,
-            r#"{"type":"assistant","isSidechain":true,"message":{"content":[{"type":"text","text":"done"}]}}"#,
-        ];
-        assert!(transcript_from_lines(lines.iter(), false).is_empty());
-        let texts: Vec<_> = transcript_from_lines(lines.iter(), true).into_iter().map(|i| i.text).collect();
-        assert_eq!(texts, ["research themes", "done"]);
-        assert!(is_agent_id("af390da93c3ee46b8") && !is_agent_id("../x") && !is_agent_id(""));
-    }
-
-    #[test]
-    fn finds_subagent_files_by_agent_id_or_tool_call() {
-        let dir = std::env::temp_dir().join(format!("deck-subagents-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&dir);
-        fs::create_dir_all(&dir).unwrap();
-        fs::write(dir.join("agent-a1.jsonl"), "{}\n").unwrap();
-        fs::write(dir.join("agent-a1.meta.json"), r#"{"toolUseId":"toolu_1"}"#).unwrap();
-        fs::write(dir.join("agent-a2.meta.json"), r#"{"toolUseId":"toolu_2"}"#).unwrap();
-        assert_eq!(subagent_file(&dir, "a1"), Some(dir.join("agent-a1.jsonl")));
-        assert_eq!(subagent_file(&dir, "toolu_1"), Some(dir.join("agent-a1.jsonl")));
-        assert_eq!(subagent_file(&dir, "toolu_2"), None);
-        assert_eq!(subagent_file(&dir, "toolu_3"), None);
-        fs::remove_dir_all(&dir).unwrap();
-    }
-
-    #[test]
-    fn search_needles_match_escaped_json_and_unicode() {
-        let needle = Needle::new(r"C:\Users").unwrap();
-        let line = serde_json::json!({"type":"user","message":{"content":r"look in C:\Users\me"}}).to_string();
-        assert!(needle.may_match(line.as_bytes()));
-        assert_eq!(search_lines("s", std::iter::once(line), &needle).len(), 1);
-        let cafe = Needle::new("café").unwrap();
-        let upper = serde_json::json!({"type":"user","message":{"content":"CAFÉ menu"}}).to_string();
-        assert!(cafe.may_match(upper.as_bytes()));
-        assert_eq!(search_lines("s", std::iter::once(upper), &cafe)[0].snippet, "CAFÉ menu");
-        assert!(Needle::new("x").is_none());
-    }
 }

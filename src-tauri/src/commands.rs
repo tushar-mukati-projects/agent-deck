@@ -4,7 +4,7 @@ use tauri::{ipc::Channel, AppHandle, Manager};
 use crate::{
     agent_config, badge, changes, fsx, git, hide_mode,
     mcp::{self, McpManager},
-    notes, phone,
+    notes, phone, process,
     pg::{self, PgManager},
     pty::{self, PtyEvent, PtyInfo, PtyManager, SpawnRequest},
     sessions::{self, LiveSession, Needle, SearchHit, SessionInfo, TranscriptPage},
@@ -70,7 +70,7 @@ pub async fn wsl_start(distro: String) -> CmdResult<()> {
 #[tauri::command]
 pub async fn live_sessions() -> CmdResult<Vec<LiveSession>> {
     blocking(|| {
-        let mut live = sessions::live_sessions();
+        let mut live = process::live_sessions();
         live.extend(wsl::live_sessions());
         Ok(live)
     })
@@ -115,7 +115,7 @@ pub async fn delete_session(file_path: String, distro: Option<String>) -> CmdRes
 pub async fn terminate_live_session(session_id: String, pid: u32, distro: Option<String>) -> CmdResult<()> {
     blocking(move || match distro {
         Some(distro) => wsl::terminate_session(&distro, &session_id, pid),
-        None => sessions::terminate_live(&session_id, pid),
+        None => process::terminate_live(&session_id, pid),
     })
     .await
 }

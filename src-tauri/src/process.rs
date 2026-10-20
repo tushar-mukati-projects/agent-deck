@@ -1,10 +1,13 @@
 use std::{
     io,
     os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle},
-    process::Child,
+    fs,
+    process::{Child, Command},
+    time::{Duration, Instant},
 };
 
 use anyhow::Context;
+use serde::Deserialize;
 use windows_sys::Win32::{
     Foundation::{FILETIME, HANDLE, STILL_ACTIVE},
     System::{
@@ -16,6 +19,14 @@ use windows_sys::Win32::{
     },
 };
 
+use crate::{
+    sessions::{live_dir, LiveSession},
+    util::{lenient, lenient_u64, run_with_timeout},
+};
+
+const TASKKILL_TIMEOUT: Duration = Duration::from_secs(10);
+const EXIT_WAIT: Duration = Duration::from_secs(5);
+const EXIT_POLL: Duration = Duration::from_millis(100);
 const TERMINATED_EXIT_CODE: u32 = 1;
 const IMAGE_PATH_CHARS: usize = 1024;
 const AGENT_IMAGES: [&str; 3] = ["claude", "node", "bun"];
@@ -97,13 +108,75 @@ fn creation_time(process: &OwnedHandle) -> Option<u64> {
     (ok != 0).then(|| (u64::from(created.dwHighDateTime) << 32) | u64::from(created.dwLowDateTime))
 }
 
-pub(crate) fn is_agent_process(pid: u32) -> bool {
+fn is_agent_process(pid: u32) -> bool {
     let Some(process) = open_process(pid) else { return false };
     still_active(&process) && image_name(&process).is_none_or(|name| AGENT_IMAGES.iter().any(|agent| name.contains(agent)))
 }
 
-pub(crate) fn process_start(pid: u32) -> Option<u64> {
+fn process_start(pid: u32) -> Option<u64> {
     creation_time(&open_process(pid)?)
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LiveFile {
+    pid: Option<u32>,
+    #[serde(default, deserialize_with = "lenient")]
+    session_id: Option<String>,
+    #[serde(default, deserialize_with = "lenient")]
+    status: Option<String>,
+    #[serde(default, deserialize_with = "lenient_u64")]
+    started_at: Option<u64>,
+    #[serde(default, deserialize_with = "lenient")]
+    proc_start: Option<String>,
+}
+
+pub fn live_sessions() -> Vec<LiveSession> {
+    let Ok(entries) = fs::read_dir(live_dir()) else { return Vec::new() };
+    entries
+        .flatten()
+        .filter(|e| e.path().extension().is_some_and(|x| x == "json"))
+        .filter_map(|e| {
+            let text = fs::read_to_string(e.path()).ok()?;
+            let live: LiveFile = serde_json::from_str(&text).ok()?;
+            let pid = live.pid?;
+            is_agent_process(pid).then_some(LiveSession {
+                distro: None,
+                session_id: live.session_id?,
+                pid,
+                status: live.status,
+                started_at: live.started_at,
+            })
+        })
+        .collect()
+}
+
+fn end_process_tree(pid: u32) -> anyhow::Result<()> {
+    let pid_text = pid.to_string();
+    let output = run_with_timeout(Command::new("taskkill").args(["/PID", &pid_text, "/T", "/F"]), None, TASKKILL_TIMEOUT)?;
+    if output.status.success() || !is_agent_process(pid) {
+        return Ok(());
+    }
+    let reason = String::from_utf8_lossy(&output.stderr);
+    anyhow::bail!("Couldn't close Claude (PID {pid}): {}", reason.trim())
+}
+
+pub fn terminate_live(session_id: &str, pid: u32) -> anyhow::Result<()> {
+    let record = fs::read_to_string(live_dir().join(format!("{pid}.json"))).ok();
+    let Some(record) = record.and_then(|text| serde_json::from_str::<LiveFile>(&text).ok()) else { return Ok(()) };
+    if !is_agent_process(pid) {
+        return Ok(());
+    }
+    anyhow::ensure!(record.session_id.as_deref() == Some(session_id), "PID {pid} is running a different session");
+    let recorded = record.proc_start.and_then(|start| start.parse::<u64>().ok());
+    anyhow::ensure!(recorded.is_some() && recorded == process_start(pid), "Couldn't confirm PID {pid} is that Claude session, so it was left running");
+    end_process_tree(pid)?;
+    let deadline = Instant::now() + EXIT_WAIT;
+    while is_agent_process(pid) {
+        anyhow::ensure!(Instant::now() < deadline, "Claude (PID {pid}) is still running");
+        std::thread::sleep(EXIT_POLL);
+    }
+    Ok(())
 }
 
 pub struct Managed {
