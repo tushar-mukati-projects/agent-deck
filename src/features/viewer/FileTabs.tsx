@@ -19,11 +19,9 @@ import { isDirty, useViewerStore } from "@/stores/viewer-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import type { Workspace } from "@/types";
 
-const mcpName = (serverId: string) => serverId.split(":").at(-1) ?? serverId;
-
 const tabLabel = (tab: string) => {
   const server = decodeMcpTab(tab);
-  return server !== null ? mcpName(server) : basename(tabTargetPath(tab));
+  return server !== null ? (server.split(":").at(-1) ?? server) : basename(tabTargetPath(tab));
 };
 
 const TabMenu = ({

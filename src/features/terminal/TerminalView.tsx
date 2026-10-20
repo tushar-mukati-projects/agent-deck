@@ -120,8 +120,6 @@ export const TerminalView = ({ terminalId, dropText, dropLabel }: TerminalViewPr
     };
   }, [terminalId]);
 
-  const acceptsDrop = (event: React.DragEvent) => event.dataTransfer.types.includes(DECK_PATH_MIME);
-
   const handleDrop = (event: React.DragEvent) => {
     setDragging(false);
     const path = event.dataTransfer.getData(DECK_PATH_MIME);
@@ -143,7 +141,7 @@ export const TerminalView = ({ terminalId, dropText, dropLabel }: TerminalViewPr
         className="isolate h-full w-full overflow-hidden"
         onMouseDown={() => requestAnimationFrame(() => requestFocus(terminalId))}
         onDragOver={(e) => {
-          if (!acceptsDrop(e)) return;
+          if (!e.dataTransfer.types.includes(DECK_PATH_MIME)) return;
           e.preventDefault();
           e.dataTransfer.dropEffect = "copy";
           setDragging(true);
