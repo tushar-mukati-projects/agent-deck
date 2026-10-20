@@ -1,9 +1,8 @@
-use anyhow::Context;
 use serde::Serialize;
 use tauri::{ipc::Channel, AppHandle, Manager};
 
 use crate::{
-    agent_config, changes, fsx, git, hide_mode,
+    agent_config, badge, changes, fsx, git, hide_mode,
     mcp::{self, McpManager},
     notes, phone,
     pg::{self, PgManager},
@@ -352,7 +351,7 @@ pub async fn unwatch_dir(app: AppHandle, root: String) -> CmdResult<()> {
 
 #[tauri::command]
 pub fn set_attention_badge(window: tauri::WebviewWindow, active: bool) -> CmdResult<()> {
-    window.set_overlay_icon(active.then(badge_icon)).map_err(message)
+    window.set_overlay_icon(active.then(badge::icon)).map_err(message)
 }
 
 #[tauri::command]
@@ -360,25 +359,19 @@ pub fn apply_hide_mode(window: tauri::WebviewWindow, enabled: bool) -> CmdResult
     hide_mode::apply(&window, enabled).map_err(message)
 }
 
-fn notes_dir(app: &AppHandle) -> anyhow::Result<std::path::PathBuf> {
-    let dir = app.path().app_data_dir()?.join("notes");
-    std::fs::create_dir_all(&dir).context("Couldn't create the notes folder")?;
-    Ok(dir)
-}
-
 #[tauri::command]
 pub async fn list_notes(app: AppHandle) -> CmdResult<Vec<notes::Note>> {
-    blocking(move || notes::list(&notes_dir(&app)?)).await
+    blocking(move || notes::list(&notes::dir(&app)?)).await
 }
 
 #[tauri::command]
 pub async fn save_note(app: AppHandle, id: String, text: String) -> CmdResult<u64> {
-    blocking(move || notes::save(&notes_dir(&app)?, &id, &text)).await
+    blocking(move || notes::save(&notes::dir(&app)?, &id, &text)).await
 }
 
 #[tauri::command]
 pub async fn delete_note(app: AppHandle, id: String) -> CmdResult<()> {
-    blocking(move || notes::delete(&notes_dir(&app)?, &id)).await
+    blocking(move || notes::delete(&notes::dir(&app)?, &id)).await
 }
 
 #[tauri::command]
@@ -388,24 +381,5 @@ pub async fn phone_ping(topic: String, title: String, message: String, urgent: b
 
 #[tauri::command]
 pub async fn notes_folder(app: AppHandle) -> CmdResult<String> {
-    blocking(move || Ok(notes_dir(&app)?.to_string_lossy().into_owned())).await
-}
-
-const BADGE_SIZE: u32 = 32;
-const BADGE_RING_WIDTH: f32 = 3.0;
-const BADGE_RING_RGB: [u8; 3] = [18, 19, 23];
-const BADGE_FILL_RGB: [u8; 3] = [226, 122, 85];
-
-fn badge_icon() -> tauri::image::Image<'static> {
-    let center = (BADGE_SIZE as f32 - 1.0) / 2.0;
-    let rgba = (0..BADGE_SIZE * BADGE_SIZE)
-        .flat_map(|i| {
-            let (x, y) = ((i % BADGE_SIZE) as f32, (i / BADGE_SIZE) as f32);
-            let distance = ((x - center).powi(2) + (y - center).powi(2)).sqrt();
-            let alpha = ((center - distance + 0.5).clamp(0.0, 1.0) * 255.0) as u8;
-            let [r, g, b] = if distance > center - BADGE_RING_WIDTH { BADGE_RING_RGB } else { BADGE_FILL_RGB };
-            [r, g, b, alpha]
-        })
-        .collect();
-    tauri::image::Image::new_owned(rgba, BADGE_SIZE, BADGE_SIZE)
+    blocking(move || Ok(notes::dir(&app)?.to_string_lossy().into_owned())).await
 }

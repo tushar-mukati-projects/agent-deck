@@ -1,4 +1,5 @@
 mod agent_config;
+mod badge;
 mod changes;
 mod codex;
 mod commands;

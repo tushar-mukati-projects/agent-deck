@@ -5,6 +5,7 @@ use std::{
 
 use anyhow::Context;
 use serde::Serialize;
+use tauri::{AppHandle, Manager};
 
 use crate::util::{mtime_ms, path_mtime_ms};
 
@@ -14,6 +15,12 @@ pub struct Note {
     pub id: String,
     pub text: String,
     pub modified_ms: u64,
+}
+
+pub fn dir(app: &AppHandle) -> anyhow::Result<PathBuf> {
+    let dir = app.path().app_data_dir()?.join("notes");
+    std::fs::create_dir_all(&dir).context("Couldn't create the notes folder")?;
+    Ok(dir)
 }
 
 pub fn list(dir: &Path) -> anyhow::Result<Vec<Note>> {
