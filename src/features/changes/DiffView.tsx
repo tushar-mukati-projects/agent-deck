@@ -9,12 +9,11 @@ import { IconButton } from "@/components/ui/icon-button";
 import { useDeckTheme, useLanguage } from "@/features/viewer/CodeView";
 import { useAsync, useThrottledCallback } from "@/hooks/useAsync";
 import { useSessionFile } from "@/hooks/useSessionFile";
-import { gitChangeStatus } from "@/lib/changes";
 import type { DiffTab } from "@/lib/diff-tabs";
 import { subscribeFileChanges } from "@/lib/file-events";
 import { api } from "@/lib/tauri/commands";
 import { revealInExplorer } from "@/lib/tauri/system";
-import { basename, dirname, normalizePath, relativePath, samePath } from "@/lib/utils";
+import { basename, normalizePath, relativePath } from "@/lib/utils";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import type { Workspace } from "@/types";
 
@@ -37,24 +36,14 @@ const readCurrent = async (path: string) => {
   return content?.kind === "text" ? content.text : "";
 };
 
-const readHead = async (path: string) => {
-  try {
-    return await api.gitHeadFile(path);
-  } catch (error) {
-    const changes = await api.gitStatus(dirname(path));
-    if (changes.some((c) => samePath(c.path, path) && gitChangeStatus(c.code) === "added"))
-      return "";
-    throw error;
-  }
-};
-
 const loadDiff = async (
   tab: DiffTab,
   session: ReturnType<typeof useSessionFile>,
 ): Promise<DiffContent> => {
   const after = await readCurrent(tab.path);
   if (tab.source === "git") {
-    return { before: await readHead(tab.path), after, beforeLabel: "HEAD" };
+    const before = await api.gitHeadFile(tab.path).catch(() => "");
+    return { before, after, beforeLabel: "HEAD" };
   }
   const before =
     tab.backup && session.filePath
