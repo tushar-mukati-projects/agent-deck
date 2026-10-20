@@ -1,19 +1,18 @@
 import { AlertTriangle, RotateCw, X } from "lucide-react";
 
 import { mentionText } from "@/actions/files";
+import { restartWorkspaceAgent } from "@/actions/sessions";
 import { closeWorkspace } from "@/actions/workspaces";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/feedback";
 import { TerminalView } from "@/features/terminal/TerminalView";
 import { useTerminal } from "@/hooks/useWorkspaceStatus";
 import { findAgent } from "@/lib/agents/registry";
-import { useWorkspaceStore } from "@/stores/workspace-store";
 import type { Workspace } from "@/types";
 
 export const AgentPane = ({ workspace }: { workspace: Workspace }) => {
   const terminalId = workspace.agentTerminalId;
   const terminal = useTerminal(terminalId);
-  const restartAgent = useWorkspaceStore((s) => s.restartAgent);
   const agent = findAgent(workspace.agent);
   if (!terminalId) return null;
 
@@ -44,7 +43,7 @@ export const AgentPane = ({ workspace }: { workspace: Workspace }) => {
               <Button size="sm" variant="ghost" onClick={() => void closeWorkspace(workspace.id)}>
                 Close tab
               </Button>
-              <Button size="sm" variant="primary" onClick={() => restartAgent(workspace.id)}>
+              <Button size="sm" variant="primary" onClick={() => void restartWorkspaceAgent(workspace.id)}>
                 <RotateCw /> Try again
               </Button>
             </div>
@@ -59,7 +58,7 @@ export const AgentPane = ({ workspace }: { workspace: Workspace }) => {
             {agent.name} exited{terminal.exitCode ? ` with code ${terminal.exitCode}` : ""}.
             {agent.history ? " The conversation is saved." : ""}
           </span>
-          <Button size="sm" variant="primary" onClick={() => restartAgent(workspace.id)}>
+          <Button size="sm" variant="primary" onClick={() => void restartWorkspaceAgent(workspace.id)}>
             <RotateCw /> {agent.history ? "Resume again" : "Start again"}
           </Button>
           <Button size="sm" variant="ghost" onClick={() => void closeWorkspace(workspace.id)}>

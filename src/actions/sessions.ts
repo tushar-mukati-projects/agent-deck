@@ -42,6 +42,13 @@ const closeElsewhere = async (live: LiveSession) => {
   }
 };
 
+const claimSession = async (sessionId: string, takeOver = false) => {
+  const live = openElsewhere(sessionId);
+  if (!live) return true;
+  if (!takeOver && !(await confirmTakeOver(live))) return false;
+  return closeElsewhere(live);
+};
+
 export const previewSession = (session: SessionInfo) =>
   useWorkspaceStore.getState().openSession(session);
 
@@ -55,12 +62,15 @@ export const resumeWorkspace = async (
     useWorkspaceStore.getState().fork(workspace);
     return;
   }
-  const live = workspace.mode === "live" ? null : openElsewhere(workspace.sessionId);
-  if (live) {
-    if (!options.takeOver && !(await confirmTakeOver(live))) return;
-    if (!(await closeElsewhere(live))) return;
-  }
+  if (workspace.mode !== "live" && !(await claimSession(workspace.sessionId, options.takeOver)))
+    return;
   useWorkspaceStore.getState().launch(workspaceId);
+};
+
+export const restartWorkspaceAgent = async (workspaceId: string) => {
+  const workspace = findWorkspace(workspaceId);
+  if (!workspace || !(await claimSession(workspace.sessionId))) return;
+  useWorkspaceStore.getState().restartAgent(workspaceId);
 };
 
 export const resumeSession = async (session: SessionInfo) =>
