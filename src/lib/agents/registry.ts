@@ -106,4 +106,12 @@ export const findAgent = (id: AgentId | undefined, settings: AgentSettings) =>
 export const agentName = (id: AgentId | undefined, settings: AgentSettings) =>
   findAgent(id, settings).name;
 
+export const resumeLabel = (
+  agent: Pick<AgentDefinition, "id" | "name" | "history">,
+  persisted: boolean,
+) => {
+  if (!persisted || !agent.history) return `Start ${agent.name}`;
+  return agent.id === CLAUDE ? "Resume session" : `Resume in ${agent.name}`;
+};
+
 export const SUBAGENT_NAME = /^[\w:.-]+$/;

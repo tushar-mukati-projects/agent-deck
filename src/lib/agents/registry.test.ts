@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { CODEX, findAgent, getAgent, listAgents } from "@/lib/agents/registry";
+import {
+  CLAUDE,
+  CODEX,
+  findAgent,
+  getAgent,
+  listAgents,
+  resumeLabel,
+} from "@/lib/agents/registry";
 import { agentSettings } from "@/lib/agents/settings-fixture";
 import type { AgentSettings } from "@/lib/agents/registry";
 
@@ -67,4 +74,19 @@ describe("agent registry", () => {
     expect(findAgent("custom:missing", agentSettings()).id).toBe("claude");
     expect(getAgent("custom:missing", agentSettings())).toBeNull();
   });
+});
+
+describe("resumeLabel", () => {
+  const claude = { id: CLAUDE, name: "Claude", history: true };
+  const codex = { id: CODEX, name: "Codex", history: true };
+  const custom = { id: "aider", name: "Aider", history: false };
+
+  it.each([
+    [claude, true, "Resume session"],
+    [claude, false, "Start Claude"],
+    [codex, true, "Resume in Codex"],
+    [custom, true, "Start Aider"],
+  ])("labels %j with persisted %s as %s", (agent, persisted, label) =>
+    expect(resumeLabel(agent, persisted)).toBe(label),
+  );
 });

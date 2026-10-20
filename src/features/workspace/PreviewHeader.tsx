@@ -22,7 +22,7 @@ import { Kbd } from "@/components/ui/kbd";
 import { SearchInput } from "@/components/ui/search-input";
 import { useExternalLive } from "@/hooks/useWorkspaceStatus";
 import { isPersisted } from "@/lib/agents/launch";
-import { resumeLabel } from "@/lib/resume-label";
+import { resumeLabel } from "@/lib/agents/registry";
 import { dangerHoverClass } from "@/lib/styles";
 import { revealInExplorer } from "@/lib/tauri/system";
 import { formatBytes, plural, shortenHome } from "@/lib/utils";
