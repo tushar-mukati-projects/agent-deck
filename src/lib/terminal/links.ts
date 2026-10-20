@@ -1,6 +1,6 @@
 import type { ILink, Terminal } from "@xterm/xterm";
 
-import { joinPath, samePath } from "@/lib/utils";
+import { resolvePath, samePath } from "@/lib/utils";
 import { parseWslPath, wslUncPath } from "@/lib/wsl";
 
 const EXTENSIONS =
@@ -20,10 +20,9 @@ export const candidatePaths = (raw: string, bases: string[]) => {
   if (/^[A-Za-z]:[\\/]/.test(raw)) return [raw];
   const wsl = bases.map(parseWslPath).find(Boolean);
   if (raw.startsWith("/") && wsl) return [wslUncPath(wsl.distro, raw)];
-  const relative = raw.replace(/^\.[\\/]/, "");
   const paths: string[] = [];
   for (const base of bases) {
-    const path = joinPath(base, relative);
+    const path = resolvePath(base, raw);
     if (!paths.some((p) => samePath(p, path))) paths.push(path);
   }
   return paths;

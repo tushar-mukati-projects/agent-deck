@@ -25,4 +25,17 @@ describe("candidatePaths", () => {
     ]);
     expect(candidatePaths("./b.md", ["C:\\repo"])).toEqual(["C:\\repo\\b.md"]);
   });
+
+  it.each([
+    ["../src/x.ts", "C:\\repo\\app", "C:\\repo\\src\\x.ts"],
+    ["..\\..\\x.ts", "C:\\repo\\app\\web", "C:\\repo\\x.ts"],
+    ["./lib/../y.ts", "C:\\repo", "C:\\repo\\y.ts"],
+    [
+      "../a.py",
+      "\\\\wsl.localhost\\Debian\\home\\me\\w",
+      "\\\\wsl.localhost\\Debian\\home\\me\\a.py",
+    ],
+  ])("resolves %s against %s", (raw, base, path) =>
+    expect(candidatePaths(raw, [base])).toEqual([path]),
+  );
 });
