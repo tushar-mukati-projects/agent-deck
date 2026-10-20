@@ -56,9 +56,6 @@ export const closeFilesWithConfirm = async (workspaceId: string, tabs: string[])
   useViewerStore.getState().forget(tabs);
 };
 
-export const closeFileWithConfirm = (workspaceId: string, tab: string) =>
-  closeFilesWithConfirm(workspaceId, [tab]);
-
 const openFileAt = (workspaceId: string, path: string, line: number | null = null) => {
   useWorkspaceStore.getState().openFile(workspaceId, path);
   if (line) useViewerStore.getState().revealLine(path, line);

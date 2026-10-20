@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-import { closeFileWithConfirm } from "@/actions/files";
+import { closeFilesWithConfirm } from "@/actions/files";
 import { toggleHideMode } from "@/actions/hide-mode";
 import { toggleNotes } from "@/actions/notes";
 import { startNewSession, startSessionInPickedFolder } from "@/actions/sessions";
@@ -56,7 +56,7 @@ const handlers: Record<ShortcutAction, () => void> = {
   nextAttention: focusNextAttention,
   closeFile: () => {
     const workspace = getActiveWorkspace();
-    if (workspace?.activeFile) void closeFileWithConfirm(workspace.id, workspace.activeFile);
+    if (workspace?.activeFile) void closeFilesWithConfirm(workspace.id, [workspace.activeFile]);
   },
   fontBigger: () => setFontSize((size) => size + 1),
   fontSmaller: () => setFontSize((size) => size - 1),

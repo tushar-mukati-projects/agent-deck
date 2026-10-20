@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import { ExternalLink, FileQuestion, FileWarning } from "lucide-react";
 import { toast } from "sonner";
 
-import { closeFileWithConfirm, openTypedPath } from "@/actions/files";
+import { closeFilesWithConfirm, openTypedPath } from "@/actions/files";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Button } from "@/components/ui/button";
 import { EmptyState, LoadingState, showError } from "@/components/ui/feedback";
@@ -260,7 +260,7 @@ const TabBoundary = ({
             <Button size="sm" variant="ghost" onClick={reset}>
               Try again
             </Button>
-            <Button size="sm" onClick={() => void closeFileWithConfirm(workspace.id, tab)}>
+            <Button size="sm" onClick={() => void closeFilesWithConfirm(workspace.id, [tab])}>
               Close tab
             </Button>
           </div>

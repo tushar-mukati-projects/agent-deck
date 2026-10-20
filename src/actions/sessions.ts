@@ -95,9 +95,6 @@ export const startAgentSession = (cwd: string, subagent: string) => {
   useWorkspaceStore.getState().newSession(cwd, { subagent });
 };
 
-export const renameSession = (session: SessionInfo) =>
-  useUiStore.getState().setRenameTarget(session);
-
 export const deleteSessionWithConfirm = async (session: SessionInfo) => {
   const workspace = findWorkspaceBySession(session.id);
   if (workspace && isTerminalAlive(workspace.agentTerminalId)) {

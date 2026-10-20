@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { ArrowRightToLine, Copy, FolderOpen, GitCompare, Plug, X, XCircle } from "lucide-react";
 
-import { closeFilesWithConfirm, closeFileWithConfirm } from "@/actions/files";
+import { closeFilesWithConfirm } from "@/actions/files";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -115,7 +115,7 @@ const FileTab = ({ workspace, tab }: { workspace: Workspace; tab: string }) => {
         ref={ref}
         selected={active}
         onSelect={() => useWorkspaceStore.getState().setActiveFile(workspace.id, tab)}
-        onClose={() => void closeFileWithConfirm(workspace.id, tab)}
+        onClose={() => void closeFilesWithConfirm(workspace.id, [tab])}
         closeLabel={dirty ? `Close ${label} (unsaved changes)` : `Close ${label}`}
         closeIcon={
           dirty ? (

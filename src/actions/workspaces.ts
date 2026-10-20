@@ -74,8 +74,6 @@ export const confirmQuit = () => {
   );
 };
 
-export const closeWorkspace = (id: string) => closeWorkspaces([id]);
-
 export const closeOtherWorkspaces = (id: string) =>
   closeWorkspaces(
     useWorkspaceStore

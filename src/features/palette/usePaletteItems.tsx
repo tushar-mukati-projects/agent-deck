@@ -34,7 +34,7 @@ import {
   startSessionInPickedFolder,
 } from "@/actions/sessions";
 import { openTypedPath } from "@/actions/files";
-import { closeIdleWorkspaces, closeOtherWorkspaces, closeWorkspace } from "@/actions/workspaces";
+import { closeIdleWorkspaces, closeOtherWorkspaces, closeWorkspaces } from "@/actions/workspaces";
 import { useAsync } from "@/hooks/useAsync";
 import { runShortcut } from "@/hooks/useGlobalShortcuts";
 import { subscribeFileChanges, watchedSince } from "@/lib/file-events";
@@ -258,7 +258,7 @@ const buildCommands = (workspace: Workspace | null): CommandDef[] => {
       id: "close",
       title: "Close this tab",
       icon: <X />,
-      run: () => void closeWorkspace(workspace.id),
+      run: () => void closeWorkspaces([workspace.id]),
     },
     {
       id: "close-others",

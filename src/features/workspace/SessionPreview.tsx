@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { format, isValid } from "date-fns";
 
-import { deleteSessionWithConfirm, renameSession, resumeWorkspace } from "@/actions/sessions";
+import { deleteSessionWithConfirm, resumeWorkspace } from "@/actions/sessions";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/feedback";
 import { IconButton } from "@/components/ui/icon-button";
@@ -30,6 +30,7 @@ import { api } from "@/lib/tauri/commands";
 import { revealInExplorer } from "@/lib/tauri/system";
 import { formatBytes, shortenHome } from "@/lib/utils";
 import { useSessionsStore } from "@/stores/sessions-store";
+import { useUiStore } from "@/stores/ui-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import type { SessionInfo, Workspace } from "@/types";
 
@@ -121,7 +122,9 @@ const PreviewHeader = ({
       <div className="group flex items-start gap-1">
         <h1
           title="Double-click to rename"
-          onDoubleClick={() => session && renameSession(session)}
+          onDoubleClick={() =>
+            session && useUiStore.getState().setRenameTarget(session)
+          }
           className="line-clamp-2 min-w-0 cursor-text text-[15px] font-semibold tracking-tight break-words text-fg"
         >
           {workspace.title}
@@ -130,7 +133,7 @@ const PreviewHeader = ({
           <IconButton
             label="Rename"
             className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
-            onClick={() => renameSession(session)}
+            onClick={() => useUiStore.getState().setRenameTarget(session)}
           >
             <Pencil />
           </IconButton>

@@ -19,7 +19,6 @@ import {
   forkSession,
   openSessionByClick,
   previewSession,
-  renameSession,
   resumeSession,
 } from "@/actions/sessions";
 import { AgentBadge } from "@/components/ui/agent-badge";
@@ -38,6 +37,7 @@ import { sessionTitle } from "@/lib/sessions";
 import { copyText, revealInExplorer } from "@/lib/tauri/system";
 import { cn } from "@/lib/utils";
 import { useSettingsStore } from "@/stores/settings-store";
+import { useUiStore } from "@/stores/ui-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import type { SessionInfo } from "@/types";
 
@@ -87,7 +87,10 @@ const SessionMenu = ({
       >
         {pinned ? "Unpin" : "Pin to top"}
       </ContextMenuItem>
-      <ContextMenuItem icon={<Pencil />} onSelect={() => renameSession(session)}>
+      <ContextMenuItem
+        icon={<Pencil />}
+        onSelect={() => useUiStore.getState().setRenameTarget(session)}
+      >
         Rename…
       </ContextMenuItem>
       <ContextMenuItem

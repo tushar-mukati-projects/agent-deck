@@ -10,11 +10,10 @@ import {
   XCircle,
 } from "lucide-react";
 
-import { renameSession, resumeWorkspace } from "@/actions/sessions";
+import { resumeWorkspace } from "@/actions/sessions";
 import {
   closeIdleWorkspaces,
   closeOtherWorkspaces,
-  closeWorkspace,
   closeWorkspaces,
   closeWorkspacesToRight,
 } from "@/actions/workspaces";
@@ -33,6 +32,7 @@ import { copyText, revealInExplorer } from "@/lib/tauri/system";
 import { basename, cn } from "@/lib/utils";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore } from "@/stores/settings-store";
+import { useUiStore } from "@/stores/ui-store";
 import { useWorkspace, useWorkspaceStore } from "@/stores/workspace-store";
 import type { Workspace } from "@/types";
 
@@ -62,7 +62,7 @@ const TabMenu = ({ workspace, children }: { workspace: Workspace; children: Reac
           disabled={!hasSession}
           onSelect={() => {
             const session = useSessionsStore.getState().byId[workspace.sessionId];
-            if (session) renameSession(session);
+            if (session) useUiStore.getState().setRenameTarget(session);
           }}
         >
           Rename…
@@ -79,7 +79,7 @@ const TabMenu = ({ workspace, children }: { workspace: Workspace; children: Reac
           Copy session ID
         </ContextMenuItem>
         <ContextMenuSeparator />
-        <ContextMenuItem icon={<X />} onSelect={() => void closeWorkspace(workspace.id)}>
+        <ContextMenuItem icon={<X />} onSelect={() => void closeWorkspaces([workspace.id])}>
           Close
         </ContextMenuItem>
         <ContextMenuItem
@@ -125,7 +125,7 @@ const TabBody = ({ workspace, isActive }: { workspace: Workspace; isActive: bool
         ref={ref}
         selected={isActive}
         onSelect={() => useWorkspaceStore.getState().activate(workspace.id)}
-        onClose={() => void closeWorkspace(workspace.id)}
+        onClose={() => void closeWorkspaces([workspace.id])}
         closeLabel={`Close ${workspace.title}`}
         title={`${workspace.title} — ${workspace.cwd}`}
         draggable
