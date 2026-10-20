@@ -70,8 +70,7 @@ const Meta = ({
       {session && (
         <span className="flex items-center gap-1.5">
           <MessageSquare />
-          {plural(session.promptCount, "prompt")} ·{" "}
-          {formatBytes(session.size)}
+          {plural(session.promptCount, "prompt")} · {formatBytes(session.size)}
         </span>
       )}
       {session?.version && <span>v{session.version}</span>}
