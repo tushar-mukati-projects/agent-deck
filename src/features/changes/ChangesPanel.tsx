@@ -4,6 +4,7 @@ import { Eye, EyeOff, GitCompare, RefreshCw } from "lucide-react";
 import { EmptyState, Hint, LoadingState } from "@/components/ui/feedback";
 import { IconButton } from "@/components/ui/icon-button";
 import { Chevron, CollapsibleSection, PanelHeader } from "@/components/ui/panel";
+import { TreeGuides, treeIndent } from "@/features/explorer/TreeGuides";
 import { useAsync, useThrottledCallback } from "@/hooks/useAsync";
 import { useSessionFile } from "@/hooks/useSessionFile";
 import { useToggleSet } from "@/hooks/useToggleSet";
@@ -42,21 +43,9 @@ const STATUS_BADGE: Record<ChangeStatus, Badge> = {
 
 const RELOAD_DELAY_MS = 1200;
 const RELOAD_MAX_WAIT_MS = 8000;
-const INDENT = 12;
 
 const rowClass =
   "relative flex h-[26px] w-full min-w-0 items-center gap-1.5 rounded-md pr-2 text-left text-[12px] hover:bg-hover";
-
-const indent = (depth: number) => ({ paddingLeft: 8 + depth * INDENT });
-
-const Guides = ({ depth }: { depth: number }) =>
-  Array.from({ length: depth }, (_, level) => (
-    <span
-      key={level}
-      className="absolute top-0 bottom-0 w-px bg-border"
-      style={{ left: 14 + level * INDENT }}
-    />
-  ));
 
 const Row = ({
   path,
@@ -77,10 +66,10 @@ const Row = ({
     title={path}
     draggable
     onDragStart={(e) => e.dataTransfer.setData(DECK_PATH_MIME, path)}
-    style={indent(depth)}
+    style={{ paddingLeft: treeIndent(depth) }}
     className={rowClass}
   >
-    <Guides depth={depth} />
+    <TreeGuides depth={depth} />
     <span className="w-3 shrink-0" />
     <FileIcon path={path} />
     <span className="min-w-0 flex-1 truncate text-fg/90">{basename(path)}</span>
@@ -116,10 +105,10 @@ const FolderRow = ({
       onClick={onToggle}
       title={folder.path}
       aria-expanded={open}
-      style={indent(depth)}
+      style={{ paddingLeft: treeIndent(depth) }}
       className={cn(rowClass, "text-fg/85")}
     >
-      <Guides depth={depth} />
+      <TreeGuides depth={depth} />
       <Chevron open={open} className="text-faint" />
       <Icon className={cn("size-3.5 shrink-0", color)} />
       <span className="min-w-0 truncate">{shortenHome(folder.name, home)}</span>

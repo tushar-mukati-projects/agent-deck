@@ -11,6 +11,7 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/menu";
 import { Chevron } from "@/components/ui/panel";
+import { TreeGuides, treeIndent } from "@/features/explorer/TreeGuides";
 import { fileActions } from "@/features/viewer/file-actions";
 import { fileIcon, folderIcon } from "@/lib/file-icons";
 import { DECK_PATH_MIME } from "@/lib/terminal/input";
@@ -24,7 +25,6 @@ import type { DirEntry, Workspace } from "@/types";
 const ROW_HEIGHT = 22;
 const OVERSCAN = 12;
 const SCROLL_STEP = ROW_HEIGHT * 6;
-const INDENT = 12;
 
 interface Row {
   entry: DirEntry;
@@ -240,7 +240,7 @@ export const FileTree = ({ workspace }: { workspace: Workspace }) => {
                 style={{
                   top: index * ROW_HEIGHT,
                   height: ROW_HEIGHT,
-                  paddingLeft: 8 + row.depth * INDENT,
+                  paddingLeft: treeIndent(row.depth),
                 }}
                 className={cn(
                   "absolute inset-x-0 flex cursor-default items-center gap-1.5 pr-2 text-[12.5px]",
@@ -252,14 +252,7 @@ export const FileTree = ({ workspace }: { workspace: Workspace }) => {
                   entry.hidden && "opacity-60",
                 )}
               >
-                {row.depth > 0 &&
-                  Array.from({ length: row.depth }, (_, level) => (
-                    <span
-                      key={level}
-                      className="absolute top-0 bottom-0 w-px bg-border"
-                      style={{ left: 14 + level * INDENT }}
-                    />
-                  ))}
+                <TreeGuides depth={row.depth} />
                 <span className="flex w-3 shrink-0 justify-center">
                   {entry.isDir && (
                     <Chevron
