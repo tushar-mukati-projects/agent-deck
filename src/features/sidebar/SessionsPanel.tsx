@@ -21,6 +21,7 @@ import {
   partitionSessions,
   type SessionGroup,
 } from "@/lib/session-list";
+import { emptyMessage, groupTone } from "@/lib/sessions-panel";
 import { basename, cn, normalizePath, samePath, toggled } from "@/lib/utils";
 import { parseWslPath } from "@/lib/wsl";
 import { agentName } from "@/stores/agents";
@@ -34,12 +35,6 @@ const NAV_KEYS = new Set(["ArrowDown", "ArrowUp", "Home", "End"]);
 const sectionClass =
   "flex h-7 w-full items-center gap-1.5 px-2 text-[11px] font-semibold tracking-wide text-faint";
 const nestedListClass = "mb-1 ml-[13px] flex flex-col gap-px border-l border-border pl-[6px]";
-const TONE_PRIORITY: DotTone[] = ["attention", "busy", "running", "external"];
-
-const groupTone = (sessions: SessionInfo[], tones: Map<string, DotTone>) => {
-  const present = new Set(sessions.map((s) => tones.get(s.id)));
-  return TONE_PRIORITY.find((tone) => present.has(tone)) ?? null;
-};
 
 const FolderHeader = ({
   group,
@@ -120,25 +115,6 @@ const useExpandedGroups = (searching: boolean, groups: SessionGroup[]) => {
   };
 
   return { isExpanded, toggle };
-};
-
-const emptyMessage = (query: string, folderFilter: string | null) => {
-  if (query)
-    return {
-      title: "No matching sessions",
-      description: folderFilter
-        ? "Try a different search, or clear the folder filter."
-        : "Try a different search.",
-    };
-  if (folderFilter)
-    return {
-      title: "No sessions in this folder yet",
-      description: `Start a session in ${basename(folderFilter)} and it will show up here.`,
-    };
-  return {
-    title: "No sessions yet",
-    description: "Start a session with any agent and it will show up here.",
-  };
 };
 
 const RefreshButton = () => {
