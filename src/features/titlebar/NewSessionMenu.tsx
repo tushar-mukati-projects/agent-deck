@@ -18,13 +18,15 @@ import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useActiveWorkspace } from "@/stores/workspace-store";
 
+const RECENT_FOLDER_LIMIT = 7;
+
 const NewSessionItems = () => {
   const folders = useFolders();
   const active = useActiveWorkspace();
   const home = useSessionsStore((s) => s.environment?.home ?? "");
   const defaultAgent = useSettingsStore((s) => s.defaultAgent);
   const agents = useAgents();
-  const recent = folders.filter((f) => !active || !samePath(f.cwd, active.cwd)).slice(0, 7);
+  const recent = folders.filter((f) => !active || !samePath(f.cwd, active.cwd)).slice(0, RECENT_FOLDER_LIMIT);
 
   return (
     <>

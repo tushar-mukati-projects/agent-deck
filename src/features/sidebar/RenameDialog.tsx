@@ -9,6 +9,8 @@ import { agentName } from "@/stores/agents";
 import { useUiStore } from "@/stores/ui-store";
 import type { SessionInfo } from "@/types";
 
+const MAX_TITLE_LENGTH = 200;
+
 const RenameForm = ({
   target,
   inputRef,
@@ -42,7 +44,7 @@ const RenameForm = ({
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         onFocus={(e) => e.currentTarget.select()}
-        maxLength={200}
+        maxLength={MAX_TITLE_LENGTH}
         className="h-9 px-3 text-[13px]"
       />
       <div className="mt-4 flex justify-end gap-2">

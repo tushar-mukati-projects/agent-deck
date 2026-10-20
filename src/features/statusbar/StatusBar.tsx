@@ -16,6 +16,8 @@ import { useActiveWorkspace } from "@/stores/workspace-store";
 import { useAgentShells, useSubagents } from "@/hooks/useAgentShells";
 import type { Workspace } from "@/types";
 
+const SHORT_SESSION_ID_LENGTH = 8;
+
 const Item = ({
   children,
   title,
@@ -99,7 +101,7 @@ export const StatusBar = () => {
                 onClick={() => void copyText(workspace.sessionId, "Session ID copied")}
               >
                 <Hash />
-                <span className="font-mono">{workspace.sessionId.slice(0, 8)}</span>
+                <span className="font-mono">{workspace.sessionId.slice(0, SHORT_SESSION_ID_LENGTH)}</span>
               </Item>
             )}
             <ShellItem workspace={workspace} />

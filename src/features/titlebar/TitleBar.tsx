@@ -28,6 +28,8 @@ import { useSettingsStore } from "@/stores/settings-store";
 import { useUiStore } from "@/stores/ui-store";
 import { activeWorkspaceOf, useWorkspaceStore } from "@/stores/workspace-store";
 
+const MAXIMIZED_SYNC_DELAY_MS = 120;
+
 const WindowControls = () => {
   const [maximized, setMaximized] = useState(false);
 
@@ -37,7 +39,7 @@ const WindowControls = () => {
     sync();
     const unlisten = appWindow.onResized(() => {
       window.clearTimeout(timer);
-      timer = window.setTimeout(sync, 120);
+      timer = window.setTimeout(sync, MAXIMIZED_SYNC_DELAY_MS);
     });
     return () => {
       window.clearTimeout(timer);

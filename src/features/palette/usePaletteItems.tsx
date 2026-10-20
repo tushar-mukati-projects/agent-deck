@@ -85,6 +85,15 @@ const FILE_CACHE_MS = 5 * 60_000;
 const UNWATCHED_FILE_CACHE_MS = 20_000;
 const CHAT_SEARCH_DELAY_MS = 250;
 const CHAT_HIT_LIMIT = 150;
+const FILES_MODE_LIMIT = 80;
+const MIXED_FILE_LIMIT = 15;
+const COMMAND_MODE_LIMIT = 100;
+const TAB_LIMIT = 8;
+const SESSION_MATCH_LIMIT = 30;
+const RECENT_SESSION_LIMIT = 12;
+const COMMAND_MATCH_LIMIT = 8;
+const SUGGESTED_COMMAND_LIMIT = 6;
+const RECENCY_MS_PER_POINT = 1e13;
 const fileCache = new Map<string, { at: number; files: string[] }>();
 const filesChangedAt = new Map<string, number>();
 
@@ -315,7 +324,7 @@ export const usePaletteItems = (mode: PaletteMode, liveQuery: string) => {
     () => files?.map((rel) => ({ rel, key: pathKey(rel) })) ?? null,
     [files],
   );
-  const fileLimit = mode === "files" ? 80 : 15;
+  const fileLimit = mode === "files" ? FILES_MODE_LIMIT : MIXED_FILE_LIMIT;
   const narrowing = useRef<FileNarrowing | null>(null);
   const fileMatches = useMemo(() => {
     if (!wantFiles || !prepared) return [];
@@ -395,7 +404,7 @@ export const usePaletteItems = (mode: PaletteMode, liveQuery: string) => {
           ]
         : [];
 
-    if (commandMode) return sortTop(commandItems(), 100);
+    if (commandMode) return sortTop(commandItems(), COMMAND_MODE_LIMIT);
     if (mode === "files") return [...pathItems, ...fileItems()];
     if (mode === "chats") return chatItems();
 
@@ -423,9 +432,14 @@ export const usePaletteItems = (mode: PaletteMode, liveQuery: string) => {
         query,
         `${s.title ?? ""} ${basename(s.cwd)} ${s.gitBranch ?? ""} ${s.lastPrompt ?? ""}`,
       );
-      return score === null ? [] : [{ session: s, score: score + s.modifiedMs / 1e13 }];
+      return score === null
+        ? []
+        : [{ session: s, score: score + s.modifiedMs / RECENCY_MS_PER_POINT }];
     });
-    const sessionItems = sortTop(scoredSessions, query ? 30 : 12).map(
+    const sessionItems = sortTop(
+      scoredSessions,
+      query ? SESSION_MATCH_LIMIT : RECENT_SESSION_LIMIT,
+    ).map(
       ({ session: s, score }): PaletteItem => ({
         id: `session:${s.id}`,
         group: "Sessions",
@@ -439,10 +453,10 @@ export const usePaletteItems = (mode: PaletteMode, liveQuery: string) => {
 
     return [
       ...pathItems,
-      ...sortTop(tabItems, 8),
+      ...sortTop(tabItems, TAB_LIMIT),
       ...sessionItems,
       ...(query ? fileItems() : []),
-      ...sortTop(commandItems(), query ? 8 : 6),
+      ...sortTop(commandItems(), query ? COMMAND_MATCH_LIMIT : SUGGESTED_COMMAND_LIMIT),
     ];
   }, [
     commandMode,
