@@ -8,6 +8,9 @@ import { basename } from "@/lib/utils";
 import { parseWslPath } from "@/lib/wsl";
 import type { SessionGroup } from "@/lib/session-list";
 
+export const SECTION_TEXT = "text-[11px] font-semibold tracking-wide text-faint uppercase";
+export const STICKY_SECTION = "sticky top-0 z-10 bg-panel";
+
 type FolderHeaderProps = {
   group: SessionGroup;
   path: string;
@@ -17,22 +20,19 @@ type FolderHeaderProps = {
 export const FolderHeader = ({ group, path, tone }: FolderHeaderProps) => {
   const name = basename(group.cwd);
   return (
-    <div
-      title={group.cwd}
-      className="group sticky top-0 z-10 flex h-7 items-center gap-1.5 bg-panel pr-1 pl-2"
-    >
-      <span className="max-w-[60%] min-w-0 shrink-0 truncate text-[11px] font-semibold tracking-wide text-faint uppercase">
-        {name}
+    <div className={`group flex h-7 items-center gap-1.5 pr-1 pl-2 ${STICKY_SECTION}`}>
+      <span title={group.cwd} className="flex min-w-0 flex-1 items-center gap-1.5">
+        <span className={`max-w-[60%] shrink-0 truncate ${SECTION_TEXT}`}>{name}</span>
+        {parseWslPath(group.cwd) && <Tag tone="badge">WSL</Tag>}
+        <span className="min-w-0 truncate text-[10.5px] text-faint">{path}</span>
       </span>
-      {parseWslPath(group.cwd) && <Tag tone="badge">WSL</Tag>}
-      <span className="min-w-0 flex-1 truncate text-[10.5px] text-faint/70">{path}</span>
       {tone && <StatusDot tone={tone} />}
-      <span className="ml-auto pr-1 text-[10.5px] text-faint tabular-nums group-focus-within:hidden group-hover:hidden">
+      <span className="pr-1 text-[10.5px] text-faint tabular-nums group-focus-within:invisible group-hover:invisible">
         {group.sessions.length}
       </span>
       <IconButton
         label={`New session in ${name}`}
-        className="ml-auto hidden group-focus-within:inline-flex group-hover:inline-flex"
+        className="absolute right-1 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100"
         onClick={() => startNewSession(group.cwd)}
       >
         <Plus />

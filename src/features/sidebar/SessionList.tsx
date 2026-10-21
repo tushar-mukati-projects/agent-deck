@@ -6,7 +6,7 @@ import { startNewSession } from "@/actions/sessions";
 import { Button } from "@/components/ui/button";
 import { Chevron } from "@/components/ui/chevron";
 import { EmptyState, LoadingState } from "@/components/ui/feedback";
-import { FolderHeader } from "@/features/sidebar/FolderHeader";
+import { FolderHeader, SECTION_TEXT, STICKY_SECTION } from "@/features/sidebar/FolderHeader";
 import { SessionItem } from "@/features/sidebar/SessionItem";
 import { useExpandedGroups } from "@/features/sidebar/useExpandedGroups";
 import { useSessionTones } from "@/features/sidebar/useSessionTones";
@@ -17,7 +17,7 @@ import {
   partitionSessions,
   splitSingleFolders,
 } from "@/lib/session-list";
-import { basename, cn, shortenHome } from "@/lib/utils";
+import { cn, shortenHome } from "@/lib/utils";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { activeWorkspaceOf, useWorkspaceStore } from "@/stores/workspace-store";
@@ -26,9 +26,7 @@ import type { SessionInfo } from "@/types";
 const RENDER_STEP_ROWS = 150;
 const FOLDER_PREVIEW_ROWS = 5;
 const NAV_KEYS = new Set(["ArrowDown", "ArrowUp", "Home", "End"]);
-const sectionClass =
-  "flex h-7 w-full items-center gap-1.5 px-2 text-[11px] font-semibold tracking-wide text-faint uppercase";
-const stickyClass = "sticky top-0 z-10 bg-panel";
+const sectionClass = `flex h-7 w-full items-center gap-1.5 px-2 ${SECTION_TEXT}`;
 const listClass = "flex flex-col gap-px";
 
 type SessionListProps = {
@@ -124,14 +122,20 @@ export const SessionList = memo(
         isOpen={openIds.has(session.id)}
       />
     );
-    const renderWithFolder = (session: SessionInfo) => renderItem(session, basename(session.cwd));
+    const renderWithFolder = (session: SessionInfo) =>
+      renderItem(session, shortenHome(session.cwd, home));
 
     const renderGroups = () => [
       ...sections.folders.map((group) => {
-        const expanded = expansion.isExpanded(group.cwd);
+        const activeIndex = group.sessions.findIndex((s) => s.id === activeSessionId);
+        const forced = activeIndex >= FOLDER_PREVIEW_ROWS;
+        const expanded = forced || expansion.isExpanded(group.cwd);
         const hidden = expanded ? [] : group.sessions.slice(FOLDER_PREVIEW_ROWS);
+        const visible = group.sessions.slice(0, group.sessions.length - hidden.length);
+        const shown = take(visible);
         const extra = group.sessions.length - FOLDER_PREVIEW_ROWS;
-        const shown = take(group.sessions.slice(0, group.sessions.length - hidden.length));
+        const toggleable =
+          extra > 0 && !deferredQuery && !forced && shown.length === visible.length;
         return (
           <section key={group.cwd} className="mb-2">
             <FolderHeader
@@ -140,10 +144,11 @@ export const SessionList = memo(
               tone={groupTone(hidden, tones)}
             />
             <div className={listClass}>{shown.map((session) => renderItem(session))}</div>
-            {extra > 0 && !deferredQuery && (
+            {toggleable && (
               <button
                 type="button"
                 data-session-row
+                aria-expanded={expanded}
                 onClick={() => expansion.toggle(group.cwd)}
                 className="h-6 w-full rounded-md px-2.5 text-left text-[11px] text-faint hover:bg-hover hover:text-fg"
               >
@@ -155,7 +160,7 @@ export const SessionList = memo(
       }),
       sections.singles.length > 0 && (
         <section key="other-folders" className="mb-2">
-          <div className={cn(sectionClass, stickyClass)}>
+          <div className={cn(sectionClass, STICKY_SECTION)}>
             Other folders
             <span className="ml-auto pr-1 font-normal tabular-nums">{sections.singles.length}</span>
           </div>
@@ -176,7 +181,7 @@ export const SessionList = memo(
         <>
           {pinnedShown.length > 0 && (
             <section className="mb-2">
-              <div className={cn(sectionClass, stickyClass)}>
+              <div className={cn(sectionClass, STICKY_SECTION)}>
                 <Pin className="size-3 fill-current" /> Pinned
                 <span className="ml-auto pr-1 font-normal tabular-nums">{pinned.length}</span>
               </div>

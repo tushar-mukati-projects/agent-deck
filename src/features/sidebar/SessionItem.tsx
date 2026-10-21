@@ -60,6 +60,8 @@ interface SessionItemProps {
 }
 
 const LIVE_TONES = new Set<DotTone>(["running", "busy", "attention", "external"]);
+const ROW_HEIGHT_PX = 28;
+const FOLDER_ROW_HEIGHT_PX = 42;
 
 const SessionMenu = ({ session, isOpen, live, pinned, archived }: SessionMenuProps) => {
   const { togglePinned, toggleArchived } = useSettingsStore.getState();
@@ -143,7 +145,7 @@ export const SessionItem = memo(({ session, folder, tone, isActive, isOpen }: Se
         <button
           type="button"
           data-session-row
-          title={title}
+          title={folder ? `${title}\n${session.cwd}` : title}
           onClick={() => openSessionByClick(session)}
           onDoubleClick={() => void resumeSession(session)}
           onKeyDown={(e) => {
@@ -151,7 +153,10 @@ export const SessionItem = memo(({ session, folder, tone, isActive, isOpen }: Se
             e.preventDefault();
             void resumeSession(session);
           }}
-          style={{ contentVisibility: "auto", containIntrinsicSize: "auto 28px" }}
+          style={{
+            contentVisibility: "auto",
+            containIntrinsicSize: `auto ${folder ? FOLDER_ROW_HEIGHT_PX : ROW_HEIGHT_PX}px`,
+          }}
           className={cn(
             "group relative flex min-h-7 w-full shrink-0 items-center gap-2 rounded-md py-1 pr-2 pl-2.5 text-left",
             isActive ? "bg-active" : "hover:bg-hover",
