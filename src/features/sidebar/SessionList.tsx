@@ -12,13 +12,12 @@ import { useExpandedGroups } from "@/features/sidebar/useExpandedGroups";
 import { useSessionTones } from "@/features/sidebar/useSessionTones";
 import {
   emptyMessage,
-  folderHints,
   groupByFolder,
   groupTone,
   partitionSessions,
   splitSingleFolders,
 } from "@/lib/session-list";
-import { basename, cn } from "@/lib/utils";
+import { basename, cn, shortenHome } from "@/lib/utils";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { activeWorkspaceOf, useWorkspaceStore } from "@/stores/workspace-store";
@@ -59,6 +58,7 @@ export const SessionList = memo(
       useShallow((s) => s.workspaces.map((w) => w.sessionId)),
     );
     const tones = useSessionTones();
+    const home = useSessionsStore((s) => s.environment?.home ?? "");
     const [renderLimit, setRenderLimit] = useState(RENDER_STEP_ROWS);
 
     useEffect(() => setRenderLimit(RENDER_STEP_ROWS), [deferredQuery, folderFilter, agentFilter]);
@@ -88,7 +88,6 @@ export const SessionList = memo(
     const groups = useMemo(() => (grouped ? groupByFolder(rest) : []), [grouped, rest]);
     const sections = useMemo(() => splitSingleFolders(groups), [groups]);
     const expansion = useExpandedGroups(!!deferredQuery, groups);
-    const hints = useMemo(() => folderHints(groups), [groups]);
     const openIds = useMemo(() => new Set(openSessionIds), [openSessionIds]);
 
     const moveFocus = (event: React.KeyboardEvent) => {
@@ -137,7 +136,7 @@ export const SessionList = memo(
           <section key={group.cwd} className="mb-2">
             <FolderHeader
               group={group}
-              hint={hints.get(group.cwd) ?? null}
+              path={shortenHome(group.cwd, home)}
               tone={groupTone(hidden, tones)}
             />
             <div className={listClass}>{shown.map((session) => renderItem(session))}</div>

@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import {
   effectiveAgent,
   emptyMessage,
-  folderHints,
   groupByFolder,
   groupTone,
   partitionSessions,
@@ -75,18 +74,6 @@ describe("groupByFolder", () => {
     ]);
   });
 
-  it("hints the parent folder only for folders that share a name", () => {
-    const groups = groupByFolder([
-      session("a", "C:\\dev\\api"),
-      session("b", "C:\\old\\API"),
-      session("c", "C:\\dev\\web"),
-    ]);
-    expect([...folderHints(groups)]).toEqual([
-      ["C:\\dev\\api", "dev"],
-      ["C:\\old\\API", "old"],
-    ]);
-  });
-
   it("gathers one-session folders when another folder has several", () => {
     const { folders, singles } = splitSingleFolders(
       groupByFolder([
@@ -106,14 +93,6 @@ describe("groupByFolder", () => {
     );
     expect(folders.map((g) => g.cwd)).toEqual(["C:\\x", "C:\\y"]);
     expect(singles).toEqual([]);
-  });
-
-  it("shows the whole parent path when parent names collide too", () => {
-    const groups = groupByFolder([session("a", "C:\\a\\work\\app"), session("b", "D:\\work\\app")]);
-    expect([...folderHints(groups)]).toEqual([
-      ["C:\\a\\work\\app", "C:\\a\\work"],
-      ["D:\\work\\app", "D:\\work"],
-    ]);
   });
 });
 
