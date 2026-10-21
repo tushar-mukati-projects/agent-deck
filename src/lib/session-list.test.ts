@@ -7,6 +7,7 @@ import {
   groupByFolder,
   groupTone,
   partitionSessions,
+  splitSingleFolders,
   type SessionFilter,
 } from "@/lib/session-list";
 import { sessionInfo } from "@/lib/session-fixture";
@@ -84,6 +85,27 @@ describe("groupByFolder", () => {
       ["C:\\dev\\api", "dev"],
       ["C:\\old\\API", "old"],
     ]);
+  });
+
+  it("gathers one-session folders when another folder has several", () => {
+    const { folders, singles } = splitSingleFolders(
+      groupByFolder([
+        session("a", "C:\\repo"),
+        session("b", "C:\\x"),
+        session("c", "C:\\repo"),
+        session("d", "C:\\y"),
+      ]),
+    );
+    expect(folders.map((g) => g.cwd)).toEqual(["C:\\repo"]);
+    expect(singles.map((s) => s.id)).toEqual(["b", "d"]);
+  });
+
+  it("keeps every folder as its own section when none has several sessions", () => {
+    const { folders, singles } = splitSingleFolders(
+      groupByFolder([session("b", "C:\\x"), session("d", "C:\\y")]),
+    );
+    expect(folders.map((g) => g.cwd)).toEqual(["C:\\x", "C:\\y"]);
+    expect(singles).toEqual([]);
   });
 
   it("shows the whole parent path when parent names collide too", () => {

@@ -36,6 +36,7 @@ import { CLAUDE } from "@/lib/agents/registry";
 import { sessionTitle } from "@/lib/sessions";
 import { copyText, revealInExplorer } from "@/lib/tauri/system";
 import { cn } from "@/lib/utils";
+import { parseWslPath } from "@/lib/wsl";
 import { agentName, findAgent } from "@/stores/agents";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useUiStore } from "@/stores/ui-store";
@@ -52,7 +53,7 @@ type SessionMenuProps = {
 
 interface SessionItemProps {
   session: SessionInfo;
-  number: number;
+  folder?: string;
   tone: DotTone | null;
   isActive: boolean;
   isOpen: boolean;
@@ -131,7 +132,7 @@ const SessionMenu = ({ session, isOpen, live, pinned, archived }: SessionMenuPro
   );
 };
 
-export const SessionItem = memo(({ session, number, tone, isActive, isOpen }: SessionItemProps) => {
+export const SessionItem = memo(({ session, folder, tone, isActive, isOpen }: SessionItemProps) => {
   const pinned = useSettingsStore((s) => s.pinnedSessions.includes(session.id));
   const archived = useSettingsStore((s) => s.archivedSessions.includes(session.id));
   const title = sessionTitle(session);
@@ -142,6 +143,7 @@ export const SessionItem = memo(({ session, number, tone, isActive, isOpen }: Se
         <button
           type="button"
           data-session-row
+          title={title}
           onClick={() => openSessionByClick(session)}
           onDoubleClick={() => void resumeSession(session)}
           onKeyDown={(e) => {
@@ -151,45 +153,41 @@ export const SessionItem = memo(({ session, number, tone, isActive, isOpen }: Se
           }}
           style={{ contentVisibility: "auto", containIntrinsicSize: "auto 28px" }}
           className={cn(
-            "group relative flex min-h-7 w-full shrink-0 items-start gap-2 rounded-md py-[5px] pr-2 pl-1.5 text-left",
-            "after:absolute after:inset-x-2 after:bottom-0 after:h-px after:bg-fg/[0.07] last:after:hidden",
-            isActive ? "bg-active after:hidden" : "hover:bg-hover hover:after:opacity-0",
+            "group relative flex min-h-7 w-full shrink-0 items-center gap-2 rounded-md py-1 pr-2 pl-2.5 text-left",
+            isActive ? "bg-active" : "hover:bg-hover",
             archived && "opacity-60",
           )}
         >
           {isActive && (
-            <span className="absolute inset-y-1.5 -left-[7px] w-[2px] rounded-full bg-accent" />
+            <span className="absolute inset-y-1.5 left-1 w-[2px] rounded-full bg-accent" />
           )}
-          <span className="min-w-[2ch] shrink-0 text-right text-[10.5px] leading-[18px] text-faint tabular-nums">
-            {number}
-          </span>
-          <span
-            className={cn(
-              "min-w-0 flex-1 text-[12px] leading-[18px] wrap-anywhere",
-              !session.title && "italic",
-              isActive
-                ? "font-medium text-fg"
-                : isOpen
-                  ? "text-fg"
-                  : "text-fg/75 group-hover:text-fg",
-            )}
-          >
-            {title}
-          </span>
-          {session.agent !== CLAUDE && (
-            <Tag tone="info" className="mt-0.5">
-              {agentName(session.agent)}
-            </Tag>
-          )}
-          {tone && (
-            <span className="flex h-[18px] shrink-0 items-center">
-              <StatusDot tone={tone} />
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span
+              className={cn(
+                "truncate text-[12px] leading-[18px]",
+                !session.title && "italic",
+                isActive
+                  ? "font-medium text-fg"
+                  : isOpen
+                    ? "text-fg"
+                    : "text-fg/75 group-hover:text-fg",
+              )}
+            >
+              {title}
             </span>
-          )}
+            {folder && (
+              <span className="flex min-w-0 items-center gap-1 text-[10.5px] leading-4 text-faint">
+                <span className="truncate">{folder}</span>
+                {parseWslPath(session.cwd) && <Tag tone="badge">WSL</Tag>}
+              </span>
+            )}
+          </span>
+          {session.agent !== CLAUDE && <Tag tone="info">{agentName(session.agent)}</Tag>}
+          {tone && <StatusDot tone={tone} />}
           <TimeAgo
             ms={session.modifiedMs}
             compact
-            className="shrink-0 text-[10.5px] leading-[18px] text-faint tabular-nums"
+            className="shrink-0 text-[10.5px] text-faint tabular-nums"
           />
         </button>
       </ContextMenuTrigger>

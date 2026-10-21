@@ -16,18 +16,21 @@ import {
   groupByFolder,
   groupTone,
   partitionSessions,
+  splitSingleFolders,
 } from "@/lib/session-list";
-import { cn } from "@/lib/utils";
+import { basename, cn } from "@/lib/utils";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { activeWorkspaceOf, useWorkspaceStore } from "@/stores/workspace-store";
 import type { SessionInfo } from "@/types";
 
 const RENDER_STEP_ROWS = 150;
+const FOLDER_PREVIEW_ROWS = 5;
 const NAV_KEYS = new Set(["ArrowDown", "ArrowUp", "Home", "End"]);
 const sectionClass =
-  "flex h-7 w-full items-center gap-1.5 px-2 text-[11px] font-semibold tracking-wide text-faint";
-const nestedListClass = "mb-1 ml-[13px] flex flex-col gap-px border-l border-border pl-[6px]";
+  "flex h-7 w-full items-center gap-1.5 px-2 text-[11px] font-semibold tracking-wide text-faint uppercase";
+const stickyClass = "sticky top-0 z-10 bg-panel";
+const listClass = "flex flex-col gap-px";
 
 type SessionListProps = {
   query: string;
@@ -83,12 +86,9 @@ export const SessionList = memo(
 
     const grouped = !folderFilter || includeSubfolders;
     const groups = useMemo(() => (grouped ? groupByFolder(rest) : []), [grouped, rest]);
+    const sections = useMemo(() => splitSingleFolders(groups), [groups]);
     const expansion = useExpandedGroups(!!deferredQuery, groups);
     const hints = useMemo(() => folderHints(groups), [groups]);
-    const groupTones = useMemo(
-      () => new Map(groups.map((group) => [group.cwd, groupTone(group.sessions, tones)])),
-      [groups, tones],
-    );
     const openIds = useMemo(() => new Set(openSessionIds), [openSessionIds]);
 
     const moveFocus = (event: React.KeyboardEvent) => {
@@ -115,52 +115,73 @@ export const SessionList = memo(
       budget -= list.length;
       return shown;
     };
-    const renderItem = (session: SessionInfo, index: number) => (
+    const renderItem = (session: SessionInfo, folder?: string) => (
       <SessionItem
         key={session.id}
         session={session}
-        number={index + 1}
+        folder={folder}
         tone={tones.get(session.id) ?? null}
         isActive={session.id === activeSessionId}
         isOpen={openIds.has(session.id)}
       />
     );
+    const renderWithFolder = (session: SessionInfo) => renderItem(session, basename(session.cwd));
 
-    const renderGroups = () =>
-      groups.map((group) => {
-        const collapsed = !expansion.isExpanded(group.cwd);
-        const shown = collapsed ? [] : take(group.sessions);
+    const renderGroups = () => [
+      ...sections.folders.map((group) => {
+        const expanded = expansion.isExpanded(group.cwd);
+        const hidden = expanded ? [] : group.sessions.slice(FOLDER_PREVIEW_ROWS);
+        const extra = group.sessions.length - FOLDER_PREVIEW_ROWS;
+        const shown = take(group.sessions.slice(0, group.sessions.length - hidden.length));
         return (
-          <section key={group.cwd} className="mb-1">
+          <section key={group.cwd} className="mb-2">
             <FolderHeader
               group={group}
-              collapsed={collapsed}
               hint={hints.get(group.cwd) ?? null}
-              tone={groupTones.get(group.cwd) ?? null}
-              onToggle={() => expansion.toggle(group.cwd)}
+              tone={groupTone(hidden, tones)}
             />
-            {shown.length > 0 && <div className={nestedListClass}>{shown.map(renderItem)}</div>}
+            <div className={listClass}>{shown.map((session) => renderItem(session))}</div>
+            {extra > 0 && !deferredQuery && (
+              <button
+                type="button"
+                data-session-row
+                onClick={() => expansion.toggle(group.cwd)}
+                className="h-6 w-full rounded-md px-2.5 text-left text-[11px] text-faint hover:bg-hover hover:text-fg"
+              >
+                {expanded ? "Show less" : `Show ${extra} more`}
+              </button>
+            )}
           </section>
         );
-      });
+      }),
+      sections.singles.length > 0 && (
+        <section key="other-folders" className="mb-2">
+          <div className={cn(sectionClass, stickyClass)}>
+            Other folders
+            <span className="ml-auto pr-1 font-normal tabular-nums">{sections.singles.length}</span>
+          </div>
+          <div className={listClass}>{take(sections.singles).map(renderWithFolder)}</div>
+        </section>
+      ),
+    ];
 
     const renderList = () => {
       const pinnedShown = take(pinned);
       const body = grouped ? (
         renderGroups()
       ) : (
-        <div className="flex flex-col gap-px">{take(rest).map(renderItem)}</div>
+        <div className={listClass}>{take(rest).map((session) => renderItem(session))}</div>
       );
       const archivedShown = showArchived ? take(archived) : [];
       return (
         <>
           {pinnedShown.length > 0 && (
-            <section className="mb-1">
-              <div className={sectionClass}>
+            <section className="mb-2">
+              <div className={cn(sectionClass, stickyClass)}>
                 <Pin className="size-3 fill-current" /> Pinned
                 <span className="ml-auto pr-1 font-normal tabular-nums">{pinned.length}</span>
               </div>
-              <div className={nestedListClass}>{pinnedShown.map(renderItem)}</div>
+              <div className={listClass}>{pinnedShown.map(renderWithFolder)}</div>
             </section>
           )}
           {body}
@@ -178,7 +199,7 @@ export const SessionList = memo(
                 <span className="ml-auto pr-1 font-normal tabular-nums">{archived.length}</span>
               </button>
               {archivedShown.length > 0 && (
-                <div className="flex flex-col gap-px">{archivedShown.map(renderItem)}</div>
+                <div className={listClass}>{archivedShown.map(renderWithFolder)}</div>
               )}
             </section>
           )}

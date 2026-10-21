@@ -61,6 +61,13 @@ export const groupByFolder = (sessions: SessionInfo[]) => {
   return [...groups.values()];
 };
 
+export const splitSingleFolders = (groups: SessionGroup[]) => {
+  const folders = groups.filter((group) => group.sessions.length > 1);
+  if (folders.length === 0) return { folders: groups, singles: [] };
+  const singles = groups.filter((group) => group.sessions.length === 1);
+  return { folders, singles: singles.flatMap((group) => group.sessions) };
+};
+
 const countBy = (values: string[]) => {
   const counts = new Map<string, number>();
   for (const value of values) counts.set(value, (counts.get(value) ?? 0) + 1);
