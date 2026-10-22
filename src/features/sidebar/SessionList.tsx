@@ -112,18 +112,19 @@ export const SessionList = memo(
       budget -= list.length;
       return shown;
     };
-    const renderItem = (session: SessionInfo, folder?: string) => (
+    const renderItem = (session: SessionInfo, index: number, folder?: string) => (
       <SessionItem
         key={session.id}
         session={session}
+        number={index + 1}
         folder={folder}
         tone={tones.get(session.id) ?? null}
         isActive={session.id === activeSessionId}
         isOpen={openIds.has(session.id)}
       />
     );
-    const renderWithFolder = (session: SessionInfo) =>
-      renderItem(session, shortenHome(session.cwd, home));
+    const renderWithFolder = (session: SessionInfo, index: number) =>
+      renderItem(session, index, shortenHome(session.cwd, home));
 
     const renderGroups = () => [
       ...sections.folders.map((group) => {
@@ -143,7 +144,9 @@ export const SessionList = memo(
               path={shortenHome(group.cwd, home)}
               tone={groupTone(hidden, tones)}
             />
-            <div className={listClass}>{shown.map((session) => renderItem(session))}</div>
+            <div className={listClass}>
+              {shown.map((session, index) => renderItem(session, index))}
+            </div>
             {toggleable && (
               <button
                 type="button"
@@ -174,7 +177,9 @@ export const SessionList = memo(
       const body = grouped ? (
         renderGroups()
       ) : (
-        <div className={listClass}>{take(rest).map((session) => renderItem(session))}</div>
+        <div className={listClass}>
+          {take(rest).map((session, index) => renderItem(session, index))}
+        </div>
       );
       const archivedShown = showArchived ? take(archived) : [];
       return (

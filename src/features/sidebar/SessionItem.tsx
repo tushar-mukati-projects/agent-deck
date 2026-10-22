@@ -53,6 +53,7 @@ type SessionMenuProps = {
 
 interface SessionItemProps {
   session: SessionInfo;
+  number: number;
   folder?: string;
   tone: DotTone | null;
   isActive: boolean;
@@ -134,7 +135,8 @@ const SessionMenu = ({ session, isOpen, live, pinned, archived }: SessionMenuPro
   );
 };
 
-export const SessionItem = memo(({ session, folder, tone, isActive, isOpen }: SessionItemProps) => {
+export const SessionItem = memo((props: SessionItemProps) => {
+  const { session, number, folder, tone, isActive, isOpen } = props;
   const pinned = useSettingsStore((s) => s.pinnedSessions.includes(session.id));
   const archived = useSettingsStore((s) => s.archivedSessions.includes(session.id));
   const title = sessionTitle(session);
@@ -166,6 +168,9 @@ export const SessionItem = memo(({ session, folder, tone, isActive, isOpen }: Se
           {isActive && (
             <span className="absolute inset-y-1.5 left-1 w-[2px] rounded-full bg-accent" />
           )}
+          <span className="min-w-[2ch] shrink-0 self-start text-right text-[10.5px] leading-[18px] text-faint tabular-nums">
+            {number}
+          </span>
           <span className="flex min-w-0 flex-1 flex-col">
             <span
               className={cn(
